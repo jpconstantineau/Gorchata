@@ -211,4 +211,3 @@ func TestContextWithCurrentModelTable(t *testing.T) {
 		}
 	})
 }
-

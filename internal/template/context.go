@@ -92,5 +92,3 @@ func WithCurrentModelTable(tableName string) ContextOption {
 		c.CurrentModelTable = tableName
 	}
 }
-
-
