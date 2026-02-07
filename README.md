@@ -36,11 +36,41 @@ The binary will be created in `bin/gorchata.exe` (Windows) or `bin/gorchata` (Un
 
 ## Quick Start
 
-### 1. Initialize a New Project (Coming Soon)
+### 1. Initialize a New Project
 
 ```bash
 gorchata init my_project
 cd my_project
+```
+
+This creates a new Gorchata project with the following structure:
+```
+my_project/
+├── gorchata_project.yml    # Project configuration
+├── profiles.yml            # Connection profiles
+├── models/                 # SQL transformation models
+│   ├── stg_users.sql      # Sample staging model
+│   ├── stg_orders.sql     # Sample staging model
+│   └── fct_order_summary.sql  # Sample fact table
+├── seeds/                  # CSV data files (for future use)
+├── tests/                  # Data quality tests (for future use)
+└── macros/                 # Reusable SQL macros (for future use)
+```
+
+**Init Command Options:**
+
+```bash
+# Initialize with sample models (default)
+gorchata init my_project
+
+# Initialize empty project without sample models
+gorchata init my_project --empty
+
+# Force initialization even if directory exists
+gorchata init my_project --force
+
+# Show help
+gorchata init --help
 ```
 
 ### 2. Configure Your Project
@@ -182,6 +212,26 @@ gorchata docs
 ```
 
 ## Commands
+
+### `init`
+Initialize a new Gorchata project with configuration files and optional sample models.
+
+```bash
+gorchata init my_project           # Create project with sample models
+gorchata init my_project --empty   # Create empty project
+gorchata init my_project --force   # Force init even if directory exists
+gorchata init --help               # Show init help
+```
+
+Creates:
+- `gorchata_project.yml` - Project configuration
+- `profiles.yml` - Connection profiles with SQLite defaults
+- `models/` - Directory for SQL models (with samples unless --empty)
+- `seeds/`, `tests/`, `macros/` - Empty directories for future use
+
+**Flags:**
+- `--empty` - Skip creating sample models
+- `--force` - Overwrite existing files if project directory exists
 
 ### `run`
 Execute all models in dependency order.
@@ -450,7 +500,7 @@ gorchata run
 
 **Error: "gorchata_project.yml not found"**
 - Ensure you're running Gorchata from a project root directory
-- Initialize a new project with `gorchata init` (coming soon)
+- Initialize a new project with `gorchata init`
 
 ## Roadmap
 
