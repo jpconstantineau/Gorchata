@@ -1,4 +1,4 @@
-module github.com/pierre/gorchata
+module github.com/jpconstantineau/gorchata
 
 go 1.25.5
 

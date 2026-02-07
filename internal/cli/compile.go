@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pierre/gorchata/internal/config"
-	"github.com/pierre/gorchata/internal/domain/dag"
-	"github.com/pierre/gorchata/internal/template"
+	"github.com/jpconstantineau/gorchata/internal/config"
+	"github.com/jpconstantineau/gorchata/internal/domain/dag"
+	"github.com/jpconstantineau/gorchata/internal/template"
 )
 
 // CompileCommand compiles SQL templates without executing them

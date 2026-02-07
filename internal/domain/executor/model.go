@@ -3,7 +3,7 @@ package executor
 import (
 	"fmt"
 
-	"github.com/pierre/gorchata/internal/domain/materialization"
+	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
 )
 
 // Model represents a single data transformation (SQL model)

@@ -3,7 +3,7 @@ package executor
 import (
 	"testing"
 
-	"github.com/pierre/gorchata/internal/domain/materialization"
+	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
 )
 
 func TestNewModel(t *testing.T) {

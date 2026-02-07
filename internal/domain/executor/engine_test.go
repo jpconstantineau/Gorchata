@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pierre/gorchata/internal/domain/materialization"
-	"github.com/pierre/gorchata/internal/platform"
-	"github.com/pierre/gorchata/internal/template"
+	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
+	"github.com/jpconstantineau/gorchata/internal/platform"
+	"github.com/jpconstantineau/gorchata/internal/template"
 )
 
 // mockAdapter is a mock DatabaseAdapter for testing
