@@ -13,10 +13,11 @@ func BuildFuncMap(ctx *Context, tracker DependencyTracker) template.FuncMap {
 	}
 
 	return template.FuncMap{
-		"ref":     makeRefFunc(ctx, tracker),
-		"var":     makeVarFunc(ctx),
-		"config":  makeConfigFunc(ctx),
-		"source":  makeSourceFunc(ctx),
-		"env_var": makeEnvVarFunc(),
+		"ref":            makeRefFunc(ctx, tracker),
+		"var":            makeVarFunc(ctx),
+		"config":         makeConfigFunc(ctx),
+		"source":         makeSourceFunc(ctx),
+		"env_var":        makeEnvVarFunc(),
+		"is_incremental": makeIsIncrementalFunc(ctx),
 	}
 }
