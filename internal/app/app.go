@@ -1,12 +1,12 @@
 package app
 
 import (
-	"fmt"
+	"github.com/pierre/gorchata/internal/cli"
 )
 
 // App represents the Gorchata application
 type App struct {
-	// Basic fields - will be expanded in later phases
+	// Future: Add configuration, logger, or other app-level dependencies here
 }
 
 // New creates and initializes a new App instance
@@ -16,11 +16,9 @@ func New() (*App, error) {
 }
 
 // Run executes the application with the provided arguments
+// This is the application wiring layer that delegates to the CLI router
 func (a *App) Run(args []string) error {
-	// Basic implementation - just print a message for now
-	// Will be expanded in later phases to handle commands
-	fmt.Println("Gorchata - SQL-first data transformation tool")
-	fmt.Println("Version 0.1.0 - Project initialized")
-
-	return nil
+	// Delegate to CLI router
+	// Future: Could inject app-level dependencies (config, logger, etc.) into CLI here
+	return cli.Run(args)
 }
