@@ -3,6 +3,7 @@ package template
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -459,6 +460,224 @@ func TestIsIncrementalInTemplate(t *testing.T) {
 		expected := "FULL"
 		if result != expected {
 			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+}
+
+func TestThisFunc(t *testing.T) {
+	t.Run("returns current model table name without schema", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.CurrentModelTable = "my_table"
+		ctx.Schema = ""
+
+		thisFunc := makeThisFunc(ctx)
+		result, err := thisFunc()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		expected := "my_table"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("returns schema-qualified table name when schema is set", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.CurrentModelTable = "my_table"
+		ctx.Schema = "public"
+
+		thisFunc := makeThisFunc(ctx)
+		result, err := thisFunc()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		expected := "public.my_table"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("returns error when CurrentModelTable is empty", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.CurrentModelTable = ""
+		ctx.Schema = "public"
+
+		thisFunc := makeThisFunc(ctx)
+		_, err := thisFunc()
+		if err == nil {
+			t.Error("expected error when CurrentModelTable is empty")
+		}
+
+		expectedMsg := "this() called but CurrentModelTable not set in context"
+		if err.Error() != expectedMsg {
+			t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
+		}
+	})
+}
+
+func TestThisInTemplate(t *testing.T) {
+	t.Run("renders current model table name", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `SELECT * FROM {{ this }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.CurrentModelTable = "my_model"
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := "SELECT * FROM my_model"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("renders schema-qualified table name", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `SELECT * FROM {{ this }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.CurrentModelTable = "my_model"
+		ctx.Schema = "analytics"
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := "SELECT * FROM analytics.my_model"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("returns error when CurrentModelTable not set", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `SELECT * FROM {{ this }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.Schema = "analytics"
+
+		_, err = Render(tmpl, ctx, nil)
+		if err == nil {
+			t.Error("expected error when CurrentModelTable not set")
+		}
+
+		expectedMsg := "this() called but CurrentModelTable not set in context"
+		if !strings.Contains(err.Error(), expectedMsg) {
+			t.Errorf("expected error containing %q, got %q", expectedMsg, err.Error())
+		}
+	})
+}
+
+func TestIncrementalFilterPattern(t *testing.T) {
+	t.Run("renders full incremental query pattern", func(t *testing.T) {
+		engine := New()
+		tmplStr := `SELECT * FROM {{ ref "source_table" }}
+{{ if is_incremental }}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{{ end }}`
+
+		tmpl, err := engine.Parse("test", tmplStr)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.CurrentModelTable = "target_table"
+		ctx.Schema = "analytics"
+		ctx.IsIncremental = true
+		ctx.CurrentModel = "my_model"
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := `SELECT * FROM analytics.source_table
+
+WHERE updated_at > (SELECT MAX(updated_at) FROM analytics.target_table)
+`
+		if result != expected {
+			t.Errorf("expected:\n%q\ngot:\n%q", expected, result)
+		}
+	})
+
+	t.Run("renders without incremental filter when is_incremental is false", func(t *testing.T) {
+		engine := New()
+		tmplStr := `SELECT * FROM {{ ref "source_table" }}
+{{ if is_incremental }}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{{ end }}`
+
+		tmpl, err := engine.Parse("test", tmplStr)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.CurrentModelTable = "target_table"
+		ctx.Schema = "analytics"
+		ctx.IsIncremental = false
+		ctx.CurrentModel = "my_model"
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := `SELECT * FROM analytics.source_table
+`
+		if result != expected {
+			t.Errorf("expected:\n%q\ngot:\n%q", expected, result)
+		}
+	})
+
+	t.Run("works with variables in incremental pattern", func(t *testing.T) {
+		engine := New()
+		tmplStr := `SELECT * FROM {{ ref "source_table" }}
+{{ if is_incremental }}
+WHERE {{ var "timestamp_column" }} > (SELECT MAX({{ var "timestamp_column" }}) FROM {{ this }})
+{{ end }}`
+
+		tmpl, err := engine.Parse("test", tmplStr)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.CurrentModelTable = "target_table"
+		ctx.Schema = "analytics"
+		ctx.IsIncremental = true
+		ctx.CurrentModel = "my_model"
+		ctx.Vars = map[string]interface{}{
+			"timestamp_column": "updated_at",
+		}
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := `SELECT * FROM analytics.source_table
+
+WHERE updated_at > (SELECT MAX(updated_at) FROM analytics.target_table)
+`
+		if result != expected {
+			t.Errorf("expected:\n%q\ngot:\n%q", expected, result)
 		}
 	})
 }
