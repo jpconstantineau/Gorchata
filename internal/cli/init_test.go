@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -154,5 +156,100 @@ func TestInitCommand_HelpFlag(t *testing.T) {
 				t.Errorf("expected no error for help flag, got: %v", err)
 			}
 		})
+	}
+}
+
+// TestCreateProjectDirectories_Success verifies that directories are created correctly
+func TestCreateProjectDirectories_Success(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "test_project")
+
+	// Call the function to create directories
+	err := createProjectDirectories(projectPath, false)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify project root directory exists
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		t.Errorf("expected project directory to exist at %s", projectPath)
+	}
+
+	// Verify subdirectories exist
+	expectedDirs := []string{"models", "seeds", "tests", "macros"}
+	for _, dir := range expectedDirs {
+		dirPath := filepath.Join(projectPath, dir)
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+			t.Errorf("expected subdirectory %s to exist at %s", dir, dirPath)
+		}
+	}
+}
+
+// TestCreateProjectDirectories_AlreadyExists verifies error when directory exists without --force
+func TestCreateProjectDirectories_AlreadyExists(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "existing_project")
+
+	// Create the directory first
+	err := os.MkdirAll(projectPath, 0755)
+	if err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+
+	// Try to create directories without force flag
+	err = createProjectDirectories(projectPath, false)
+	if err == nil {
+		t.Error("expected error when directory exists without --force, got nil")
+	}
+
+	// Verify error message mentions the directory exists
+	if !strings.Contains(err.Error(), "already exists") && !strings.Contains(err.Error(), "exists") {
+		t.Errorf("expected error message to mention directory exists, got: %v", err)
+	}
+}
+
+// TestCreateProjectDirectories_ForceOverwrite verifies --force removes and recreates directory
+func TestCreateProjectDirectories_ForceOverwrite(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "force_project")
+
+	// Create the directory first with a marker file
+	err := os.MkdirAll(projectPath, 0755)
+	if err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+
+	markerFile := filepath.Join(projectPath, "marker.txt")
+	err = os.WriteFile(markerFile, []byte("old content"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create marker file: %v", err)
+	}
+
+	// Try to create directories with force flag
+	err = createProjectDirectories(projectPath, true)
+	if err != nil {
+		t.Fatalf("expected no error with --force, got: %v", err)
+	}
+
+	// Verify project root directory still exists
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		t.Errorf("expected project directory to exist at %s", projectPath)
+	}
+
+	// Verify marker file is gone (directory was removed and recreated)
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("expected marker file to be removed when using --force")
+	}
+
+	// Verify subdirectories exist
+	expectedDirs := []string{"models", "seeds", "tests", "macros"}
+	for _, dir := range expectedDirs {
+		dirPath := filepath.Join(projectPath, dir)
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+			t.Errorf("expected subdirectory %s to exist at %s", dir, dirPath)
+		}
 	}
 }
