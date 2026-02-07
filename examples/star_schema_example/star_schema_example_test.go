@@ -3089,3 +3089,421 @@ func TestRollupDailySalesProductCategories(t *testing.T) {
 		}
 	}
 }
+
+// TestEndToEndIntegration performs a comprehensive end-to-end test of the entire star schema pipeline
+func TestEndToEndIntegration(t *testing.T) {
+	// Create temp database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	// Step 1: Create raw_sales (source)
+	t.Log("Step 1: Creating raw_sales source table...")
+	rawSalesPath := filepath.Join("models", "sources", "raw_sales.sql")
+	rawSalesContent, err := os.ReadFile(rawSalesPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_sales.sql: %v", err)
+	}
+	sqlContent := string(rawSalesContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE raw_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create raw_sales: %v", err)
+	}
+
+	// Verify raw_sales row count
+	var rawSalesCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM raw_sales").Scan(&rawSalesCount)
+	if err != nil {
+		t.Fatalf("Failed to count raw_sales: %v", err)
+	}
+	if rawSalesCount != 30 {
+		t.Errorf("Expected raw_sales to have 30 rows, got %d", rawSalesCount)
+	}
+	t.Logf("✓ raw_sales created with %d rows", rawSalesCount)
+
+	// Step 2: Create dimensions
+	t.Log("Step 2: Creating dimension tables...")
+
+	// Create dim_products
+	dimProductsPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	dimProductsContent, err := os.ReadFile(dimProductsPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+	sqlContent = string(dimProductsContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_products AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create dim_products: %v", err)
+	}
+
+	var dimProductsCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM dim_products").Scan(&dimProductsCount)
+	if err != nil {
+		t.Fatalf("Failed to count dim_products: %v", err)
+	}
+	if dimProductsCount != 12 {
+		t.Errorf("Expected dim_products to have 12 rows, got %d", dimProductsCount)
+	}
+	t.Logf("✓ dim_products created with %d rows", dimProductsCount)
+
+	// Create dim_dates
+	dimDatesPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	dimDatesContent, err := os.ReadFile(dimDatesPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+	sqlContent = string(dimDatesContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_dates AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create dim_dates: %v", err)
+	}
+
+	var dimDatesCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM dim_dates").Scan(&dimDatesCount)
+	if err != nil {
+		t.Fatalf("Failed to count dim_dates: %v", err)
+	}
+	if dimDatesCount != 30 {
+		t.Errorf("Expected dim_dates to have 30 rows, got %d", dimDatesCount)
+	}
+	t.Logf("✓ dim_dates created with %d rows", dimDatesCount)
+
+	// Create dim_customers (SCD Type 2)
+	dimCustomersPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	dimCustomersContent, err := os.ReadFile(dimCustomersPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+	sqlContent = string(dimCustomersContent)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_customers AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create dim_customers: %v", err)
+	}
+
+	var dimCustomersCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM dim_customers").Scan(&dimCustomersCount)
+	if err != nil {
+		t.Fatalf("Failed to count dim_customers: %v", err)
+	}
+	// Should have > 8 unique customers, but with SCD Type 2, some customers have multiple versions
+	if dimCustomersCount < 8 {
+		t.Errorf("Expected dim_customers to have at least 8 rows, got %d", dimCustomersCount)
+	}
+	t.Logf("✓ dim_customers created with %d rows (includes SCD Type 2 versions)", dimCustomersCount)
+
+	// Step 3: Test SCD Type 2 specifically for customer 1001
+	t.Log("Step 3: Validating SCD Type 2 for customer 1001...")
+	rows, err := db.QueryContext(context.Background(), `
+		SELECT customer_sk, customer_id, customer_city, customer_state, valid_from, valid_to, is_current
+		FROM dim_customers
+		WHERE customer_id = 1001
+		ORDER BY valid_from
+	`)
+	if err != nil {
+		t.Fatalf("Failed to query customer 1001 versions: %v", err)
+	}
+	defer rows.Close()
+
+	type customerVersion struct {
+		sk        int
+		id        int
+		city      string
+		state     string
+		validFrom string
+		validTo   string
+		isCurrent int
+	}
+	var customer1001Versions []customerVersion
+	for rows.Next() {
+		var cv customerVersion
+		if err := rows.Scan(&cv.sk, &cv.id, &cv.city, &cv.state, &cv.validFrom, &cv.validTo, &cv.isCurrent); err != nil {
+			t.Fatalf("Failed to scan customer version: %v", err)
+		}
+		customer1001Versions = append(customer1001Versions, cv)
+	}
+
+	// Customer 1001 should have at least 2 versions (Seattle -> Portland)
+	if len(customer1001Versions) < 2 {
+		t.Errorf("Expected customer 1001 to have at least 2 versions, got %d", len(customer1001Versions))
+	} else {
+		t.Logf("✓ Customer 1001 has %d versions (SCD Type 2)", len(customer1001Versions))
+		for i, cv := range customer1001Versions {
+			t.Logf("  Version %d: SK=%d, City=%s, State=%s, Valid %s to %s, Current=%d",
+				i+1, cv.sk, cv.city, cv.state, cv.validFrom, cv.validTo, cv.isCurrent)
+		}
+
+		// First version should be Seattle
+		if customer1001Versions[0].city != "Seattle" {
+			t.Errorf("Expected first version of customer 1001 to be in Seattle, got %s", customer1001Versions[0].city)
+		}
+
+		// Last version should be current
+		lastVersion := customer1001Versions[len(customer1001Versions)-1]
+		if lastVersion.isCurrent != 1 {
+			t.Errorf("Expected last version of customer 1001 to be current, got is_current=%d", lastVersion.isCurrent)
+		}
+		if lastVersion.validTo != "9999-12-31" {
+			t.Errorf("Expected current version to have valid_to='9999-12-31', got %s", lastVersion.validTo)
+		}
+	}
+
+	// Step 4: Create fact table
+	t.Log("Step 4: Creating fct_sales fact table...")
+	fctSalesPath := filepath.Join("models", "facts", "fct_sales.sql")
+	fctSalesContent, err := os.ReadFile(fctSalesPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+	sqlContent = string(fctSalesContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE fct_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create fct_sales: %v", err)
+	}
+
+	var fctSalesCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM fct_sales").Scan(&fctSalesCount)
+	if err != nil {
+		t.Fatalf("Failed to count fct_sales: %v", err)
+	}
+	if fctSalesCount != 30 {
+		t.Errorf("Expected fct_sales to have 30 rows, got %d", fctSalesCount)
+	}
+	t.Logf("✓ fct_sales created with %d rows", fctSalesCount)
+
+	// Step 5: Validate joins between fact and dimensions work
+	t.Log("Step 5: Validating joins between fact and dimensions...")
+	var joinTestCount int
+	err = db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*)
+		FROM fct_sales f
+		INNER JOIN dim_customers c ON f.customer_sk = c.customer_sk
+		INNER JOIN dim_products p ON f.product_id = p.product_id
+		INNER JOIN dim_dates d ON f.sale_date = d.sale_date
+	`).Scan(&joinTestCount)
+	if err != nil {
+		t.Fatalf("Failed to test joins: %v", err)
+	}
+	if joinTestCount != 30 {
+		t.Errorf("Expected join to return 30 rows, got %d", joinTestCount)
+	}
+	t.Logf("✓ All fact rows join successfully to all dimensions (%d rows)", joinTestCount)
+
+	// Step 6: Create rollup table
+	t.Log("Step 6: Creating rollup_daily_sales aggregation table...")
+	rollupPath := filepath.Join("models", "rollups", "rollup_daily_sales.sql")
+	rollupContent, err := os.ReadFile(rollupPath)
+	if err != nil {
+		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
+	}
+	sqlContent = string(rollupContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE rollup_daily_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to create rollup_daily_sales: %v", err)
+	}
+
+	var rollupCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM rollup_daily_sales").Scan(&rollupCount)
+	if err != nil {
+		t.Fatalf("Failed to count rollup_daily_sales: %v", err)
+	}
+	// Rollup should have rows (may be same or fewer than fact table depending on aggregation granularity)
+	if rollupCount == 0 {
+		t.Errorf("Expected rollup_daily_sales to have rows, got 0")
+	}
+	t.Logf("✓ rollup_daily_sales created with %d rows (aggregated from %d fact rows)", rollupCount, fctSalesCount)
+
+	// Step 7: Validate rollup aggregation matches fact table
+	t.Log("Step 7: Validating rollup aggregation matches fact table...")
+	var factTotal, rollupTotal float64
+	err = db.QueryRowContext(context.Background(), "SELECT SUM(sale_amount) FROM fct_sales").Scan(&factTotal)
+	if err != nil {
+		t.Fatalf("Failed to sum fact table: %v", err)
+	}
+	err = db.QueryRowContext(context.Background(), "SELECT SUM(total_sales) FROM rollup_daily_sales").Scan(&rollupTotal)
+	if err != nil {
+		t.Fatalf("Failed to sum rollup table: %v", err)
+	}
+	if factTotal != rollupTotal {
+		t.Errorf("Rollup total_sales (%f) does not match fact table sum (%f)", rollupTotal, factTotal)
+	}
+	t.Logf("✓ Rollup aggregation validated: $%.2f matches fact table total", rollupTotal)
+
+	// Step 8: Test sample analytical query
+	t.Log("Step 8: Testing sample analytical query...")
+	analyticalQuery := `
+		SELECT 
+			d.year,
+			d.month,
+			p.product_category,
+			SUM(f.sale_amount) as revenue,
+			COUNT(*) as sale_count
+		FROM fct_sales f
+		INNER JOIN dim_dates d ON f.sale_date = d.sale_date
+		INNER JOIN dim_products p ON f.product_id = p.product_id
+		WHERE d.year = 2024
+		GROUP BY d.year, d.month, p.product_category
+		ORDER BY d.month, p.product_category
+		LIMIT 5
+	`
+	analyticalRows, err := db.QueryContext(context.Background(), analyticalQuery)
+	if err != nil {
+		t.Fatalf("Failed to execute analytical query: %v", err)
+	}
+	defer analyticalRows.Close()
+
+	var analyticalResults []struct {
+		year     int
+		month    int
+		category string
+		revenue  float64
+		count    int
+	}
+	for analyticalRows.Next() {
+		var result struct {
+			year     int
+			month    int
+			category string
+			revenue  float64
+			count    int
+		}
+		if err := analyticalRows.Scan(&result.year, &result.month, &result.category, &result.revenue, &result.count); err != nil {
+			t.Fatalf("Failed to scan analytical result: %v", err)
+		}
+		analyticalResults = append(analyticalResults, result)
+	}
+
+	if len(analyticalResults) == 0 {
+		t.Error("Analytical query returned no results")
+	} else {
+		t.Logf("✓ Analytical query successful, sample results:")
+		for _, r := range analyticalResults {
+			t.Logf("  %d-%02d %s: $%.2f (%d sales)", r.year, r.month, r.category, r.revenue, r.count)
+		}
+	}
+
+	// Step 9: Test rollup query for reporting
+	t.Log("Step 9: Testing rollup query for pre-aggregated reporting...")
+	rollupQuery := `
+		SELECT 
+			product_category,
+			SUM(total_sales) as category_total,
+			SUM(total_quantity) as category_quantity,
+			AVG(avg_sale_amount) as avg_transaction
+		FROM rollup_daily_sales
+		GROUP BY product_category
+		ORDER BY category_total DESC
+	`
+	rollupRows, err := db.QueryContext(context.Background(), rollupQuery)
+	if err != nil {
+		t.Fatalf("Failed to execute rollup query: %v", err)
+	}
+	defer rollupRows.Close()
+
+	var rollupResults []struct {
+		category string
+		total    float64
+		quantity int
+		avgTrans float64
+	}
+	for rollupRows.Next() {
+		var result struct {
+			category string
+			total    float64
+			quantity int
+			avgTrans float64
+		}
+		if err := rollupRows.Scan(&result.category, &result.total, &result.quantity, &result.avgTrans); err != nil {
+			t.Fatalf("Failed to scan rollup result: %v", err)
+		}
+		rollupResults = append(rollupResults, result)
+	}
+
+	if len(rollupResults) == 0 {
+		t.Error("Rollup query returned no results")
+	} else {
+		t.Logf("✓ Rollup query successful, category totals:")
+		for _, r := range rollupResults {
+			t.Logf("  %s: $%.2f (%d units, avg $%.2f per transaction)", r.category, r.total, r.quantity, r.avgTrans)
+		}
+	}
+
+	// Step 10: Data quality check - verify all foreign keys are valid
+	t.Log("Step 10: Data quality validation...")
+	var orphanCustomers int
+	db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM fct_sales f
+		LEFT JOIN dim_customers c ON f.customer_sk = c.customer_sk
+		WHERE c.customer_sk IS NULL
+	`).Scan(&orphanCustomers)
+	if orphanCustomers > 0 {
+		t.Errorf("Found %d orphan customer references in fct_sales", orphanCustomers)
+	}
+
+	var orphanProducts int
+	db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM fct_sales f
+		LEFT JOIN dim_products p ON f.product_id = p.product_id
+		WHERE p.product_id IS NULL
+	`).Scan(&orphanProducts)
+	if orphanProducts > 0 {
+		t.Errorf("Found %d orphan product references in fct_sales", orphanProducts)
+	}
+
+	var orphanDates int
+	db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM fct_sales f
+		LEFT JOIN dim_dates d ON f.sale_date = d.sale_date
+		WHERE d.sale_date IS NULL
+	`).Scan(&orphanDates)
+	if orphanDates > 0 {
+		t.Errorf("Found %d orphan date references in fct_sales", orphanDates)
+	}
+
+	t.Logf("✓ Data quality validation passed: all foreign keys are valid")
+
+	t.Log("========================================")
+	t.Log("✅ End-to-end integration test completed successfully!")
+	t.Log("========================================")
+	t.Logf("Summary:")
+	t.Logf("  - Source: raw_sales (%d rows)", rawSalesCount)
+	t.Logf("  - Dimensions: dim_products (%d), dim_dates (%d), dim_customers (%d with SCD Type 2)",
+		dimProductsCount, dimDatesCount, dimCustomersCount)
+	t.Logf("  - Fact: fct_sales (%d rows)", fctSalesCount)
+	t.Logf("  - Rollup: rollup_daily_sales (%d aggregated rows)", rollupCount)
+	t.Logf("  - Total revenue: $%.2f", factTotal)
+}
