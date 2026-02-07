@@ -349,3 +349,186 @@ func TestGenerateProjectConfig_FileCreation(t *testing.T) {
 		t.Error("expected config file to have content, got empty file")
 	}
 }
+
+// TestGenerateProfiles_DatabasePath verifies that database path matches project name
+func TestGenerateProfiles_DatabasePath(t *testing.T) {
+	tests := []struct {
+		name        string
+		projectName string
+		wantDevDB   string
+		wantProdDB  string
+	}{
+		{
+			name:        "simple project name",
+			projectName: "myproject",
+			wantDevDB:   "myproject.db",
+			wantProdDB:  "myproject_prod.db",
+		},
+		{
+			name:        "project with underscores",
+			projectName: "my_project",
+			wantDevDB:   "my_project.db",
+			wantProdDB:  "my_project_prod.db",
+		},
+		{
+			name:        "project with hyphens",
+			projectName: "my-project",
+			wantDevDB:   "my-project.db",
+			wantProdDB:  "my-project_prod.db",
+		},
+		{
+			name:        "project with numbers",
+			projectName: "project123",
+			wantDevDB:   "project123.db",
+			wantProdDB:  "project123_prod.db",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary directory for testing
+			tempDir := t.TempDir()
+
+			// Generate the profiles file
+			err := generateProfiles(tempDir, tt.projectName)
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+
+			// Read the generated file
+			profilesPath := filepath.Join(tempDir, "profiles.yml")
+			content, err := os.ReadFile(profilesPath)
+			if err != nil {
+				t.Fatalf("failed to read generated profiles file: %v", err)
+			}
+
+			contentStr := string(content)
+
+			// Verify dev database path
+			expectedDevDB := fmt.Sprintf(`database: "%s"`, tt.wantDevDB)
+			if !strings.Contains(contentStr, expectedDevDB) {
+				t.Errorf("expected profiles to contain dev database '%s', got:\n%s", expectedDevDB, contentStr)
+			}
+
+			// Verify prod database path
+			expectedProdDB := fmt.Sprintf(`database: "%s"`, tt.wantProdDB)
+			if !strings.Contains(contentStr, expectedProdDB) {
+				t.Errorf("expected profiles to contain prod database '%s', got:\n%s", expectedProdDB, contentStr)
+			}
+		})
+	}
+}
+
+// TestGenerateProfiles_MultipleEnvs verifies that dev and prod environments are configured
+func TestGenerateProfiles_MultipleEnvs(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectName := "test_project"
+
+	// Generate the profiles file
+	err := generateProfiles(tempDir, projectName)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Read the generated file
+	profilesPath := filepath.Join(tempDir, "profiles.yml")
+	content, err := os.ReadFile(profilesPath)
+	if err != nil {
+		t.Fatalf("failed to read generated profiles file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify default section exists
+	if !strings.Contains(contentStr, "default:") {
+		t.Error("expected profiles to contain 'default:' section")
+	}
+
+	// Verify default target is dev
+	if !strings.Contains(contentStr, "target: dev") {
+		t.Error("expected profiles to contain 'target: dev'")
+	}
+
+	// Verify dev output exists
+	if !strings.Contains(contentStr, "dev:") {
+		t.Error("expected profiles to contain 'dev:' output")
+	}
+
+	// Verify dev uses sqlite
+	devSection := strings.Index(contentStr, "dev:")
+	if devSection != -1 {
+		devContent := contentStr[devSection:]
+		if !strings.Contains(devContent, "type: sqlite") {
+			t.Error("expected dev output to have 'type: sqlite'")
+		}
+	}
+
+	// Verify prod section exists
+	if !strings.Contains(contentStr, "prod:") {
+		t.Error("expected profiles to contain 'prod:' section")
+	}
+
+	// Verify prod target is prod
+	prodSection := strings.Index(contentStr, "prod:")
+	if prodSection != -1 {
+		// Find the second occurrence for the target line
+		remainingContent := contentStr[prodSection:]
+		if !strings.Contains(remainingContent, "target: prod") {
+			t.Error("expected profiles to contain 'target: prod'")
+		}
+	}
+
+	// Verify prod uses sqlite
+	if prodSection != -1 {
+		prodContent := contentStr[prodSection:]
+		if !strings.Contains(prodContent, "type: sqlite") {
+			t.Error("expected prod output to have 'type: sqlite'")
+		}
+	}
+}
+
+// TestGenerateProfiles_FileCreation verifies file is written correctly to projectPath/profiles.yml
+func TestGenerateProfiles_FileCreation(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectName := "file_test_project"
+
+	// Generate the profiles file
+	err := generateProfiles(tempDir, projectName)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify file exists at the correct location
+	profilesPath := filepath.Join(tempDir, "profiles.yml")
+	info, err := os.Stat(profilesPath)
+	if os.IsNotExist(err) {
+		t.Fatalf("expected profiles file to exist at %s", profilesPath)
+	}
+	if err != nil {
+		t.Fatalf("failed to stat profiles file: %v", err)
+	}
+
+	// Verify it's a file, not a directory
+	if info.IsDir() {
+		t.Errorf("expected %s to be a file, not a directory", profilesPath)
+	}
+
+	// Verify permissions (should be readable)
+	content, err := os.ReadFile(profilesPath)
+	if err != nil {
+		t.Errorf("failed to read profiles file: %v", err)
+	}
+
+	// Verify content is not empty
+	if len(content) == 0 {
+		t.Error("expected profiles file to have content, got empty file")
+	}
+
+	// Verify content is valid YAML format (contains expected structure)
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "outputs:") {
+		t.Error("expected profiles to contain 'outputs:' section")
+	}
+}

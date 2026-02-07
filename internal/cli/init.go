@@ -24,6 +24,36 @@ vars:
   start_date: '{{CURRENT_YEAR}}-01-01'
 `
 
+// profilesTemplate is the template for profiles.yml
+const profilesTemplate = `default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: "{{PROJECT_NAME}}.db"
+
+prod:
+  target: prod
+  outputs:
+    prod:
+      type: sqlite
+      database: "{{PROJECT_NAME}}_prod.db"
+`
+
+// generateProfiles creates the profiles.yml file with project-specific values
+func generateProfiles(projectPath, projectName string) error {
+	// Replace placeholder in template
+	content := strings.ReplaceAll(profilesTemplate, "{{PROJECT_NAME}}", projectName)
+
+	// Write file
+	profilesPath := filepath.Join(projectPath, "profiles.yml")
+	if err := os.WriteFile(profilesPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write profiles file: %w", err)
+	}
+
+	return nil
+}
+
 // generateProjectConfig creates the gorchata_project.yml file with project-specific values
 func generateProjectConfig(projectPath, projectName string) error {
 	// Get current year
@@ -120,6 +150,11 @@ func InitCommand(args []string) error {
 
 	// Generate project config file
 	if err := generateProjectConfig(projectName, projectName); err != nil {
+		return err
+	}
+
+	// Generate profiles file
+	if err := generateProfiles(projectName, projectName); err != nil {
 		return err
 	}
 
