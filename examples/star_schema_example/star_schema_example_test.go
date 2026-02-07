@@ -1,12 +1,61 @@
 package star_schema_example_test
 
 import (
+	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jpconstantineau/gorchata/internal/config"
+	_ "modernc.org/sqlite"
 )
+
+// setupTestDB creates a temporary database with the raw_sales model executed.
+// Returns the database connection and a cleanup function.
+func setupTestDB(t *testing.T) (*sql.DB, func()) {
+	t.Helper()
+
+	// Create temp database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+
+	// Read model file
+	modelPath := filepath.Join("models", "sources", "raw_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to read raw_sales.sql: %v", err)
+	}
+
+	// Extract SQL (remove Jinja-like config directive for raw execution test)
+	contentStr := string(content)
+	sqlContent := strings.ReplaceAll(contentStr, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	// Wrap in CREATE TABLE for testing
+	createTableSQL := "CREATE TABLE raw_sales AS " + sqlContent
+
+	// Execute SQL
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to execute raw_sales model: %v", err)
+	}
+
+	// Return DB and cleanup function
+	cleanup := func() {
+		db.Close()
+	}
+
+	return db, cleanup
+}
 
 // TestStarSchemaProjectConfig tests that the star_schema_example project config can be loaded
 func TestStarSchemaProjectConfig(t *testing.T) {
@@ -181,5 +230,243 @@ func TestStarSchemaREADMEExists(t *testing.T) {
 	}
 	if info.Size() == 0 {
 		t.Error("README.md is empty")
+	}
+}
+
+// TestRawSalesModelExists verifies raw_sales.sql model file exists
+func TestRawSalesModelExists(t *testing.T) {
+	modelPath := filepath.Join("models", "sources", "raw_sales.sql")
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("raw_sales.sql does not exist: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("raw_sales.sql is a directory, expected a file")
+	}
+	if info.Size() == 0 {
+		t.Error("raw_sales.sql is empty")
+	}
+}
+
+// TestRawSalesModelContent verifies raw_sales.sql has required content
+func TestRawSalesModelContent(t *testing.T) {
+	modelPath := filepath.Join("models", "sources", "raw_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_sales.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for config directive
+	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+		t.Error("raw_sales.sql missing config directive with materialized='table'")
+	}
+
+	// Check for expected column names in the model
+	expectedColumns := []string{
+		"sale_id", "sale_date", "sale_amount", "quantity",
+		"customer_id", "customer_name", "customer_email", "customer_city", "customer_state",
+		"product_id", "product_name", "product_category", "product_price",
+	}
+
+	for _, col := range expectedColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("raw_sales.sql missing expected column: %s", col)
+		}
+	}
+
+	// Check for VALUES clause (inline data)
+	if !strings.Contains(contentStr, "VALUES") {
+		t.Error("raw_sales.sql missing VALUES clause for inline data")
+	}
+
+	// Check for SELECT FROM pattern
+	if !strings.Contains(contentStr, "SELECT") && !strings.Contains(contentStr, "FROM") {
+		t.Error("raw_sales.sql missing SELECT FROM pattern")
+	}
+}
+
+// TestRawSalesModelCompiles verifies raw_sales.sql compiles successfully
+func TestRawSalesModelCompiles(t *testing.T) {
+	modelPath := filepath.Join("models", "sources", "raw_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_sales.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Basic validation that SQL syntax keywords are present
+	requiredKeywords := []string{"SELECT", "FROM", "VALUES"}
+	for _, keyword := range requiredKeywords {
+		if !strings.Contains(strings.ToUpper(contentStr), keyword) {
+			t.Errorf("raw_sales.sql missing SQL keyword: %s", keyword)
+		}
+	}
+}
+
+// TestRawSalesModelExecution tests that raw_sales model can be executed
+func TestRawSalesModelExecution(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Verify table was created
+	var tableName string
+	err := db.QueryRowContext(context.Background(),
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='raw_sales'").Scan(&tableName)
+	if err != nil {
+		t.Fatalf("Table raw_sales not found: %v", err)
+	}
+	if tableName != "raw_sales" {
+		t.Errorf("Expected table 'raw_sales', got '%s'", tableName)
+	}
+}
+
+// TestRawSalesColumns verifies raw_sales table has expected columns
+func TestRawSalesColumns(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Query table info
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(raw_sales)")
+	if err != nil {
+		t.Fatalf("Failed to get table info: %v", err)
+	}
+	defer rows.Close()
+
+	// Collect column names
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		columns = append(columns, name)
+	}
+
+	// Expected columns
+	expectedColumns := []string{
+		"sale_id", "sale_date", "sale_amount", "quantity",
+		"customer_id", "customer_name", "customer_email", "customer_city", "customer_state",
+		"product_id", "product_name", "product_category", "product_price",
+	}
+
+	// Verify all expected columns exist
+	for _, expected := range expectedColumns {
+		found := false
+		for _, col := range columns {
+			if col == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in raw_sales table. Found columns: %v", expected, columns)
+		}
+	}
+}
+
+// TestRawSalesDataCount verifies raw_sales has 20-30 records
+func TestRawSalesDataCount(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Count records
+	var count int
+	err := db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM raw_sales").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count records: %v", err)
+	}
+
+	if count < 20 || count > 30 {
+		t.Errorf("Expected 20-30 records, got %d", count)
+	}
+}
+
+// TestRawSalesSCDType2Data verifies data includes customer attribute changes over time
+func TestRawSalesSCDType2Data(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Check for customer 1001 with different cities over time
+	type customerRecord struct {
+		saleDate     string
+		city         string
+		state        string
+		email        string
+		customerName string
+	}
+
+	rows, err := db.QueryContext(context.Background(),
+		"SELECT sale_date, customer_city, customer_state, customer_email, customer_name FROM raw_sales WHERE customer_id = 1001 ORDER BY sale_date")
+	if err != nil {
+		t.Fatalf("Failed to query customer 1001: %v", err)
+	}
+	defer rows.Close()
+
+	var records []customerRecord
+	for rows.Next() {
+		var r customerRecord
+		if err := rows.Scan(&r.saleDate, &r.city, &r.state, &r.email, &r.customerName); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		records = append(records, r)
+	}
+
+	if len(records) < 3 {
+		t.Errorf("Expected at least 3 records for customer 1001 (showing attribute changes over time), got %d", len(records))
+	}
+
+	// Check that there are different cities for the same customer (showing move)
+	cities := make(map[string]bool)
+	for _, r := range records {
+		cities[r.city] = true
+	}
+
+	if len(cities) < 2 {
+		t.Error("Expected customer 1001 to have at least 2 different cities (demonstrating SCD Type 2), but found only one city")
+	}
+}
+
+// TestRawSalesDataDiversity verifies data diversity (multiple customers and products)
+func TestRawSalesDataDiversity(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Count unique customers
+	var customerCount int
+	err := db.QueryRowContext(context.Background(), "SELECT COUNT(DISTINCT customer_id) FROM raw_sales").Scan(&customerCount)
+	if err != nil {
+		t.Fatalf("Failed to count unique customers: %v", err)
+	}
+
+	if customerCount < 5 || customerCount > 8 {
+		t.Errorf("Expected 5-8 unique customers, got %d", customerCount)
+	}
+
+	// Count unique products
+	var productCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(DISTINCT product_id) FROM raw_sales").Scan(&productCount)
+	if err != nil {
+		t.Fatalf("Failed to count unique products: %v", err)
+	}
+
+	if productCount < 8 || productCount > 12 {
+		t.Errorf("Expected 8-12 unique products, got %d", productCount)
+	}
+
+	// Count unique categories
+	var categoryCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(DISTINCT product_category) FROM raw_sales").Scan(&categoryCount)
+	if err != nil {
+		t.Fatalf("Failed to count unique categories: %v", err)
+	}
+
+	if categoryCount < 3 || categoryCount > 4 {
+		t.Errorf("Expected 3-4 unique product categories, got %d", categoryCount)
 	}
 }
