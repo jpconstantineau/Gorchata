@@ -141,3 +141,74 @@ func TestContextMultipleOptions(t *testing.T) {
 		}
 	})
 }
+
+func TestContextWithIncrementalState(t *testing.T) {
+	t.Run("defaults to non-incremental", func(t *testing.T) {
+		ctx := NewContext()
+
+		if ctx.IsIncremental {
+			t.Error("expected IsIncremental to default to false")
+		}
+	})
+
+	t.Run("sets incremental flag", func(t *testing.T) {
+		ctx := NewContext(WithIsIncremental(true))
+
+		if !ctx.IsIncremental {
+			t.Error("expected IsIncremental to be true")
+		}
+	})
+
+	t.Run("sets incremental flag to false explicitly", func(t *testing.T) {
+		ctx := NewContext(WithIsIncremental(false))
+
+		if ctx.IsIncremental {
+			t.Error("expected IsIncremental to be false")
+		}
+	})
+}
+
+func TestContextWithCurrentModelTable(t *testing.T) {
+	t.Run("defaults to empty string", func(t *testing.T) {
+		ctx := NewContext()
+
+		if ctx.CurrentModelTable != "" {
+			t.Errorf("expected CurrentModelTable to default to empty string, got %s", ctx.CurrentModelTable)
+		}
+	})
+
+	t.Run("sets current model table name", func(t *testing.T) {
+		ctx := NewContext(WithCurrentModelTable("analytics.dim_customers"))
+
+		if ctx.CurrentModelTable != "analytics.dim_customers" {
+			t.Errorf("expected CurrentModelTable to be 'analytics.dim_customers', got %s", ctx.CurrentModelTable)
+		}
+	})
+
+	t.Run("sets current model table with schema", func(t *testing.T) {
+		ctx := NewContext(WithCurrentModelTable("staging.stg_orders"))
+
+		if ctx.CurrentModelTable != "staging.stg_orders" {
+			t.Errorf("expected CurrentModelTable to be 'staging.stg_orders', got %s", ctx.CurrentModelTable)
+		}
+	})
+
+	t.Run("combines with other options", func(t *testing.T) {
+		ctx := NewContext(
+			WithCurrentModel("customers"),
+			WithCurrentModelTable("analytics.dim_customers"),
+			WithIsIncremental(true),
+		)
+
+		if ctx.CurrentModel != "customers" {
+			t.Errorf("expected CurrentModel to be 'customers', got %s", ctx.CurrentModel)
+		}
+		if ctx.CurrentModelTable != "analytics.dim_customers" {
+			t.Errorf("expected CurrentModelTable to be 'analytics.dim_customers', got %s", ctx.CurrentModelTable)
+		}
+		if !ctx.IsIncremental {
+			t.Error("expected IsIncremental to be true")
+		}
+	})
+}
+
