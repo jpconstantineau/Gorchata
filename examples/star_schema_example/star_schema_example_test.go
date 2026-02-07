@@ -990,3 +990,591 @@ func TestDimDatesWeekendDetection(t *testing.T) {
 		t.Errorf("Weekend detection mismatch: day_of_week IN ('0','6') gave %d, is_weekend=1 gave %d", weekendCount, isWeekendCount)
 	}
 }
+
+// ============================================================================
+// Phase 4: SCD Type 2 Customer Dimension
+// ============================================================================
+
+// TestDimCustomersModelExists verifies dim_customers.sql model file exists
+func TestDimCustomersModelExists(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("dim_customers.sql does not exist: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("dim_customers.sql is a directory, expected a file")
+	}
+	if info.Size() == 0 {
+		t.Error("dim_customers.sql is empty")
+	}
+}
+
+// TestDimCustomersModelContent verifies dim_customers.sql has correct config directive
+func TestDimCustomersModelContent(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for config directive with incremental materialization
+	if !strings.Contains(contentStr, "materialized='incremental'") {
+		t.Error("dim_customers.sql missing config directive with materialized='incremental'")
+	}
+
+	// Check for unique_key in config
+	if !strings.Contains(contentStr, "unique_key") {
+		t.Error("dim_customers.sql missing unique_key in config directive")
+	}
+
+	// Check for ref to raw_sales
+	if !strings.Contains(contentStr, `{{ ref "raw_sales" }}`) {
+		t.Error("dim_customers.sql missing {{ ref \"raw_sales\" }} reference")
+	}
+
+	// Check for expected column names
+	expectedColumns := []string{
+		"customer_sk", "customer_id", "customer_name", "customer_email",
+		"customer_city", "customer_state", "valid_from", "valid_to", "is_current",
+	}
+	for _, col := range expectedColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("dim_customers.sql missing expected column: %s", col)
+		}
+	}
+}
+
+// TestDimCustomersModelExecution tests that dim_customers model can be executed
+func TestDimCustomersModelExecution(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Read dim_customers model
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
+	sqlContent := string(content)
+	// Remove config directive (we'll treat as table for testing)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	// Execute as CREATE TABLE
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Verify table was created
+	var tableName string
+	err = db.QueryRowContext(context.Background(),
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='dim_customers'").Scan(&tableName)
+	if err != nil {
+		t.Fatalf("Table dim_customers not found: %v", err)
+	}
+}
+
+// TestDimCustomersColumns verifies dim_customers table has expected columns
+func TestDimCustomersColumns(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Query table info
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(dim_customers)")
+	if err != nil {
+		t.Fatalf("Failed to get table info: %v", err)
+	}
+	defer rows.Close()
+
+	// Collect column names
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		columns = append(columns, name)
+	}
+
+	// Expected columns for SCD Type 2
+	expectedColumns := []string{
+		"customer_sk", "customer_id", "customer_name", "customer_email",
+		"customer_city", "customer_state", "valid_from", "valid_to", "is_current",
+	}
+
+	// Verify all expected columns exist
+	for _, expected := range expectedColumns {
+		found := false
+		for _, col := range columns {
+			if col == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in dim_customers table. Found columns: %v", expected, columns)
+		}
+	}
+}
+
+// TestDimCustomersSurrogateKeyUnique verifies customer_sk is unique across all versions
+func TestDimCustomersSurrogateKeyUnique(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Verify no duplicates on customer_sk
+	var duplicateCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM (SELECT customer_sk, COUNT(*) as cnt FROM dim_customers GROUP BY customer_sk HAVING cnt > 1)").Scan(&duplicateCount)
+	if err != nil {
+		t.Fatalf("Failed to check for duplicates: %v", err)
+	}
+
+	if duplicateCount > 0 {
+		t.Errorf("Found %d duplicate customer_sk values in dim_customers", duplicateCount)
+	}
+}
+
+// TestDimCustomersMultipleVersions verifies multiple versions exist for customers with changes
+func TestDimCustomersMultipleVersions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Count versions for customer_id 1001
+	var versionCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_customers WHERE customer_id = 1001").Scan(&versionCount)
+	if err != nil {
+		t.Fatalf("Failed to count versions for customer 1001: %v", err)
+	}
+
+	// Expected: 3 versions (Seattle -> Portland city, then email change)
+	if versionCount != 3 {
+		t.Errorf("Expected 3 versions for customer 1001, got %d", versionCount)
+	}
+}
+
+// TestDimCustomersCustomer1001Versions verifies customer 1001 has correct version history
+func TestDimCustomersCustomer1001Versions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Query all versions for customer 1001, ordered by valid_from
+	type customerVersion struct {
+		customerSK    int
+		customerID    int
+		customerName  string
+		customerEmail string
+		customerCity  string
+		customerState string
+		validFrom     string
+		validTo       string
+		isCurrent     int
+	}
+
+	rows, err := db.QueryContext(context.Background(),
+		`SELECT customer_sk, customer_id, customer_name, customer_email, customer_city, customer_state, 
+		        valid_from, valid_to, is_current 
+		 FROM dim_customers 
+		 WHERE customer_id = 1001 
+		 ORDER BY valid_from`)
+	if err != nil {
+		t.Fatalf("Failed to query customer 1001 versions: %v", err)
+	}
+	defer rows.Close()
+
+	var versions []customerVersion
+	for rows.Next() {
+		var v customerVersion
+		if err := rows.Scan(&v.customerSK, &v.customerID, &v.customerName, &v.customerEmail,
+			&v.customerCity, &v.customerState, &v.validFrom, &v.validTo, &v.isCurrent); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		versions = append(versions, v)
+	}
+
+	// Verify we have exactly 3 versions
+	if len(versions) != 3 {
+		t.Fatalf("Expected 3 versions for customer 1001, got %d", len(versions))
+	}
+
+	// Version 1: Seattle, WA, alice@example.com
+	v1 := versions[0]
+	if v1.customerCity != "Seattle" {
+		t.Errorf("Version 1: Expected city 'Seattle', got '%s'", v1.customerCity)
+	}
+	if v1.customerState != "WA" {
+		t.Errorf("Version 1: Expected state 'WA', got '%s'", v1.customerState)
+	}
+	if v1.customerEmail != "alice@example.com" {
+		t.Errorf("Version 1: Expected email 'alice@example.com', got '%s'", v1.customerEmail)
+	}
+	if v1.validFrom != "2024-01-05" {
+		t.Errorf("Version 1: Expected valid_from '2024-01-05', got '%s'", v1.validFrom)
+	}
+	if v1.validTo != "2024-06-10" {
+		t.Errorf("Version 1: Expected valid_to '2024-06-10', got '%s'", v1.validTo)
+	}
+	if v1.isCurrent != 0 {
+		t.Errorf("Version 1: Expected is_current 0, got %d", v1.isCurrent)
+	}
+
+	// Version 2: Portland, OR, alice@example.com
+	v2 := versions[1]
+	if v2.customerCity != "Portland" {
+		t.Errorf("Version 2: Expected city 'Portland', got '%s'", v2.customerCity)
+	}
+	if v2.customerState != "OR" {
+		t.Errorf("Version 2: Expected state 'OR', got '%s'", v2.customerState)
+	}
+	if v2.customerEmail != "alice@example.com" {
+		t.Errorf("Version 2: Expected email 'alice@example.com', got '%s'", v2.customerEmail)
+	}
+	if v2.validFrom != "2024-06-10" {
+		t.Errorf("Version 2: Expected valid_from '2024-06-10', got '%s'", v2.validFrom)
+	}
+	if v2.validTo != "2024-11-08" {
+		t.Errorf("Version 2: Expected valid_to '2024-11-08', got '%s'", v2.validTo)
+	}
+	if v2.isCurrent != 0 {
+		t.Errorf("Version 2: Expected is_current 0, got %d", v2.isCurrent)
+	}
+
+	// Version 3: Portland, OR, alice.j.new@example.com
+	v3 := versions[2]
+	if v3.customerCity != "Portland" {
+		t.Errorf("Version 3: Expected city 'Portland', got '%s'", v3.customerCity)
+	}
+	if v3.customerState != "OR" {
+		t.Errorf("Version 3: Expected state 'OR', got '%s'", v3.customerState)
+	}
+	if v3.customerEmail != "alice.j.new@example.com" {
+		t.Errorf("Version 3: Expected email 'alice.j.new@example.com', got '%s'", v3.customerEmail)
+	}
+	if v3.validFrom != "2024-11-08" {
+		t.Errorf("Version 3: Expected valid_from '2024-11-08', got '%s'", v3.validFrom)
+	}
+	if v3.validTo != "9999-12-31" {
+		t.Errorf("Version 3: Expected valid_to '9999-12-31', got '%s'", v3.validTo)
+	}
+	if v3.isCurrent != 1 {
+		t.Errorf("Version 3: Expected is_current 1, got %d", v3.isCurrent)
+	}
+}
+
+// TestDimCustomersValidFromValidTo verifies valid_from and valid_to track history correctly
+func TestDimCustomersValidFromValidTo(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Verify that for each customer_id, valid_to of version N equals valid_from of version N+1
+	// (except for the last version which has valid_to = '9999-12-31')
+	rows, err := db.QueryContext(context.Background(),
+		`SELECT customer_id, valid_from, valid_to 
+		 FROM dim_customers 
+		 ORDER BY customer_id, valid_from`)
+	if err != nil {
+		t.Fatalf("Failed to query customers: %v", err)
+	}
+	defer rows.Close()
+
+	type version struct {
+		customerID int
+		validFrom  string
+		validTo    string
+	}
+
+	var versions []version
+	for rows.Next() {
+		var v version
+		if err := rows.Scan(&v.customerID, &v.validFrom, &v.validTo); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		versions = append(versions, v)
+	}
+
+	// Check continuity for each customer
+	for i := 0; i < len(versions)-1; i++ {
+		current := versions[i]
+		next := versions[i+1]
+
+		// If same customer, check continuity
+		if current.customerID == next.customerID {
+			if current.validTo != next.validFrom {
+				t.Errorf("Customer %d: valid_to '%s' of version %d does not match valid_from '%s' of next version",
+					current.customerID, current.validTo, i, next.validFrom)
+			}
+		}
+	}
+}
+
+// TestDimCustomersIsCurrentFlag verifies is_current flag identifies active records
+func TestDimCustomersIsCurrentFlag(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Count unique customers
+	var uniqueCustomers int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(DISTINCT customer_id) FROM dim_customers").Scan(&uniqueCustomers)
+	if err != nil {
+		t.Fatalf("Failed to count unique customers: %v", err)
+	}
+
+	// Count is_current = 1 records
+	var currentCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_customers WHERE is_current = 1").Scan(&currentCount)
+	if err != nil {
+		t.Fatalf("Failed to count current records: %v", err)
+	}
+
+	// Should have exactly one current record per customer
+	if currentCount != uniqueCustomers {
+		t.Errorf("Expected %d current records (one per customer), got %d", uniqueCustomers, currentCount)
+	}
+
+	// Verify that all current records have valid_to = '9999-12-31'
+	var invalidCurrent int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_customers WHERE is_current = 1 AND valid_to != '9999-12-31'").Scan(&invalidCurrent)
+	if err != nil {
+		t.Fatalf("Failed to check current records valid_to: %v", err)
+	}
+
+	if invalidCurrent > 0 {
+		t.Errorf("Found %d current records with valid_to != '9999-12-31'", invalidCurrent)
+	}
+
+	// Verify that all non-current records have is_current = 0
+	var invalidNonCurrent int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_customers WHERE valid_to != '9999-12-31' AND is_current = 1").Scan(&invalidNonCurrent)
+	if err != nil {
+		t.Fatalf("Failed to check non-current records: %v", err)
+	}
+
+	if invalidNonCurrent > 0 {
+		t.Errorf("Found %d historical records with is_current = 1", invalidNonCurrent)
+	}
+}
+
+// TestDimCustomersDataIntegrity verifies no NULLs in required fields
+func TestDimCustomersDataIntegrity(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_customers table
+	modelPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_customers AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_customers model: %v", err)
+	}
+
+	// Check that no customers have NULL values in required fields
+	var nullCount int
+	err = db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM dim_customers 
+		 WHERE customer_sk IS NULL 
+		    OR customer_id IS NULL 
+		    OR customer_name IS NULL 
+		    OR customer_email IS NULL 
+		    OR customer_city IS NULL 
+		    OR customer_state IS NULL 
+		    OR valid_from IS NULL 
+		    OR valid_to IS NULL 
+		    OR is_current IS NULL`).Scan(&nullCount)
+	if err != nil {
+		t.Fatalf("Failed to check for NULLs: %v", err)
+	}
+
+	if nullCount > 0 {
+		t.Errorf("Found %d customer records with NULL values in required fields", nullCount)
+	}
+}
