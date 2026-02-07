@@ -32,6 +32,8 @@ func Run(args []string) error {
 	commandArgs := args[1:]
 
 	switch command {
+	case "init":
+		return InitCommand(commandArgs)
 	case "run":
 		return RunCommand(commandArgs)
 	case "compile":
@@ -53,6 +55,7 @@ func printUsage() {
 	fmt.Println("  gorchata [command] [options]")
 	fmt.Println()
 	fmt.Println("Available Commands:")
+	fmt.Println("  init      Initialize a new Gorchata project")
 	fmt.Println("  run       Execute SQL transformations against the database")
 	fmt.Println("  compile   Compile SQL templates without executing them")
 	fmt.Println("  test      Run data quality tests (not yet implemented)")
