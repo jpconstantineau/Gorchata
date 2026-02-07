@@ -40,6 +40,70 @@ prod:
       database: "{{PROJECT_NAME}}_prod.db"
 `
 
+// stgUsersTemplate is the template for stg_users.sql
+const stgUsersTemplate = `-- Stage clean users data
+-- {{ config(materialized='view') }}
+
+SELECT 
+    id,
+    name,
+    email,
+    created_at
+FROM raw_users
+WHERE deleted_at IS NULL
+`
+
+// stgOrdersTemplate is the template for stg_orders.sql
+const stgOrdersTemplate = `-- Stage clean orders data
+-- {{ config(materialized='view') }}
+
+SELECT 
+    id,
+    user_id,
+    amount,
+    order_date
+FROM raw_orders
+WHERE status = 'completed'
+`
+
+// fctOrderSummaryTemplate is the template for fct_order_summary.sql
+const fctOrderSummaryTemplate = `-- Create order summary fact table
+-- {{ config(materialized='table') }}
+
+SELECT 
+    u.id as user_id,
+    u.name as user_name,
+    u.email,
+    COUNT(o.id) as order_count,
+    SUM(o.amount) as total_amount,
+    MAX(o.order_date) as last_order_date
+FROM {{ ref "stg_users" }} u
+LEFT JOIN {{ ref "stg_orders" }} o ON u.id = o.user_id
+GROUP BY u.id, u.name, u.email
+`
+
+// generateModels creates the sample SQL model files in the models/ subdirectory
+func generateModels(projectPath string) error {
+	modelsDir := filepath.Join(projectPath, "models")
+
+	// Define model files to create
+	models := map[string]string{
+		"stg_users.sql":         stgUsersTemplate,
+		"stg_orders.sql":        stgOrdersTemplate,
+		"fct_order_summary.sql": fctOrderSummaryTemplate,
+	}
+
+	// Write each model file
+	for filename, content := range models {
+		filePath := filepath.Join(modelsDir, filename)
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to write model file %s: %w", filename, err)
+		}
+	}
+
+	return nil
+}
+
 // generateProfiles creates the profiles.yml file with project-specific values
 func generateProfiles(projectPath, projectName string) error {
 	// Replace placeholder in template
@@ -155,6 +219,11 @@ func InitCommand(args []string) error {
 
 	// Generate profiles file
 	if err := generateProfiles(projectName, projectName); err != nil {
+		return err
+	}
+
+	// Generate model files
+	if err := generateModels(projectName); err != nil {
 		return err
 	}
 

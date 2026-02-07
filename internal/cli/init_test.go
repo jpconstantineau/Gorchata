@@ -532,3 +532,148 @@ func TestGenerateProfiles_FileCreation(t *testing.T) {
 		t.Error("expected profiles to contain 'outputs:' section")
 	}
 }
+
+// TestGenerateModels_AllFiles verifies that all three model files are created in models/ subdirectory
+func TestGenerateModels_AllFiles(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "test_project")
+
+	// Create project structure first
+	err := createProjectDirectories(projectPath, false)
+	if err != nil {
+		t.Fatalf("failed to create project directories: %v", err)
+	}
+
+	// Generate models
+	err = generateModels(projectPath)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify all three model files exist
+	expectedFiles := []string{
+		"stg_users.sql",
+		"stg_orders.sql",
+		"fct_order_summary.sql",
+	}
+
+	for _, filename := range expectedFiles {
+		filePath := filepath.Join(projectPath, "models", filename)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("expected model file to exist at %s", filePath)
+		}
+	}
+}
+
+// TestGenerateModels_ContentCorrect verifies that SQL content and config blocks are present
+func TestGenerateModels_ContentCorrect(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "test_project")
+
+	// Create project structure first
+	err := createProjectDirectories(projectPath, false)
+	if err != nil {
+		t.Fatalf("failed to create project directories: %v", err)
+	}
+
+	// Generate models
+	err = generateModels(projectPath)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		filename        string
+		expectedStrings []string
+	}{
+		{
+			name:     "stg_users.sql",
+			filename: "stg_users.sql",
+			expectedStrings: []string{
+				"{{ config(materialized='view') }}",
+				"SELECT",
+				"FROM raw_users",
+				"WHERE deleted_at IS NULL",
+			},
+		},
+		{
+			name:     "stg_orders.sql",
+			filename: "stg_orders.sql",
+			expectedStrings: []string{
+				"{{ config(materialized='view') }}",
+				"SELECT",
+				"FROM raw_orders",
+				"WHERE status = 'completed'",
+			},
+		},
+		{
+			name:     "fct_order_summary.sql",
+			filename: "fct_order_summary.sql",
+			expectedStrings: []string{
+				"{{ config(materialized='table') }}",
+				"SELECT",
+				"FROM",
+				"LEFT JOIN",
+				"GROUP BY",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := filepath.Join(projectPath, "models", tt.filename)
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				t.Fatalf("failed to read model file %s: %v", tt.filename, err)
+			}
+
+			contentStr := string(content)
+			for _, expected := range tt.expectedStrings {
+				if !strings.Contains(contentStr, expected) {
+					t.Errorf("expected model file %s to contain %q, got:\n%s", tt.filename, expected, contentStr)
+				}
+			}
+		})
+	}
+}
+
+// TestGenerateModels_RefSyntax verifies that {{ ref }} syntax is correct in fct_order_summary.sql
+func TestGenerateModels_RefSyntax(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectPath := filepath.Join(tempDir, "test_project")
+
+	// Create project structure first
+	err := createProjectDirectories(projectPath, false)
+	if err != nil {
+		t.Fatalf("failed to create project directories: %v", err)
+	}
+
+	// Generate models
+	err = generateModels(projectPath)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Read fct_order_summary.sql
+	filePath := filepath.Join(projectPath, "models", "fct_order_summary.sql")
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read fct_order_summary.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify {{ ref "stg_users" }} syntax
+	if !strings.Contains(contentStr, `{{ ref "stg_users" }}`) {
+		t.Errorf("expected fct_order_summary.sql to contain {{ ref \"stg_users\" }}, got:\n%s", contentStr)
+	}
+
+	// Verify {{ ref "stg_orders" }} syntax
+	if !strings.Contains(contentStr, `{{ ref "stg_orders" }}`) {
+		t.Errorf("expected fct_order_summary.sql to contain {{ ref \"stg_orders\" }}, got:\n%s", contentStr)
+	}
+}
