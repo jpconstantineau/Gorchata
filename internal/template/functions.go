@@ -128,3 +128,23 @@ func makeIsIncrementalFunc(ctx *Context) func() bool {
 		return ctx.IsIncremental
 	}
 }
+
+// makeThisFunc creates a this() function for template use.
+// Returns the current model's table name with schema qualification if set.
+// Returns an error if CurrentModelTable is not set (protects against misuse).
+func makeThisFunc(ctx *Context) func() (string, error) {
+	return func() (string, error) {
+		// Error if CurrentModelTable not set - protects against misuse
+		if ctx.CurrentModelTable == "" {
+			return "", fmt.Errorf("this() called but CurrentModelTable not set in context")
+		}
+
+		// Return qualified table name if schema is set
+		if ctx.Schema != "" {
+			return fmt.Sprintf("%s.%s", ctx.Schema, ctx.CurrentModelTable), nil
+		}
+
+		// Return just the table name
+		return ctx.CurrentModelTable, nil
+	}
+}

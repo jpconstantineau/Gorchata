@@ -19,5 +19,6 @@ func BuildFuncMap(ctx *Context, tracker DependencyTracker) template.FuncMap {
 		"source":         makeSourceFunc(ctx),
 		"env_var":        makeEnvVarFunc(),
 		"is_incremental": makeIsIncrementalFunc(ctx),
+		"this":           makeThisFunc(ctx),
 	}
 }
