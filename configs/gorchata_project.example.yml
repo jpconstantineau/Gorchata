@@ -1,0 +1,43 @@
+# Example gorchata_project.yml
+# This file defines your Gorchata project configuration
+
+# Project identification
+name: my_gorchata_project
+version: 1.0.0
+
+# Default profile to use (references profiles.yml)
+profile: default
+
+# Directory paths for different asset types
+model-paths:
+  - models
+  # - custom_models  # Optional: additional model directories
+
+seed-paths:
+  - seeds
+
+test-paths:
+  - tests
+
+macro-paths:
+  - macros
+
+# Project-wide variables accessible in your models
+vars:
+  # Example variables
+  start_date: '2024-01-01'
+  environment: dev
+
+# Model-specific configurations
+models:
+  # Configuration for models in the 'my_gorchata_project' namespace
+  my_gorchata_project:
+    # Default materialization strategy: 'view', 'table', or 'ephemeral'
+    materialized: view
+    # Default schema for models
+    schema: main
+  
+  # Example: Configure a specific schema
+  # analytics:
+  #   materialized: table
+  #   schema: analytics

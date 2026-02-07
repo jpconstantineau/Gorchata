@@ -1,0 +1,9 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: ./gorchata_dev.db
+    prod:
+      type: sqlite
+      database: /data/prod.db

@@ -61,15 +61,30 @@ macro-paths:
   - macros
 ```
 
-**profiles.yml** (typically `~/.gorchata/profiles.yml`):
+**profiles.yml** (typically `~/.gorchata/profiles.yml` or project root):
 ```yaml
-dev:
-  target: local
+default:
+  target: dev
   outputs:
-    local:
+    dev:
       type: sqlite
-      database: .gorchata/gorchata.db
-      schema: main
+      database: ${GORCHATA_DB_PATH:./gorchata.db}
+    prod:
+      type: sqlite
+      database: ${GORCHATA_PROD_DB:/data/gorchata_prod.db}
+```
+
+**Environment Variables in profiles.yml:**
+- `${VAR}`: Required variable - error if not set
+- `${VAR:default}`: Optional variable with default value
+
+Example environment variable usage:
+```bash
+# Set database path via environment variable
+export GORCHATA_DB_PATH=/custom/path/to/db.db
+
+# Run gorchata (will use the env var)
+gorchata run
 ```
 
 ### 3. Create Your First Model
@@ -169,25 +184,45 @@ gorchata docs generate
 
 ## Configuration
 
+### Configuration Files
+
+Gorchata uses two main configuration files:
+
+1. **gorchata_project.yml** - Project-specific settings (checked into version control)
+2. **profiles.yml** - Environment/connection settings (typically not in version control)
+
+See example configuration files in [configs/](configs/) directory:
+- [configs/gorchata_project.example.yml](configs/gorchata_project.example.yml)
+- [configs/profiles.example.yml](configs/profiles.example.yml)
+
 ### Database Location
 
 By default, Gorchata stores its SQLite database at:
 - **Windows**: `.gorchata/gorchata.db` (in project root)
-- **Linux/Mac**: `.gorchata/gorchata.db` (in project root)
-
-Override via `profiles.yml` or environment variables (coming soon).
-
-### Project Structure
-
-A typical Gorchata project looks like this:
-
-```
-my_project/
-├── gorchata_project.yml    # Project configuration
-├── profiles.yml            # Connection profiles (optional, can be in ~/.gorchata/)
+- **Linux/Mac**: `.gorchata/gorchata.db` (in projectr in ~/.gorchata/)
 ├── models/                 # SQL transformation models
 │   ├── staging/
 │   │   └── stg_customers.sql
+│   └── marts/
+│       └── customers.sql
+├── seeds/                  # CSV files to load as tables
+│   └── country_codes.csv
+├── tests/                  # Data quality tests
+│   └── assert_positive_revenue.sql
+├── macros/                 # Reusable SQL snippets
+│   └── cents_to_dollars.sql
+└── .gorchata/              # Local database and runtime files (gitignored)
+    └── gorchata.db
+```
+
+### Configuration Discovery
+
+Gorchata searches for config files in the following order:
+1. Current directory
+2. Parent directories (recursively up to root)
+3. `~/.gorchata/` (for profiles.yml only)
+
+This allows you to run `gorchata` from subdirectories within your project. │   └── stg_customers.sql
 │   └── marts/
 │       └── customers.sql
 ├── seeds/                  # CSV files to load as tables
@@ -299,7 +334,7 @@ gorchata run
 
 **Error: "profiles.yml not found"**
 - Create `profiles.yml` in project root or `~/.gorchata/`
-- Check the configuration section above for the correct format
+- Cx] Phase 2: Configuration parsing (YAML with environment variable supportr the correct format
 
 **Error: "gorchata_project.yml not found"**
 - Ensure you're running Gorchata from a project root directory
