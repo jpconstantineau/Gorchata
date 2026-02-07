@@ -442,3 +442,98 @@ func TestRunMissingConfig(t *testing.T) {
 		t.Errorf("RunCommand() error = %v, want error about missing config", err)
 	}
 }
+
+// TestFullRefreshFlag tests that the --full-refresh flag is properly parsed
+func TestFullRefreshFlag(t *testing.T) {
+	// Create temp directory for test project
+	tmpDir := t.TempDir()
+
+	// Create test database
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create project config
+	projectConfig := `
+name: test_project
+version: 1.0.0
+model_paths:
+  - models
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "gorchata_project.yml"), []byte(projectConfig), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create profiles config
+	profilesConfig := fmt.Sprintf(`
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: %s
+`, dbPath)
+	if err := os.WriteFile(filepath.Join(tmpDir, "profiles.yml"), []byte(profilesConfig), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create models directory
+	modelsDir := filepath.Join(tmpDir, "models")
+	if err := os.MkdirAll(modelsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an incremental model that uses is_incremental
+	modelContent := `{{ config(materialization="incremental", unique_key="id") }}
+SELECT 
+	1 as id,
+	'test' as value
+{{ if is_incremental }}
+WHERE 1 = 0  -- This should be removed with --full-refresh
+{{ end }}`
+
+	if err := os.WriteFile(filepath.Join(modelsDir, "incremental_model.sql"), []byte(modelContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// First run without --full-refresh (incremental should be true in first run, but table doesn't exist yet)
+	err = RunCommand([]string{})
+	if err != nil {
+		t.Fatalf("First RunCommand() error = %v, want nil", err)
+	}
+
+	// Verify table was created
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Check table exists
+	var name string
+	err = db.QueryRowContext(context.Background(), "SELECT name FROM sqlite_master WHERE type='table' AND name='incremental_model'").Scan(&name)
+	if err != nil {
+		t.Fatalf("Table incremental_model not found: %v", err)
+	}
+
+	// Now run with --full-refresh flag - should force a full refresh
+	err = RunCommand([]string{"--full-refresh"})
+	if err != nil {
+		t.Errorf("RunCommand() with --full-refresh error = %v, want nil", err)
+	}
+
+	// Table should still exist (it would be dropped and recreated)
+	err = db.QueryRowContext(context.Background(), "SELECT name FROM sqlite_master WHERE type='table' AND name='incremental_model'").Scan(&name)
+	if err != nil {
+		t.Errorf("Table incremental_model not found after --full-refresh: %v", err)
+	}
+}

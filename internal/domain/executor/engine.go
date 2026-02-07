@@ -41,6 +41,41 @@ func (e *Engine) ExecuteModel(ctx context.Context, model *Model) (ModelResult, e
 		StartTime: time.Now(),
 	}
 
+	// If TemplateContent is set, render it with the correct incremental context
+	if model.TemplateContent != "" {
+		// Determine if this is an incremental run
+		isIncremental := model.MaterializationConfig.Type == materialization.MaterializationIncremental &&
+			!model.MaterializationConfig.FullRefresh
+
+		// Build template context with incremental settings
+		tmplCtx := template.NewContext(
+			template.WithCurrentModel(model.ID),
+			template.WithIsIncremental(isIncremental),
+			template.WithCurrentModelTable(model.ID),
+		)
+
+		// Parse the template
+		tmpl, err := e.templateEngine.Parse(model.ID, model.TemplateContent)
+		if err != nil {
+			result.Status = StatusFailed
+			result.Error = fmt.Sprintf("failed to parse template: %v", err)
+			result.EndTime = time.Now()
+			return result, fmt.Errorf("failed to parse template for model %s: %w", model.ID, err)
+		}
+
+		// Render the template with the incremental context
+		rendered, err := template.Render(tmpl, tmplCtx, nil)
+		if err != nil {
+			result.Status = StatusFailed
+			result.Error = fmt.Sprintf("failed to render template: %v", err)
+			result.EndTime = time.Now()
+			return result, fmt.Errorf("failed to render template for model %s: %w", model.ID, err)
+		}
+
+		// Update the compiled SQL with the newly rendered version
+		model.SetCompiledSQL(rendered)
+	}
+
 	// Validate model has compiled SQL
 	if model.CompiledSQL == "" {
 		result.Status = StatusFailed
