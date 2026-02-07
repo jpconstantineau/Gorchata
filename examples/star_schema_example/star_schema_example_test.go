@@ -470,3 +470,523 @@ func TestRawSalesDataDiversity(t *testing.T) {
 		t.Errorf("Expected 3-4 unique product categories, got %d", categoryCount)
 	}
 }
+
+// ============================================================================
+// Phase 3: Dimension Tables - Products & Dates
+// ============================================================================
+
+// TestDimProductsModelExists verifies dim_products.sql model file exists
+func TestDimProductsModelExists(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("dim_products.sql does not exist: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("dim_products.sql is a directory, expected a file")
+	}
+	if info.Size() == 0 {
+		t.Error("dim_products.sql is empty")
+	}
+}
+
+// TestDimProductsModelContent verifies dim_products.sql has required content
+func TestDimProductsModelContent(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for config directive
+	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+		t.Error("dim_products.sql missing config directive with materialized='table'")
+	}
+
+	// Check for ref to raw_sales
+	if !strings.Contains(contentStr, `{{ ref "raw_sales" }}`) {
+		t.Error("dim_products.sql missing {{ ref \"raw_sales\" }} reference")
+	}
+
+	// Check for expected column names
+	expectedColumns := []string{"product_id", "product_name", "product_category", "product_price"}
+	for _, col := range expectedColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("dim_products.sql missing expected column: %s", col)
+		}
+	}
+}
+
+// TestDimProductsModelExecution tests that dim_products model can be executed
+func TestDimProductsModelExecution(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Read dim_products model
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+
+	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	// Execute as CREATE TABLE
+	createTableSQL := "CREATE TABLE dim_products AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_products model: %v", err)
+	}
+
+	// Verify table was created
+	var tableName string
+	err = db.QueryRowContext(context.Background(),
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='dim_products'").Scan(&tableName)
+	if err != nil {
+		t.Fatalf("Table dim_products not found: %v", err)
+	}
+}
+
+// TestDimProductsColumns verifies dim_products table has expected columns
+func TestDimProductsColumns(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_products table
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_products AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_products model: %v", err)
+	}
+
+	// Query table info
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(dim_products)")
+	if err != nil {
+		t.Fatalf("Failed to get table info: %v", err)
+	}
+	defer rows.Close()
+
+	// Collect column names
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		columns = append(columns, name)
+	}
+
+	// Expected columns
+	expectedColumns := []string{"product_id", "product_name", "product_category", "product_price"}
+
+	// Verify all expected columns exist
+	for _, expected := range expectedColumns {
+		found := false
+		for _, col := range columns {
+			if col == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in dim_products table. Found columns: %v", expected, columns)
+		}
+	}
+}
+
+// TestDimProductsUniqueProducts verifies dim_products extracts unique products
+func TestDimProductsUniqueProducts(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_products table
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_products AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_products model: %v", err)
+	}
+
+	// Count total records
+	var totalCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM dim_products").Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("Failed to count records: %v", err)
+	}
+
+	// Expected: 12 unique products
+	if totalCount != 12 {
+		t.Errorf("Expected 12 unique products, got %d", totalCount)
+	}
+
+	// Verify no duplicates on product_id
+	var duplicateCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM (SELECT product_id, COUNT(*) as cnt FROM dim_products GROUP BY product_id HAVING cnt > 1)").Scan(&duplicateCount)
+	if err != nil {
+		t.Fatalf("Failed to check for duplicates: %v", err)
+	}
+
+	if duplicateCount > 0 {
+		t.Errorf("Found %d duplicate product_ids in dim_products", duplicateCount)
+	}
+}
+
+// TestDimProductsDataIntegrity verifies product data has all attributes
+func TestDimProductsDataIntegrity(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_products table
+	modelPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_products AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_products model: %v", err)
+	}
+
+	// Check that no products have NULL values
+	var nullCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_products WHERE product_id IS NULL OR product_name IS NULL OR product_category IS NULL OR product_price IS NULL").Scan(&nullCount)
+	if err != nil {
+		t.Fatalf("Failed to check for NULLs: %v", err)
+	}
+
+	if nullCount > 0 {
+		t.Errorf("Found %d products with NULL attributes", nullCount)
+	}
+}
+
+// TestDimDatesModelExists verifies dim_dates.sql model file exists
+func TestDimDatesModelExists(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("dim_dates.sql does not exist: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("dim_dates.sql is a directory, expected a file")
+	}
+	if info.Size() == 0 {
+		t.Error("dim_dates.sql is empty")
+	}
+}
+
+// TestDimDatesModelContent verifies dim_dates.sql has required content
+func TestDimDatesModelContent(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for config directive
+	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+		t.Error("dim_dates.sql missing config directive with materialized='table'")
+	}
+
+	// Check for ref to raw_sales
+	if !strings.Contains(contentStr, `{{ ref "raw_sales" }}`) {
+		t.Error("dim_dates.sql missing {{ ref \"raw_sales\" }} reference")
+	}
+
+	// Check for expected column names
+	expectedColumns := []string{"sale_date", "year", "quarter", "month", "day", "day_of_week", "is_weekend"}
+	for _, col := range expectedColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("dim_dates.sql missing expected column: %s", col)
+		}
+	}
+
+	// Check for strftime usage
+	if !strings.Contains(contentStr, "strftime") {
+		t.Error("dim_dates.sql should use strftime for date extraction")
+	}
+}
+
+// TestDimDatesModelExecution tests that dim_dates model can be executed
+func TestDimDatesModelExecution(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Read dim_dates model
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	// Execute as CREATE TABLE
+	createTableSQL := "CREATE TABLE dim_dates AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_dates model: %v", err)
+	}
+
+	// Verify table was created
+	var tableName string
+	err = db.QueryRowContext(context.Background(),
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='dim_dates'").Scan(&tableName)
+	if err != nil {
+		t.Fatalf("Table dim_dates not found: %v", err)
+	}
+}
+
+// TestDimDatesColumns verifies dim_dates table has expected columns
+func TestDimDatesColumns(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_dates table
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_dates AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_dates model: %v", err)
+	}
+
+	// Query table info
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(dim_dates)")
+	if err != nil {
+		t.Fatalf("Failed to get table info: %v", err)
+	}
+	defer rows.Close()
+
+	// Collect column names
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		columns = append(columns, name)
+	}
+
+	// Expected columns
+	expectedColumns := []string{"sale_date", "year", "quarter", "month", "day", "day_of_week", "is_weekend"}
+
+	// Verify all expected columns exist
+	for _, expected := range expectedColumns {
+		found := false
+		for _, col := range columns {
+			if col == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in dim_dates table. Found columns: %v", expected, columns)
+		}
+	}
+}
+
+// TestDimDatesUniqueDates verifies dim_dates has one row per unique date
+func TestDimDatesUniqueDates(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_dates table
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_dates AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_dates model: %v", err)
+	}
+
+	// Count total records
+	var totalCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM dim_dates").Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("Failed to count records: %v", err)
+	}
+
+	// Expected: 30 unique dates (one per sale in raw_sales)
+	if totalCount != 30 {
+		t.Errorf("Expected 30 unique dates, got %d", totalCount)
+	}
+
+	// Verify no duplicates on sale_date
+	var duplicateCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM (SELECT sale_date, COUNT(*) as cnt FROM dim_dates GROUP BY sale_date HAVING cnt > 1)").Scan(&duplicateCount)
+	if err != nil {
+		t.Fatalf("Failed to check for duplicates: %v", err)
+	}
+
+	if duplicateCount > 0 {
+		t.Errorf("Found %d duplicate dates in dim_dates", duplicateCount)
+	}
+}
+
+// TestDimDatesTimeAttributes verifies dim_dates has correct time attributes
+func TestDimDatesTimeAttributes(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_dates table
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_dates AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_dates model: %v", err)
+	}
+
+	// Test a sample date's attributes - using 2024-01-05 (Friday) from actual data
+	var year, quarter, month, day int
+	var dayOfWeek string
+	var isWeekend int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT year, quarter, month, day, day_of_week, is_weekend FROM dim_dates WHERE sale_date = '2024-01-05'").
+		Scan(&year, &quarter, &month, &day, &dayOfWeek, &isWeekend)
+	if err != nil {
+		t.Fatalf("Failed to query 2024-01-05: %v", err)
+	}
+
+	// Verify attributes for 2024-01-05 (Friday)
+	if year != 2024 {
+		t.Errorf("Expected year 2024, got %d", year)
+	}
+	if quarter != 1 {
+		t.Errorf("Expected quarter 1, got %d", quarter)
+	}
+	if month != 1 {
+		t.Errorf("Expected month 1, got %d", month)
+	}
+	if day != 5 {
+		t.Errorf("Expected day 5, got %d", day)
+	}
+	// Friday is day_of_week = 5
+	if dayOfWeek != "5" {
+		t.Errorf("Expected day_of_week '5' (Friday), got %s", dayOfWeek)
+	}
+	if isWeekend != 0 {
+		t.Errorf("Expected is_weekend 0 (not weekend), got %d", isWeekend)
+	}
+}
+
+// TestDimDatesWeekendDetection verifies is_weekend is calculated correctly
+func TestDimDatesWeekendDetection(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create dim_dates table
+	modelPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_dates AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_dates model: %v", err)
+	}
+
+	// Count weekend days (day_of_week = 0 (Sunday) or 6 (Saturday))
+	var weekendCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_dates WHERE day_of_week IN ('0', '6')").Scan(&weekendCount)
+	if err != nil {
+		t.Fatalf("Failed to count weekend days: %v", err)
+	}
+
+	// Count is_weekend = 1
+	var isWeekendCount int
+	err = db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM dim_dates WHERE is_weekend = 1").Scan(&isWeekendCount)
+	if err != nil {
+		t.Fatalf("Failed to count is_weekend: %v", err)
+	}
+
+	// They should match
+	if weekendCount != isWeekendCount {
+		t.Errorf("Weekend detection mismatch: day_of_week IN ('0','6') gave %d, is_weekend=1 gave %d", weekendCount, isWeekendCount)
+	}
+}
