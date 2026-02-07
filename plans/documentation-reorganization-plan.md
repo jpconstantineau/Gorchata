@@ -66,7 +66,7 @@ Reorganize README.md into logical sections for users vs. developers, consider sp
 ### Phase 4: Update GitHub URLs in Documentation
 - **Objective:** Update all GitHub URLs in README and other documentation files
 - **Files/Functions to Modify/Create:**
-  - [README.md](README.md) - 4 references to github.com/pierre/gorchata
+  - [README.md](README.md) - 4 references to github.com/jpconstantineau/gorchata
   - Any other markdown files in [plans/](plans/) if they contain old URLs
 - **Tests to Write:**
   1. Manual verification test that all links work (can be scripted)
@@ -76,7 +76,7 @@ Reorganize README.md into logical sections for users vs. developers, consider sp
   2. Update clone URL: `git clone https://github.com/jpconstantineau/gorchata.git`
   3. Update Issues URL: `https://github.com/jpconstantineau/gorchata/issues`
   4. Update Discussions URL: `https://github.com/jpconstantineau/gorchata/discussions`
-  5. Run grep search to verify no instances of `github.com/pierre/gorchata` remain
+  5. Run grep search to verify no instances of `github.com/jpconstantineau/gorchata` remain
   6. Build and test to verify documentation references don't affect functionality
 
 ### Phase 5: Reorganize README Documentation Structure
