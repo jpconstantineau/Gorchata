@@ -6,9 +6,41 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+	"time"
 )
 
 var projectNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// projectConfigTemplate is the template for gorchata_project.yml
+const projectConfigTemplate = `name: {{PROJECT_NAME}}
+version: 1.0.0
+profile: dev
+
+model-paths:
+  - models
+
+vars:
+  start_date: '{{CURRENT_YEAR}}-01-01'
+`
+
+// generateProjectConfig creates the gorchata_project.yml file with project-specific values
+func generateProjectConfig(projectPath, projectName string) error {
+	// Get current year
+	currentYear := time.Now().Year()
+
+	// Replace placeholders in template
+	content := strings.ReplaceAll(projectConfigTemplate, "{{PROJECT_NAME}}", projectName)
+	content = strings.ReplaceAll(content, "{{CURRENT_YEAR}}", fmt.Sprintf("%d", currentYear))
+
+	// Write file
+	configPath := filepath.Join(projectPath, "gorchata_project.yml")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write project config file: %w", err)
+	}
+
+	return nil
+}
 
 // createProjectDirectories creates the project root directory and its subdirectories
 func createProjectDirectories(projectPath string, force bool) error {
@@ -83,6 +115,11 @@ func InitCommand(args []string) error {
 
 	// Create project directories
 	if err := createProjectDirectories(projectName, *force); err != nil {
+		return err
+	}
+
+	// Generate project config file
+	if err := generateProjectConfig(projectName, projectName); err != nil {
 		return err
 	}
 
