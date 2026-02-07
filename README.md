@@ -1,0 +1,339 @@
+# Gorchata 🌶️
+
+**Gorchata** is a SQL-first data transformation tool inspired by dbt, designed for Go developers who want a lightweight, dependency-free solution for managing data transformations.
+
+## Why Gorchata?
+
+- **SQL-First**: Write your transformations in SQL, the language of data
+- **Go-Powered**: Fast, compiled binary with no runtime dependencies
+- **Zero CGO**: Pure Go implementation with SQLite (no C dependencies)
+- **dbt-Compatible**: Familiar project structure and concepts for dbt users
+- **Lightweight**: Single binary, minimal footprint
+- **Cross-Platform**: Works on Windows, Linux, and macOS
+
+## Requirements
+
+- **Go 1.25+** (for building from source)
+- Terminal / Command Prompt
+
+## Installation
+
+### Option 1: Install via go install
+
+```bash
+go install github.com/pierre/gorchata/cmd/gorchata@latest
+```
+
+### Option 2: Build from Source
+
+```bash
+git clone https://github.com/pierre/gorchata.git
+cd gorchata
+scripts/build.ps1 -Task build
+```
+
+The binary will be created in `bin/gorchata.exe` (Windows) or `bin/gorchata` (Unix).
+
+## Quick Start
+
+### 1. Initialize a New Project (Coming Soon)
+
+```bash
+gorchata init my_project
+cd my_project
+```
+
+### 2. Configure Your Project
+
+**gorchata_project.yml** (project root):
+```yaml
+name: my_project
+version: 1.0.0
+profile: dev
+
+model-paths:
+  - models
+seed-paths:
+  - seeds
+test-paths:
+  - tests
+macro-paths:
+  - macros
+```
+
+**profiles.yml** (typically `~/.gorchata/profiles.yml`):
+```yaml
+dev:
+  target: local
+  outputs:
+    local:
+      type: sqlite
+      database: .gorchata/gorchata.db
+      schema: main
+```
+
+### 3. Create Your First Model
+
+**models/customers.sql**:
+```sql
+-- Description: Customer dimension table
+-- Depends: raw_customers
+
+SELECT
+    customer_id,
+    customer_name,
+    email,
+    created_at
+FROM raw_customers
+WHERE deleted_at IS NULL
+```
+
+### 4. Run Your Models
+
+```bash
+gorchata run
+```
+
+## How to Run
+
+### Via PowerShell Script (Recommended for Development)
+
+```powershell
+# Run tests
+scripts/build.ps1 -Task test
+
+# Build the binary
+scripts/build.ps1 -Task build
+
+# Run the application
+scripts/build.ps1 -Task run
+
+# Run with arguments
+scripts/build.ps1 -Task run -- --help
+
+# Clean build artifacts
+scripts/build.ps1 -Task clean
+```
+
+### Via Go Command
+
+```bash
+# Run directly without building
+go run ./cmd/gorchata
+
+# Build and run
+go build -o bin/gorchata ./cmd/gorchata
+./bin/gorchata
+```
+
+### Via Installed Binary
+
+```bash
+gorchata run
+gorchata compile
+gorchata test
+gorchata docs
+```
+
+## Commands
+
+### `run`
+Execute all models in dependency order.
+
+```bash
+gorchata run                    # Run all models
+gorchata run --models customers  # Run specific model
+gorchata run --exclude staging.* # Exclude models by pattern
+```
+
+### `compile`
+Compile templates without executing them (validate SQL).
+
+```bash
+gorchata compile
+```
+
+### `test` (Placeholder)
+Run data quality tests on your models.
+
+```bash
+gorchata test
+```
+
+### `docs` (Placeholder)
+Generate documentation from your models.
+
+```bash
+gorchata docs generate
+```
+
+## Configuration
+
+### Database Location
+
+By default, Gorchata stores its SQLite database at:
+- **Windows**: `.gorchata/gorchata.db` (in project root)
+- **Linux/Mac**: `.gorchata/gorchata.db` (in project root)
+
+Override via `profiles.yml` or environment variables (coming soon).
+
+### Project Structure
+
+A typical Gorchata project looks like this:
+
+```
+my_project/
+├── gorchata_project.yml    # Project configuration
+├── profiles.yml            # Connection profiles (optional, can be in ~/.gorchata/)
+├── models/                 # SQL transformation models
+│   ├── staging/
+│   │   └── stg_customers.sql
+│   └── marts/
+│       └── customers.sql
+├── seeds/                  # CSV files to load as tables
+│   └── country_codes.csv
+├── tests/                  # Data quality tests
+│   └── assert_positive_revenue.sql
+├── macros/                 # Reusable SQL snippets
+│   └── cents_to_dollars.sql
+└── .gorchata/              # Local database and runtime files
+    └── gorchata.db
+```
+
+### Schema Migrations
+
+Gorchata automatically migrates the SQLite database schema on first launch or when the version changes. No manual intervention required.
+
+## Developer Workflow
+
+### Running Tests
+
+```bash
+# Via PowerShell
+scripts/build.ps1 -Task test
+
+# Via Go command
+go test ./...
+```
+
+### Building
+
+```bash
+# Via PowerShell
+scripts/build.ps1 -Task build
+
+# Via Go command (with CGO disabled)
+CGO_ENABLED=0 go build -o bin/gorchata ./cmd/gorchata
+```
+
+### Test-Driven Development (TDD)
+
+This project follows strict TDD principles:
+
+1. **Write tests first** - Define expected behavior
+2. **Run tests** - Confirm they fail (red phase)
+3. **Implement** - Write minimal code to pass
+4. **Run tests** - Confirm they pass (green phase)
+5. **Refactor** - Improve code while keeping tests green
+6. **Build/Run** - Verify end-to-end via PowerShell script
+
+All contributions must include tests.
+
+## Architecture
+
+Gorchata follows Clean Architecture principles:
+
+```
+cmd/gorchata/          # Thin entrypoint (main.go)
+internal/
+├── app/               # Application wiring, dependency injection
+├── cli/               # Command-line interface (Bubble Tea)
+├── domain/            # Business logic (pure, no dependencies)
+│   ├── model/         # Model domain logic
+│   ├── project/       # Project configuration
+│   └── compilation/   # Template compilation
+├── config/            # Configuration loading/parsing
+├── template/          # SQL template engine (Jinja-like)
+└── platform/          # External dependencies
+    ├── sqlite/        # SQLite adapter
+    └── fs/            # Filesystem adapter
+```
+
+### Key Principles
+
+- **Domain is pure**: No external dependencies (UI, DB, filesystem)
+- **Ports and Adapters**: Interfaces defined in domain, implemented in platform
+- **Dependency Injection**: All dependencies injected via constructors
+- **No CGO**: Pure Go, cross-platform compilation
+
+## Troubleshooting
+
+### Reset Database
+
+If you encounter database issues:
+
+```bash
+# Delete the database file
+rm .gorchata/gorchata.db   # Unix/Mac
+del .gorchata\gorchata.db  # Windows
+
+# Re-run Gorchata to recreate
+gorchata run
+```
+
+### Build Errors
+
+**Error: "cgo is required"**
+- Ensure `CGO_ENABLED=0` is set in your environment
+- Use the provided PowerShell script which sets this automatically
+
+**Error: "cannot find package"**
+- Run `go mod tidy` to download dependencies
+- Ensure Go 1.25+ is installed: `go version`
+
+**Error: "binary not found"**
+- Ensure you've run `scripts/build.ps1 -Task build` first
+- Check that `bin/gorchata.exe` exists
+
+### Runtime Errors
+
+**Error: "profiles.yml not found"**
+- Create `profiles.yml` in project root or `~/.gorchata/`
+- Check the configuration section above for the correct format
+
+**Error: "gorchata_project.yml not found"**
+- Ensure you're running Gorchata from a project root directory
+- Initialize a new project with `gorchata init` (coming soon)
+
+## Roadmap
+
+- [x] Phase 1: Project scaffolding and build infrastructure
+- [ ] Phase 2: Configuration parsing (YAML)
+- [ ] Phase 3: SQL template engine (Jinja-like)
+- [ ] Phase 4: Model compilation and dependency resolution
+- [ ] Phase 5: SQLite execution engine
+- [ ] Phase 6: CLI interface (Bubble Tea)
+- [ ] Phase 7: Seeds and tests
+- [ ] Phase 8: Macros and documentation generation
+
+## Contributing
+
+Contributions are welcome! Please ensure:
+
+1. All tests pass (`scripts/build.ps1 -Task test`)
+2. New features include tests (TDD)
+3. Code follows idiomatic Go style (`gofmt`)
+4. Documentation is updated (README.md)
+
+## License
+
+See [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: https://github.com/pierre/gorchata/issues
+- **Discussions**: https://github.com/pierre/gorchata/discussions
+
+---
+
+*Made with ❤️ and Go*
