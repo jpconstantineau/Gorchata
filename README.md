@@ -89,24 +89,55 @@ gorchata run
 
 ### 3. Create Your First Model
 
-**models/customers.sql**:
+Models are SQL files with optional configuration and template functions.
+
+**models/staging/stg_users.sql**:
 ```sql
--- Description: Customer dimension table
--- Depends: raw_customers
+-- Staging model for users
+{{ config(materialized='view') }}
 
 SELECT
-    customer_id,
-    customer_name,
+    id,
+    name,
     email,
     created_at
-FROM raw_customers
+FROM raw_users
 WHERE deleted_at IS NULL
 ```
+
+**models/marts/fct_orders.sql**:
+```sql
+-- Fact table combining users and orders
+{{ config(materialized='table') }}
+
+SELECT
+    u.id as user_id,
+    u.name as user_name,
+    COUNT(o.id) as order_count,
+    SUM(o.amount) as total_amount
+FROM {{ ref "stg_users" }} u
+LEFT JOIN {{ ref "stg_orders" }} o ON u.id = o.user_id
+GROUP BY u.id, u.name
+```
+
+**Key Template Functions:**
+- `{{ config(materialized='view') }}` - Set materialization strategy (view, table, incremental)
+- `{{ ref "model_name" }}` - Reference another model (creates dependency)
 
 ### 4. Run Your Models
 
 ```bash
+# Run all models in dependency order
 gorchata run
+
+# Run with verbose output
+gorchata run --verbose
+
+# Run specific models
+gorchata run --models stg_users,fct_orders
+
+# Stop on first error
+gorchata run --fail-fast
 ```
 
 ## How to Run
@@ -156,31 +187,147 @@ gorchata docs
 Execute all models in dependency order.
 
 ```bash
-gorchata run                    # Run all models
-gorchata run --models customers  # Run specific model
-gorchata run --exclude staging.* # Exclude models by pattern
+gorchata run                       # Run all models
+gorchata run --verbose             # Show detailed output
+gorchata run --models customers    # Run specific model(s)
+gorchata run --fail-fast           # Stop on first error
+gorchata run --target prod         # Use specific target from profiles
 ```
 
 ### `compile`
 Compile templates without executing them (validate SQL).
 
 ```bash
-gorchata compile
+gorchata compile                   # Compile all models
+gorchata compile --models orders   # Compile specific models
 ```
 
-### `test` (Placeholder)
+### `test` (Coming Soon)
 Run data quality tests on your models.
 
 ```bash
 gorchata test
 ```
 
-### `docs` (Placeholder)
+### `docs` (Coming Soon)
 Generate documentation from your models.
 
 ```bash
 gorchata docs generate
 ```
+
+## Materialization Strategies
+
+Gorchata supports three materialization strategies:
+
+### View (Default)
+Creates a SQL view. Fast to build, always reflects current data.
+
+```sql
+{{ config(materialized='view') }}
+
+SELECT * FROM source_table
+```
+
+### Table
+Creates a physical table using `CREATE TABLE AS SELECT`. Full refresh on each run.
+
+```sql
+{{ config(materialized='table') }}
+
+SELECT * FROM source_table
+```
+
+### Incremental (Coming Soon)
+Appends new records to existing table based on unique key.  
+
+```sql
+{{ config(materialized='incremental', unique_key=['id']) }}
+
+SELECT * FROM source_table
+WHERE created_at > (SELECT MAX(created_at) FROM {{ this }})
+```
+
+## Sample Project Structure
+
+```
+my_project/
+├── gorchata_project.yml    # Project configuration
+├── profiles.yml            # Connection profiles
+├── models/
+│   ├── staging/
+│   │   ├── stg_users.sql
+│   │   └── stg_orders.sql
+│   └── marts/
+│       └── fct_order_summary.sql
+├── seeds/                  # CSV data files (coming soon)
+├── tests/                  # Data quality tests (coming soon)
+└── macros/                 # Reusable SQL macros (coming soon)
+```
+
+See [test/fixtures/sample_project](test/fixtures/sample_project) for a complete working example.
+
+## Troubleshooting
+
+### Database Location
+
+By default, Gorchata stores its SQLite database at the path specified in your `profiles.yml`.
+Example: `./gorchata.db` (in project root)
+
+To find your database:
+```bash
+# Check your profiles.yml
+cat profiles.yml | grep database
+```
+
+### Reset Database
+
+To start fresh with a clean database:
+
+```bash
+# Delete the database file
+rm gorchata.db
+
+# Run gorchata again (will create new database)
+gorchata run
+```
+
+### Common Errors
+
+**Error: "no such table: raw_users"**
+- Your model references a source table that doesn't exist
+- Create the source table or seed data first
+-Or modify your model to use existing tables
+
+**Error: "cycle detected in graph"**
+- You have circular dependencies (Model A depends on B, B depends on A)
+- Review your `{{ ref "..." }}` calls to break the cycle
+
+**Error: "failed to load config"**
+- Check that `gorchata_project.yml` and `profiles.yml` exist
+- Validate YAML syntax (use a YAML validator)
+- Ensure `default` profile exists in `profiles.yml`
+
+**Error: "template execution failed"**
+- Check template syntax: use `{{ ref "model" }}` not `{{ ref('model') }}`
+- Ensure all referenced models exist
+- Validate SQL syntax
+
+### Execution Order
+
+Models are executed in topological order based on dependencies (via `{{ ref "..." }}`).
+Use `--verbose` flag to see execution order:
+
+```bash
+gorchata run --verbose
+```
+
+### Performance Tips
+
+1. Use `views` for transformations that don't need to be persisted
+2. Use `tables` for large aggregations or expensive queries
+3. Use `--models` flag to run only specific models during development
+4. Consider database indexing for foreign keys and join columns
 
 ## Configuration
 
@@ -195,26 +342,6 @@ See example configuration files in [configs/](configs/) directory:
 - [configs/gorchata_project.example.yml](configs/gorchata_project.example.yml)
 - [configs/profiles.example.yml](configs/profiles.example.yml)
 
-### Database Location
-
-By default, Gorchata stores its SQLite database at:
-- **Windows**: `.gorchata/gorchata.db` (in project root)
-- **Linux/Mac**: `.gorchata/gorchata.db` (in projectr in ~/.gorchata/)
-├── models/                 # SQL transformation models
-│   ├── staging/
-│   │   └── stg_customers.sql
-│   └── marts/
-│       └── customers.sql
-├── seeds/                  # CSV files to load as tables
-│   └── country_codes.csv
-├── tests/                  # Data quality tests
-│   └── assert_positive_revenue.sql
-├── macros/                 # Reusable SQL snippets
-│   └── cents_to_dollars.sql
-└── .gorchata/              # Local database and runtime files (gitignored)
-    └── gorchata.db
-```
-
 ### Configuration Discovery
 
 Gorchata searches for config files in the following order:
@@ -222,22 +349,7 @@ Gorchata searches for config files in the following order:
 2. Parent directories (recursively up to root)
 3. `~/.gorchata/` (for profiles.yml only)
 
-This allows you to run `gorchata` from subdirectories within your project. │   └── stg_customers.sql
-│   └── marts/
-│       └── customers.sql
-├── seeds/                  # CSV files to load as tables
-│   └── country_codes.csv
-├── tests/                  # Data quality tests
-│   └── assert_positive_revenue.sql
-├── macros/                 # Reusable SQL snippets
-│   └── cents_to_dollars.sql
-└── .gorchata/              # Local database and runtime files
-    └── gorchata.db
-```
-
-### Schema Migrations
-
-Gorchata automatically migrates the SQLite database schema on first launch or when the version changes. No manual intervention required.
+This allows you to run `gorchata` from subdirectories within your project.
 
 ## Developer Workflow
 

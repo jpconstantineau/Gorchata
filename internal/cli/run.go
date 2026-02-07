@@ -4,10 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pierre/gorchata/internal/config"
-	"github.com/pierre/gorchata/internal/domain/dag"
+	"github.com/pierre/gorchata/internal/domain/executor"
+	"github.com/pierre/gorchata/internal/domain/materialization"
 	"github.com/pierre/gorchata/internal/platform"
 	"github.com/pierre/gorchata/internal/platform/sqlite"
 	"github.com/pierre/gorchata/internal/template"
@@ -52,95 +56,112 @@ func RunCommand(args []string) error {
 		fmt.Printf("Connected to %s database: %s\n", cfg.Output.Type, cfg.Output.Database)
 	}
 
-	// Build DAG from first model path
-	builder := dag.NewBuilder()
-	graph, err := builder.BuildFromDirectory(cfg.Project.ModelPaths[0])
-	if err != nil {
-		return fmt.Errorf("failed to build DAG: %w", err)
+	// Load models from model paths
+	var allModels []*executor.Model
+	for _, modelPath := range cfg.Project.ModelPaths {
+		models, err := loadModelsFromDirectory(modelPath)
+		if err != nil {
+			return fmt.Errorf("failed to load models from %s: %w", modelPath, err)
+		}
+		allModels = append(allModels, models...)
 	}
 
-	// Validate DAG
-	if err := dag.Validate(graph); err != nil {
-		return fmt.Errorf("DAG validation failed: %w", err)
+	if len(allModels) == 0 {
+		return fmt.Errorf("no models found in model paths")
 	}
 
-	// Get topologically sorted nodes
-	sorted, err := dag.TopologicalSort(graph)
-	if err != nil {
-		return fmt.Errorf("failed to sort DAG: %w", err)
+	if common.Verbose {
+		fmt.Printf("Found %d model(s)\n", len(allModels))
+	}
+
+	// Parse templates and extract config/dependencies
+	templateEngine := template.New()
+	tracker := newSimpleDependencyTracker()
+	templateEngineWithTracker := template.New(template.WithDependencyTracker(tracker))
+
+	for _, model := range allModels {
+		// Read model content
+		content, err := os.ReadFile(model.Path)
+		if err != nil {
+			return fmt.Errorf("failed to read model %s: %w", model.ID, err)
+		}
+
+		contentStr := string(content)
+
+		// Extract config from template
+		cfg := extractModelConfig(contentStr)
+		model.SetMaterializationConfig(cfg)
+
+		// Remove config() calls before parsing
+		contentStr = removeConfigCalls(contentStr)
+
+		// Parse template
+		tmpl, err := templateEngineWithTracker.Parse(model.ID, contentStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse template %s: %w", model.ID, err)
+		}
+
+		// Render template
+		ctx := template.NewContext(template.WithCurrentModel(model.ID))
+		rendered, err := template.Render(tmpl, ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to render template %s: %w", model.ID, err)
+		}
+
+		model.SetCompiledSQL(rendered)
+
+		// Extract dependencies
+		deps := tracker.GetDependencies(model.ID)
+		for _, dep := range deps {
+			model.AddDependency(dep)
+		}
 	}
 
 	// Filter models if specified
 	if common.Models != "" {
-		sorted = filterModels(sorted, strings.Split(common.Models, ","))
+		modelNames := strings.Split(common.Models, ",")
+		allModels = filterModelsByName(allModels, modelNames)
 	}
 
 	if common.Verbose {
-		fmt.Printf("Executing %d model(s)\n", len(sorted))
+		fmt.Printf("Executing %d model(s)\n", len(allModels))
 	}
 
-	// Create template engine (tracker not needed for basic execution)
-	engine := template.New()
-
-	// Execute each model
-	successCount := 0
-	for _, node := range sorted {
-		if common.Verbose {
-			fmt.Printf("Running model: %s\n", node.Name)
-		}
-
-		// Get file content from node metadata
-		content, ok := node.Metadata["content"].(string)
-		if !ok {
-			err := fmt.Errorf("model %s has no content", node.Name)
-			if common.FailFast {
-				return err
-			}
-			fmt.Printf("  Error: %v\n", err)
-			continue
-		}
-
-		// Parse and render template
-		tmplCtx := template.NewContext()
-		tmpl, err := engine.Parse(node.Name, content)
-		if err != nil {
-			err = fmt.Errorf("failed to parse template for model %s: %w", node.Name, err)
-			if common.FailFast {
-				return err
-			}
-			fmt.Printf("  Error: %v\n", err)
-			continue
-		}
-
-		sql, err := template.Render(tmpl, tmplCtx, nil)
-		if err != nil {
-			err = fmt.Errorf("failed to render template for model %s: %w", node.Name, err)
-			if common.FailFast {
-				return err
-			}
-			fmt.Printf("  Error: %v\n", err)
-			continue
-		}
-
-		// Execute SQL against database
-		if err := adapter.ExecuteDDL(ctx, sql); err != nil {
-			err = fmt.Errorf("model %s execution failed: %w", node.Name, err)
-			if common.FailFast {
-				return err
-			}
-			fmt.Printf("  Error: %v\n", err)
-			continue
-		}
-
-		successCount++
-
-		if common.Verbose {
-			fmt.Printf("  -> Success\n")
-		}
+	// Create execution engine
+	engine, err := executor.NewEngine(adapter, templateEngine)
+	if err != nil {
+		return fmt.Errorf("failed to create execution engine: %w", err)
 	}
 
+	// Execute models
+	result, err := engine.ExecuteModels(ctx, allModels, common.FailFast)
+	if err != nil {
+		return fmt.Errorf("execution failed: %w", err)
+	}
+
+	// Print results
 	if common.Verbose {
-		fmt.Printf("\nExecuted %d/%d model(s) successfully\n", successCount, len(sorted))
+		fmt.Printf("\n")
+		for _, mr := range result.ModelResults {
+			status := "✓"
+			if mr.Status == executor.StatusFailed {
+				status = "✗"
+			}
+			fmt.Printf("  %s %s (%.2fs)\n", status, mr.ModelID, mr.Duration().Seconds())
+			if mr.Error != "" {
+				fmt.Printf("    Error: %s\n", mr.Error)
+			}
+		}
+		fmt.Printf("\n")
+	}
+
+	fmt.Printf("Executed %d/%d model(s) successfully in %.2fs\n",
+		result.SuccessCount(),
+		len(result.ModelResults),
+		result.Duration().Seconds())
+
+	if result.FailureCount() > 0 {
+		return fmt.Errorf("%d model(s) failed", result.FailureCount())
 	}
 
 	return nil
@@ -157,4 +178,113 @@ func createAdapter(output *config.OutputConfig) (platform.DatabaseAdapter, error
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", output.Type)
 	}
+}
+
+// loadModelsFromDirectory loads all SQL models from a directory
+func loadModelsFromDirectory(dir string) ([]*executor.Model, error) {
+	var models []*executor.Model
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+
+		modelID := strings.TrimSuffix(entry.Name(), ".sql")
+		modelPath := filepath.Join(dir, entry.Name())
+
+		model, err := executor.NewModel(modelID, modelPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model %s: %w", modelID, err)
+		}
+
+		models = append(models, model)
+	}
+
+	return models, nil
+}
+
+// extractModelConfig extracts materialization config from SQL template
+func extractModelConfig(content string) materialization.MaterializationConfig {
+	config := materialization.DefaultConfig()
+
+	// Look for {{ config(materialized='view') }} pattern (new format)
+	configRe := regexp.MustCompile(`{{\s*config\s*\(\s*materialized\s*=\s*['"](\w+)['"]\s*\)\s*}}`)
+	matches := configRe.FindStringSubmatch(content)
+
+	if len(matches) > 1 {
+		switch matches[1] {
+		case "view":
+			config.Type = materialization.MaterializationView
+		case "table":
+			config.Type = materialization.MaterializationTable
+		case "incremental":
+			config.Type = materialization.MaterializationIncremental
+		}
+		return config
+	}
+
+	// Fall back to -- Materialization: table comment (old format)
+	oldFormatRe := regexp.MustCompile(`--\s*Materialization:\s*(\w+)`)
+	matches = oldFormatRe.FindStringSubmatch(content)
+
+	if len(matches) > 1 {
+		switch matches[1] {
+		case "view":
+			config.Type = materialization.MaterializationView
+		case "table":
+			config.Type = materialization.MaterializationTable
+		case "incremental":
+			config.Type = materialization.MaterializationIncremental
+		}
+	}
+
+	return config
+}
+
+// removeConfigCalls removes {{ config(...) }} from content
+func removeConfigCalls(content string) string {
+	configRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
+	return configRe.ReplaceAllString(content, "")
+}
+
+// simpleDependencyTracker tracks template dependencies
+type simpleDependencyTracker struct {
+	dependencies map[string][]string
+}
+
+func newSimpleDependencyTracker() *simpleDependencyTracker {
+	return &simpleDependencyTracker{
+		dependencies: make(map[string][]string),
+	}
+}
+
+func (t *simpleDependencyTracker) AddDependency(from, to string) error {
+	t.dependencies[from] = append(t.dependencies[from], to)
+	return nil
+}
+
+func (t *simpleDependencyTracker) GetDependencies(modelID string) []string {
+	return t.dependencies[modelID]
+}
+
+// filterModelsByName filters models by name
+func filterModelsByName(models []*executor.Model, names []string) []*executor.Model {
+	nameSet := make(map[string]bool)
+	for _, name := range names {
+		nameSet[strings.TrimSpace(name)] = true
+	}
+
+	var filtered []*executor.Model
+	for _, model := range models {
+		if nameSet[model.ID] {
+			filtered = append(filtered, model)
+		}
+	}
+
+	return filtered
 }

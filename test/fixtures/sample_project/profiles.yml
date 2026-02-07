@@ -1,0 +1,13 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: "sample.db"
+
+prod:
+  target: prod
+  outputs:
+    prod:
+      type: sqlite
+      database: "prod.db"

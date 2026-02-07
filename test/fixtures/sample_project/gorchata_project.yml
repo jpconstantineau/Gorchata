@@ -1,0 +1,9 @@
+name: sample_ecommerce
+version: 1.0.0
+profile: dev
+
+model-paths:
+  - models
+
+vars:
+  start_date: '2024-01-01'
