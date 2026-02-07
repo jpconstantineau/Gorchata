@@ -1,0 +1,6 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: ${STAR_SCHEMA_DB:./examples/star_schema_example/star_schema.db}
