@@ -8,6 +8,13 @@ type Context struct {
 	// Schema is the default schema for table references
 	Schema string
 
+	// IsIncremental indicates whether the model is being executed in incremental mode
+	IsIncremental bool
+
+	// CurrentModelTable is the fully qualified table name for the current model being processed
+	// e.g., "schema.table_name" or just "table_name"
+	CurrentModelTable string
+
 	// Vars contains project variables available in templates
 	Vars map[string]interface{}
 
@@ -71,3 +78,19 @@ func WithSources(sources map[string]map[string]string) ContextOption {
 		c.Sources = sources
 	}
 }
+
+// WithIsIncremental sets the incremental execution flag for the context.
+func WithIsIncremental(isIncremental bool) ContextOption {
+	return func(c *Context) {
+		c.IsIncremental = isIncremental
+	}
+}
+
+// WithCurrentModelTable sets the fully qualified table name for the current model.
+func WithCurrentModelTable(tableName string) ContextOption {
+	return func(c *Context) {
+		c.CurrentModelTable = tableName
+	}
+}
+
+
