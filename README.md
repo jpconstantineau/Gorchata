@@ -21,13 +21,13 @@
 ### Option 1: Install via go install
 
 ```bash
-go install github.com/pierre/gorchata/cmd/gorchata@latest
+go install github.com/jpconstantineau/gorchata/cmd/gorchata@latest
 ```
 
 ### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/pierre/gorchata.git
+git clone https://github.com/jpconstantineau/gorchata.git
 cd gorchata
 scripts/build.ps1 -Task build
 ```
@@ -528,8 +528,8 @@ See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: https://github.com/pierre/gorchata/issues
-- **Discussions**: https://github.com/pierre/gorchata/discussions
+- **Issues**: https://github.com/jpconstantineau/gorchata/issues
+- **Discussions**: https://github.com/jpconstantineau/gorchata/discussions
 
 ---
 
