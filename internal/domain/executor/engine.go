@@ -51,7 +51,9 @@ func (e *Engine) ExecuteModel(ctx context.Context, model *Model) (ModelResult, e
 
 	// Check if this is raw DDL (CREATE TABLE, INSERT, UPDATE, DELETE, etc.)
 	// If so, execute directly without materialization strategy
-	trimmedSQL := strings.TrimSpace(strings.ToUpper(model.CompiledSQL))
+	// Strip SQL comments first to properly detect DDL statements
+	sqlWithoutComments := stripSQLComments(model.CompiledSQL)
+	trimmedSQL := strings.TrimSpace(strings.ToUpper(sqlWithoutComments))
 	isRawDDL := strings.HasPrefix(trimmedSQL, "CREATE ") ||
 		strings.HasPrefix(trimmedSQL, "INSERT ") ||
 		strings.HasPrefix(trimmedSQL, "UPDATE ") ||
@@ -193,4 +195,68 @@ func (e *Engine) ExecuteModels(ctx context.Context, models []*Model, failFast bo
 	}
 
 	return result, nil
+}
+
+// stripSQLComments removes SQL comments from a string
+// Handles both single-line (--) and multi-line (/* */) comments
+func stripSQLComments(sql string) string {
+	var result strings.Builder
+	inMultiLineComment := false
+	inSingleLineComment := false
+	inStringLiteral := false
+
+	for i := 0; i < len(sql); i++ {
+		ch := sql[i]
+
+		// Check for string literals (don't process comments inside strings)
+		if ch == '\'' && !inMultiLineComment && !inSingleLineComment {
+			inStringLiteral = !inStringLiteral
+			result.WriteByte(ch)
+			continue
+		}
+
+		// If in string literal, just copy the character
+		if inStringLiteral {
+			result.WriteByte(ch)
+			continue
+		}
+
+		// Check for end of single-line comment
+		if inSingleLineComment {
+			if ch == '\n' {
+				inSingleLineComment = false
+				result.WriteByte(ch) // Keep the newline
+			}
+			continue
+		}
+
+		// Check for end of multi-line comment
+		if inMultiLineComment {
+			if ch == '*' && i+1 < len(sql) && sql[i+1] == '/' {
+				inMultiLineComment = false
+				i++ // Skip the '/'
+			}
+			continue
+		}
+
+		// Check for start of single-line comment
+		if ch == '-' && i+1 < len(sql) && sql[i+1] == '-' {
+			inSingleLineComment = true
+			i++ // Skip the second '-'
+			continue
+		}
+
+		// Check for start of multi-line comment
+		if ch == '/' && i+1 < len(sql) && sql[i+1] == '*' {
+			inMultiLineComment = true
+			i++ // Skip the '*'
+			continue
+		}
+
+		// Regular character - add to result
+		result.WriteByte(ch)
+	}
+
+	return result.String()
+
 }

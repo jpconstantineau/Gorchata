@@ -382,3 +382,72 @@ func TestEngine_ExecuteModels_ContinueOnError(t *testing.T) {
 		t.Errorf("FailureCount = %d, want 1", result.FailureCount())
 	}
 }
+
+// TestStripSQLComments tests the stripSQLComments helper function
+func TestStripSQLComments(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single-line comment at start",
+			input:    "-- This is a comment\nSELECT 1",
+			expected: "\nSELECT 1",
+		},
+		{
+			name:     "single-line comment in middle",
+			input:    "SELECT 1\n-- This is a comment\nSELECT 2",
+			expected: "SELECT 1\n\nSELECT 2",
+		},
+		{
+			name:     "multi-line comment",
+			input:    "/* This is a\nmulti-line comment */\nSELECT 1",
+			expected: "\nSELECT 1",
+		},
+		{
+			name:     "mixed comments",
+			input:    "-- Single line\n/* Multi\nline */\nSELECT 1",
+			expected: "\n\nSELECT 1",
+		},
+		{
+			name:     "comment with dash in string",
+			input:    "SELECT 'some--text' as value",
+			expected: "SELECT 'some--text' as value",
+		},
+		{
+			name:     "comment characters in string",
+			input:    "SELECT '/* not a comment */' as value",
+			expected: "SELECT '/* not a comment */' as value",
+		},
+		{
+			name:     "materialization comment",
+			input:    "-- Materialization: table\nCREATE TABLE test (id INTEGER)",
+			expected: "\nCREATE TABLE test (id INTEGER)",
+		},
+		{
+			name:     "no comments",
+			input:    "SELECT 1",
+			expected: "SELECT 1",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "only comment",
+			input:    "-- Just a comment",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripSQLComments(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripSQLComments() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
