@@ -120,3 +120,11 @@ func makeEnvVarFunc() func(string, ...string) (string, error) {
 		return "", fmt.Errorf("environment variable not set: %s", key)
 	}
 }
+
+// makeIsIncrementalFunc creates an is_incremental() function for template use.
+// Returns whether the current execution is an incremental run.
+func makeIsIncrementalFunc(ctx *Context) func() bool {
+	return func() bool {
+		return ctx.IsIncremental
+	}
+}

@@ -371,3 +371,94 @@ func TestEnvVarFunction(t *testing.T) {
 		}
 	})
 }
+
+func TestIsIncrementalFunc(t *testing.T) {
+	t.Run("returns false when IsIncremental is false", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.IsIncremental = false
+
+		isIncrementalFunc := makeIsIncrementalFunc(ctx)
+		result := isIncrementalFunc()
+
+		if result != false {
+			t.Errorf("expected false, got %t", result)
+		}
+	})
+
+	t.Run("returns true when IsIncremental is true", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.IsIncremental = true
+
+		isIncrementalFunc := makeIsIncrementalFunc(ctx)
+		result := isIncrementalFunc()
+
+		if result != true {
+			t.Errorf("expected true, got %t", result)
+		}
+	})
+}
+
+func TestIsIncrementalInTemplate(t *testing.T) {
+	t.Run("renders incremental block when is_incremental is true", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `{{ if is_incremental }}INCREMENTAL{{ end }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.IsIncremental = true
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := "INCREMENTAL"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("renders nothing when is_incremental is false", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `{{ if is_incremental }}INCREMENTAL{{ end }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.IsIncremental = false
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := ""
+		if result != expected {
+			t.Errorf("expected empty string, got %q", result)
+		}
+	})
+
+	t.Run("renders else block when is_incremental is false", func(t *testing.T) {
+		engine := New()
+		tmpl, err := engine.Parse("test", `{{ if is_incremental }}INCREMENTAL{{ else }}FULL{{ end }}`)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.IsIncremental = false
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("render error: %v", err)
+		}
+
+		expected := "FULL"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+}
