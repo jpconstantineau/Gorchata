@@ -1578,3 +1578,615 @@ func TestDimCustomersDataIntegrity(t *testing.T) {
 		t.Errorf("Found %d customer records with NULL values in required fields", nullCount)
 	}
 }
+
+// ============================================================================
+// Phase 5: Fact Table - Sales
+// ============================================================================
+
+// TestFctSalesModelExists verifies fct_sales.sql model file exists
+func TestFctSalesModelExists(t *testing.T) {
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("fct_sales.sql does not exist: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("fct_sales.sql is a directory, expected a file")
+	}
+	if info.Size() == 0 {
+		t.Error("fct_sales.sql is empty")
+	}
+}
+
+// TestFctSalesModelContent verifies fct_sales.sql has required content
+func TestFctSalesModelContent(t *testing.T) {
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for config directive
+	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+		t.Error("fct_sales.sql missing config directive with materialized='table'")
+	}
+
+	// Check for references to all required tables
+	requiredRefs := []string{
+		`{{ ref "raw_sales" }}`,
+		`{{ ref "dim_customers" }}`,
+		`{{ ref "dim_products" }}`,
+		`{{ ref "dim_dates" }}`,
+	}
+	for _, ref := range requiredRefs {
+		if !strings.Contains(contentStr, ref) {
+			t.Errorf("fct_sales.sql missing required reference: %s", ref)
+		}
+	}
+
+	// Check for required columns
+	requiredColumns := []string{
+		"sale_id",
+		"customer_sk",
+		"product_id",
+		"sale_date",
+		"sale_amount",
+		"quantity",
+	}
+	for _, col := range requiredColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("fct_sales.sql missing expected column: %s", col)
+		}
+	}
+
+	// Check that no denormalized attributes are present
+	denormalizedAttrs := []string{
+		"customer_name",
+		"customer_email",
+		"customer_city",
+		"customer_state",
+		"product_name",
+		"product_category",
+		"product_price",
+	}
+	for _, attr := range denormalizedAttrs {
+		// Only error if we SELECT the attribute (ignore it in joins)
+		// We need to be careful here - check for SELECT <attr> pattern
+		if strings.Contains(contentStr, "SELECT") {
+			selectPart := contentStr[strings.Index(contentStr, "SELECT"):]
+			fromIndex := strings.Index(selectPart, "FROM")
+			if fromIndex > 0 {
+				selectClause := selectPart[:fromIndex]
+				// Check if the attribute appears in the SELECT clause
+				if strings.Contains(selectClause, attr) {
+					t.Errorf("fct_sales.sql contains denormalized attribute in SELECT: %s", attr)
+				}
+			}
+		}
+	}
+}
+
+// TestFctSalesModelExecution tests that fct_sales model can be executed
+func TestFctSalesModelExecution(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create all dimension tables first
+
+	// 1. Create dim_customers
+	dimCustomersPath := filepath.Join("models", "dimensions", "dim_customers.sql")
+	dimCustomersContent, err := os.ReadFile(dimCustomersPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_customers.sql: %v", err)
+	}
+	dimCustomersSQL := string(dimCustomersContent)
+	lines := strings.Split(dimCustomersSQL, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	dimCustomersSQL = strings.Join(filteredLines, "\n")
+	dimCustomersSQL = strings.ReplaceAll(dimCustomersSQL, `{{ ref "raw_sales" }}`, "raw_sales")
+	dimCustomersSQL = strings.TrimSpace(dimCustomersSQL)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_customers AS "+dimCustomersSQL)
+	if err != nil {
+		t.Fatalf("Failed to create dim_customers: %v", err)
+	}
+
+	// 2. Create dim_products
+	dimProductsPath := filepath.Join("models", "dimensions", "dim_products.sql")
+	dimProductsContent, err := os.ReadFile(dimProductsPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_products.sql: %v", err)
+	}
+	dimProductsSQL := string(dimProductsContent)
+	lines = strings.Split(dimProductsSQL, "\n")
+	filteredLines = []string{}
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	dimProductsSQL = strings.Join(filteredLines, "\n")
+	dimProductsSQL = strings.ReplaceAll(dimProductsSQL, `{{ ref "raw_sales" }}`, "raw_sales")
+	dimProductsSQL = strings.TrimSpace(dimProductsSQL)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_products AS "+dimProductsSQL)
+	if err != nil {
+		t.Fatalf("Failed to create dim_products: %v", err)
+	}
+
+	// 3. Create dim_dates
+	dimDatesPath := filepath.Join("models", "dimensions", "dim_dates.sql")
+	dimDatesContent, err := os.ReadFile(dimDatesPath)
+	if err != nil {
+		t.Fatalf("Failed to read dim_dates.sql: %v", err)
+	}
+	dimDatesSQL := string(dimDatesContent)
+	lines = strings.Split(dimDatesSQL, "\n")
+	filteredLines = []string{}
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	dimDatesSQL = strings.Join(filteredLines, "\n")
+	dimDatesSQL = strings.ReplaceAll(dimDatesSQL, `{{ ref "raw_sales" }}`, "raw_sales")
+	dimDatesSQL = strings.TrimSpace(dimDatesSQL)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_dates AS "+dimDatesSQL)
+	if err != nil {
+		t.Fatalf("Failed to create dim_dates: %v", err)
+	}
+
+	// Now create fct_sales
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines = strings.Split(sqlContent, "\n")
+	filteredLines = []string{}
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE fct_sales AS " + sqlContent
+	_, err = db.ExecContext(context.Background(), createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute fct_sales model: %v", err)
+	}
+
+	// Verify table was created
+	var tableName string
+	err = db.QueryRowContext(context.Background(),
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='fct_sales'").Scan(&tableName)
+	if err != nil {
+		t.Fatalf("Table fct_sales not found: %v", err)
+	}
+}
+
+// TestFctSalesColumns verifies fct_sales table has expected columns
+func TestFctSalesColumns(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create all dimensions (same setup as above)
+	// Helper function to create dimension tables
+	createDimensions := func(t *testing.T, db *sql.DB) {
+		t.Helper()
+
+		dims := []struct {
+			path      string
+			tableName string
+		}{
+			{filepath.Join("models", "dimensions", "dim_customers.sql"), "dim_customers"},
+			{filepath.Join("models", "dimensions", "dim_products.sql"), "dim_products"},
+			{filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"},
+		}
+
+		for _, dim := range dims {
+			content, err := os.ReadFile(dim.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", dim.path, err)
+			}
+			sqlContent := string(content)
+			lines := strings.Split(sqlContent, "\n")
+			var filteredLines []string
+			for _, line := range lines {
+				if !strings.Contains(line, "{{ config(") {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			sqlContent = strings.Join(filteredLines, "\n")
+			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+			sqlContent = strings.TrimSpace(sqlContent)
+			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
+			if err != nil {
+				t.Fatalf("Failed to create %s: %v", dim.tableName, err)
+			}
+		}
+	}
+
+	createDimensions(t, db)
+
+	// Create fct_sales table
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE fct_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to execute fct_sales model: %v", err)
+	}
+
+	// Get column names
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(fct_sales)")
+	if err != nil {
+		t.Fatalf("Failed to get table info: %v", err)
+	}
+	defer rows.Close()
+
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name string
+		var dataType string
+		var notNull int
+		var dfltValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk); err != nil {
+			t.Fatalf("Failed to scan column info: %v", err)
+		}
+		columns = append(columns, name)
+	}
+
+	// Expected columns (keys and measures only)
+	expectedColumns := []string{"sale_id", "customer_sk", "product_id", "sale_date", "sale_amount", "quantity"}
+	for _, expected := range expectedColumns {
+		found := false
+		for _, col := range columns {
+			if col == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in fct_sales", expected)
+		}
+	}
+
+	// Verify no denormalized attributes
+	denormalizedAttrs := []string{
+		"customer_name", "customer_email", "customer_city", "customer_state",
+		"product_name", "product_category", "product_price",
+	}
+	for _, attr := range denormalizedAttrs {
+		for _, col := range columns {
+			if col == attr {
+				t.Errorf("Denormalized attribute %s found in fct_sales columns", attr)
+			}
+		}
+	}
+}
+
+// TestFctSalesRowCount verifies fact table has exactly 30 rows (one per sale)
+func TestFctSalesRowCount(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create all dimensions
+	createDimensions := func(t *testing.T, db *sql.DB) {
+		t.Helper()
+		dims := []struct {
+			path      string
+			tableName string
+		}{
+			{filepath.Join("models", "dimensions", "dim_customers.sql"), "dim_customers"},
+			{filepath.Join("models", "dimensions", "dim_products.sql"), "dim_products"},
+			{filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"},
+		}
+		for _, dim := range dims {
+			content, err := os.ReadFile(dim.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", dim.path, err)
+			}
+			sqlContent := string(content)
+			lines := strings.Split(sqlContent, "\n")
+			var filteredLines []string
+			for _, line := range lines {
+				if !strings.Contains(line, "{{ config(") {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			sqlContent = strings.Join(filteredLines, "\n")
+			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+			sqlContent = strings.TrimSpace(sqlContent)
+			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
+			if err != nil {
+				t.Fatalf("Failed to create %s: %v", dim.tableName, err)
+			}
+		}
+	}
+	createDimensions(t, db)
+
+	// Create fct_sales
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE fct_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to execute fct_sales model: %v", err)
+	}
+
+	// Count rows
+	var rowCount int
+	err = db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM fct_sales").Scan(&rowCount)
+	if err != nil {
+		t.Fatalf("Failed to count rows: %v", err)
+	}
+
+	if rowCount != 30 {
+		t.Errorf("Expected 30 rows in fct_sales, got %d", rowCount)
+	}
+}
+
+// TestFctSalesPointInTimeJoin verifies correct customer_sk values for customer 1001 sales
+func TestFctSalesPointInTimeJoin(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create all dimensions
+	createDimensions := func(t *testing.T, db *sql.DB) {
+		t.Helper()
+		dims := []struct {
+			path      string
+			tableName string
+		}{
+			{filepath.Join("models", "dimensions", "dim_customers.sql"), "dim_customers"},
+			{filepath.Join("models", "dimensions", "dim_products.sql"), "dim_products"},
+			{filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"},
+		}
+		for _, dim := range dims {
+			content, err := os.ReadFile(dim.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", dim.path, err)
+			}
+			sqlContent := string(content)
+			lines := strings.Split(sqlContent, "\n")
+			var filteredLines []string
+			for _, line := range lines {
+				if !strings.Contains(line, "{{ config(") {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			sqlContent = strings.Join(filteredLines, "\n")
+			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+			sqlContent = strings.TrimSpace(sqlContent)
+			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
+			if err != nil {
+				t.Fatalf("Failed to create %s: %v", dim.tableName, err)
+			}
+		}
+	}
+	createDimensions(t, db)
+
+	// Create fct_sales
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE fct_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to execute fct_sales model: %v", err)
+	}
+
+	// Test specific point-in-time join results
+	testCases := []struct {
+		saleID     int
+		expectedSK int
+		desc       string
+	}{
+		{1, 1001001, "Sale 1 (2024-01-05) should join to customer_sk 1001001 (Seattle version)"},
+		{15, 1001002, "Sale 15 (2024-06-10) should join to customer_sk 1001002 (Portland, old email)"},
+		{26, 1001003, "Sale 26 (2024-11-08) should join to customer_sk 1001003 (Portland, new email)"},
+	}
+
+	for _, tc := range testCases {
+		var customerSK int
+		err := db.QueryRowContext(context.Background(),
+			"SELECT customer_sk FROM fct_sales WHERE sale_id = ?", tc.saleID).Scan(&customerSK)
+		if err != nil {
+			t.Fatalf("Failed to query sale_id %d: %v", tc.saleID, err)
+		}
+
+		if customerSK != tc.expectedSK {
+			t.Errorf("%s: got customer_sk = %d, want %d", tc.desc, customerSK, tc.expectedSK)
+		}
+	}
+}
+
+// TestFctSalesDataIntegrity verifies no NULLs in required fields and all FKs resolve
+func TestFctSalesDataIntegrity(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create all dimensions
+	createDimensions := func(t *testing.T, db *sql.DB) {
+		t.Helper()
+		dims := []struct {
+			path      string
+			tableName string
+		}{
+			{filepath.Join("models", "dimensions", "dim_customers.sql"), "dim_customers"},
+			{filepath.Join("models", "dimensions", "dim_products.sql"), "dim_products"},
+			{filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"},
+		}
+		for _, dim := range dims {
+			content, err := os.ReadFile(dim.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", dim.path, err)
+			}
+			sqlContent := string(content)
+			lines := strings.Split(sqlContent, "\n")
+			var filteredLines []string
+			for _, line := range lines {
+				if !strings.Contains(line, "{{ config(") {
+					filteredLines = append(filteredLines, line)
+				}
+			}
+			sqlContent = strings.Join(filteredLines, "\n")
+			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+			sqlContent = strings.TrimSpace(sqlContent)
+			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
+			if err != nil {
+				t.Fatalf("Failed to create %s: %v", dim.tableName, err)
+			}
+		}
+	}
+	createDimensions(t, db)
+
+	// Create fct_sales
+	modelPath := filepath.Join("models", "facts", "fct_sales.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read fct_sales.sql: %v", err)
+	}
+	sqlContent := string(content)
+	lines := strings.Split(sqlContent, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !strings.Contains(line, "{{ config(") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+	sqlContent = strings.TrimSpace(sqlContent)
+	_, err = db.ExecContext(context.Background(), "CREATE TABLE fct_sales AS "+sqlContent)
+	if err != nil {
+		t.Fatalf("Failed to execute fct_sales model: %v", err)
+	}
+
+	// Check for NULLs in required fields
+	var nullCount int
+	err = db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM fct_sales 
+		 WHERE sale_id IS NULL 
+		    OR customer_sk IS NULL 
+		    OR product_id IS NULL 
+		    OR sale_date IS NULL 
+		    OR sale_amount IS NULL 
+		    OR quantity IS NULL`).Scan(&nullCount)
+	if err != nil {
+		t.Fatalf("Failed to check for NULLs: %v", err)
+	}
+	if nullCount > 0 {
+		t.Errorf("Found %d sales records with NULL values in required fields", nullCount)
+	}
+
+	// Verify all customer_sk values resolve to dim_customers
+	var unresolvedCustomers int
+	err = db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM fct_sales f
+		 WHERE NOT EXISTS (
+		   SELECT 1 FROM dim_customers d WHERE d.customer_sk = f.customer_sk
+		 )`).Scan(&unresolvedCustomers)
+	if err != nil {
+		t.Fatalf("Failed to check customer FK integrity: %v", err)
+	}
+	if unresolvedCustomers > 0 {
+		t.Errorf("Found %d sales with unresolved customer_sk values", unresolvedCustomers)
+	}
+
+	// Verify all product_id values resolve to dim_products
+	var unresolvedProducts int
+	err = db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM fct_sales f
+		 WHERE NOT EXISTS (
+		   SELECT 1 FROM dim_products p WHERE p.product_id = f.product_id
+		 )`).Scan(&unresolvedProducts)
+	if err != nil {
+		t.Fatalf("Failed to check product FK integrity: %v", err)
+	}
+	if unresolvedProducts > 0 {
+		t.Errorf("Found %d sales with unresolved product_id values", unresolvedProducts)
+	}
+
+	// Verify all sale_date values resolve to dim_dates
+	var unresolvedDates int
+	err = db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM fct_sales f
+		 WHERE NOT EXISTS (
+		   SELECT 1 FROM dim_dates d WHERE d.sale_date = f.sale_date
+		 )`).Scan(&unresolvedDates)
+	if err != nil {
+		t.Fatalf("Failed to check date FK integrity: %v", err)
+	}
+	if unresolvedDates > 0 {
+		t.Errorf("Found %d sales with unresolved sale_date values", unresolvedDates)
+	}
+}
