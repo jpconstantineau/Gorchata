@@ -300,3 +300,149 @@ func removeConfigCalls(content string) string {
 	configRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
 	return configRe.ReplaceAllString(content, "")
 }
+
+// TestIntegration_IncrementalModel tests end-to-end incremental model execution
+// with both is_incremental template function and {{ this }} reference
+func TestIntegration_IncrementalModel(t *testing.T) {
+	// Create temporary database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create SQLite adapter
+	config := &platform.ConnectionConfig{
+		DatabasePath: dbPath,
+	}
+	adapter := sqlite.NewSQLiteAdapter(config)
+
+	ctx := context.Background()
+	if err := adapter.Connect(ctx); err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer adapter.Close()
+
+	// Create source table with initial data
+	createSQL := `CREATE TABLE source_data (
+		id INTEGER PRIMARY KEY,
+		value TEXT,
+		updated_at TEXT
+	)`
+	if err := adapter.ExecuteDDL(ctx, createSQL); err != nil {
+		t.Fatalf("failed to create source table: %v", err)
+	}
+
+	insertSQL := `INSERT INTO source_data (id, value, updated_at) VALUES
+		(1, 'first', '2024-01-01'),
+		(2, 'second', '2024-01-02'),
+		(3, 'third', '2024-01-03')`
+	if err := adapter.ExecuteDDL(ctx, insertSQL); err != nil {
+		t.Fatalf("failed to insert initial data: %v", err)
+	}
+
+	// Create incremental model
+	model, err := executor.NewModel("incremental_test", "test_model.sql")
+	if err != nil {
+		t.Fatalf("failed to create model: %v", err)
+	}
+
+	// Template with incremental logic
+	templateContent := `SELECT 
+		id,
+		value,
+		updated_at
+	FROM source_data
+	{{ if is_incremental }}
+	WHERE updated_at > (SELECT COALESCE(MAX(updated_at), '1900-01-01') FROM {{ this }})
+	{{ end }}`
+
+	model.SetTemplateContent(templateContent)
+	model.SetMaterializationConfig(materialization.MaterializationConfig{
+		Type:      materialization.MaterializationIncremental,
+		UniqueKey: []string{"id"},
+	})
+
+	// Create execution engine
+	templateEngine := template.New()
+	engine, err := executor.NewEngine(adapter, templateEngine)
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	// First run - should create table with all 3 rows (table doesn't exist yet)
+	result, err := engine.ExecuteModel(ctx, model)
+	if err != nil {
+		t.Fatalf("first execution failed: %v", err)
+	}
+
+	if result.Status != executor.StatusSuccess {
+		t.Errorf("expected success, got %v: %s", result.Status, result.Error)
+	}
+
+	// Verify all 3 rows were inserted
+	queryResult, err := adapter.ExecuteQuery(ctx, "SELECT COUNT(*) as count FROM incremental_test")
+	if err != nil {
+		t.Fatalf("failed to query table: %v", err)
+	}
+	rows, _ := queryResult.FetchAll()
+	if len(rows) == 0 || rows[0]["count"] != int64(3) {
+		t.Errorf("expected 3 rows after first run, got %v", rows)
+	}
+
+	// Add more data to source
+	insertSQL2 := `INSERT INTO source_data (id, value, updated_at) VALUES
+		(4, 'fourth', '2024-01-04'),
+		(5, 'fifth', '2024-01-05')`
+	if err := adapter.ExecuteDDL(ctx, insertSQL2); err != nil {
+		t.Fatalf("failed to insert more data: %v", err)
+	}
+
+	// Second run - incremental, should only add 2 new rows
+	result2, err := engine.ExecuteModel(ctx, model)
+	if err != nil {
+		t.Fatalf("second execution failed: %v", err)
+	}
+
+	if result2.Status != executor.StatusSuccess {
+		t.Errorf("expected success on second run, got %v: %s", result2.Status, result2.Error)
+	}
+
+	// Verify we now have 5 rows total
+	queryResult2, err := adapter.ExecuteQuery(ctx, "SELECT COUNT(*) as count FROM incremental_test")
+	if err != nil {
+		t.Fatalf("failed to query table after second run: %v", err)
+	}
+	rows2, _ := queryResult2.FetchAll()
+	if len(rows2) == 0 || rows2[0]["count"] != int64(5) {
+		t.Errorf("expected 5 rows after second run, got %v", rows2)
+	}
+
+	// Third run with full refresh - should rebuild from scratch
+	model.SetMaterializationConfig(materialization.MaterializationConfig{
+		Type:        materialization.MaterializationIncremental,
+		UniqueKey:   []string{"id"},
+		FullRefresh: true,
+	})
+
+	result3, err := engine.ExecuteModel(ctx, model)
+	if err != nil {
+		t.Fatalf("third execution (full refresh) failed: %v", err)
+	}
+
+	if result3.Status != executor.StatusSuccess {
+		t.Errorf("expected success on full refresh, got %v: %s", result3.Status, result3.Error)
+	}
+
+	// Verify we still have 5 rows (all data from source)
+	queryResult3, err := adapter.ExecuteQuery(ctx, "SELECT COUNT(*) as count FROM incremental_test")
+	if err != nil {
+		t.Fatalf("failed to query table after full refresh: %v", err)
+	}
+	rows3, _ := queryResult3.FetchAll()
+	if len(rows3) == 0 || rows3[0]["count"] != int64(5) {
+		t.Errorf("expected 5 rows after full refresh, got %v", rows3)
+	}
+
+	t.Logf("✓ Incremental model test completed successfully")
+	t.Logf("  - First run: Created table with 3 rows")
+	t.Logf("  - Second run: Added 2 new rows incrementally")
+	t.Logf("  - Third run: Full refresh with 5 rows")
+}

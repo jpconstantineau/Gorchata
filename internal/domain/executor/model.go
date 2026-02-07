@@ -14,6 +14,10 @@ type Model struct {
 	// Path is the file path to the model template (e.g., "models/staging/stg_users.sql")
 	Path string
 
+	// TemplateContent is the template content (with config() calls removed)
+	// This is used by the executor to re-render with the correct incremental context
+	TemplateContent string
+
 	// CompiledSQL is the rendered SQL after template processing
 	CompiledSQL string
 
@@ -54,6 +58,11 @@ func (m *Model) AddDependency(modelID string) {
 		}
 	}
 	m.Dependencies = append(m.Dependencies, modelID)
+}
+
+// SetTemplateContent sets the template content for the model
+func (m *Model) SetTemplateContent(content string) {
+	m.TemplateContent = content
 }
 
 // SetCompiledSQL sets the compiled SQL for the model

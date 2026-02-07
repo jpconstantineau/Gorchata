@@ -242,6 +242,7 @@ gorchata run --verbose             # Show detailed output
 gorchata run --models customers    # Run specific model(s)
 gorchata run --fail-fast           # Stop on first error
 gorchata run --target prod         # Use specific target from profiles
+gorchata run --full-refresh        # Force full refresh for incremental models
 ```
 
 ### `compile`
@@ -288,15 +289,34 @@ Creates a physical table using `CREATE TABLE AS SELECT`. Full refresh on each ru
 SELECT * FROM source_table
 ```
 
-### Incremental (Coming Soon)
-Appends new records to existing table based on unique key.  
+### Incremental
+Appends new records to existing table based on unique key. Use the `is_incremental` template function to add filtering logic that only applies during incremental runs.
 
 ```sql
-{{ config(materialized='incremental', unique_key=['id']) }}
+{{ config(materialization="incremental", unique_key="id") }}
 
-SELECT * FROM source_table
+SELECT 
+  id,
+  name,
+  created_at
+FROM source_table
+{{ if is_incremental }}
 WHERE created_at > (SELECT MAX(created_at) FROM {{ this }})
+{{ end }}
 ```
+
+**Template Functions:**
+- `{{ if is_incremental }}` - Conditional logic for incremental runs
+- `{{ this }}` - References the current model's table name
+
+**Full Refresh:**
+Force a full refresh (rebuild from scratch) using the `--full-refresh` flag:
+
+```bash
+gorchata run --full-refresh
+```
+
+When `--full-refresh` is used, `is_incremental` returns false and the model is rebuilt using DROP+CREATE.
 
 ## Sample Project Structure
 

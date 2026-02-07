@@ -90,10 +90,19 @@ func RunCommand(args []string) error {
 
 		// Extract config from template
 		cfg := extractModelConfig(contentStr)
+
+		// Apply --full-refresh flag if set
+		if common.FullRefresh && cfg.Type == materialization.MaterializationIncremental {
+			cfg.FullRefresh = true
+		}
+
 		model.SetMaterializationConfig(cfg)
 
 		// Remove config() calls before parsing
 		contentStr = removeConfigCalls(contentStr)
+
+		// Store template content for engine to re-render with incremental context
+		model.SetTemplateContent(contentStr)
 
 		// Parse template
 		tmpl, err := templateEngineWithTracker.Parse(model.ID, contentStr)
