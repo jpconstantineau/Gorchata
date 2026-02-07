@@ -222,13 +222,12 @@ func InitCommand(args []string) error {
 		return err
 	}
 
-	// Generate model files
-	if err := generateModels(projectName); err != nil {
-		return err
+	// Generate model files (only if not empty)
+	if !*empty {
+		if err := generateModels(projectName); err != nil {
+			return fmt.Errorf("failed to generate models: %w", err)
+		}
 	}
-
-	// Placeholder for remaining implementation
-	_ = empty
 
 	// Print success message
 	fmt.Printf("✓ Successfully initialized Gorchata project: %s\n\n", projectName)
@@ -236,7 +235,11 @@ func InitCommand(args []string) error {
 	fmt.Println("  - Project configuration: gorchata_project.yml")
 	fmt.Println("  - Database profiles: profiles.yml")
 	fmt.Println("  - Folders: models/, seeds/, tests/, macros/")
-	fmt.Println("  - Sample models: 3 SQL files")
+	if *empty {
+		fmt.Println("  - Sample models: 0 SQL files (empty project)")
+	} else {
+		fmt.Println("  - Sample models: 3 SQL files")
+	}
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  1. cd %s\n", projectName)

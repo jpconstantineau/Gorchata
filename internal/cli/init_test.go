@@ -850,3 +850,129 @@ func TestInitCommand_Integration_AllFolders(t *testing.T) {
 		}
 	}
 }
+
+// TestInitCommand_EmptyFlag verifies --empty creates only structure and configs, no models
+func TestInitCommand_EmptyFlag(t *testing.T) {
+	// Use t.TempDir() for test project
+	tempDir := t.TempDir()
+	projectName := "test_empty_project"
+
+	// Change to temp directory first so the project is created there
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	// Call InitCommand with --empty flag
+	err = InitCommand([]string{"--empty", projectName})
+	if err != nil {
+		t.Fatalf("expected no error from InitCommand with --empty, got: %v", err)
+	}
+
+	projectPath := filepath.Join(tempDir, projectName)
+
+	// Check all 4 folders exist
+	expectedDirs := []string{"models", "seeds", "tests", "macros"}
+	for _, dirName := range expectedDirs {
+		dirPath := filepath.Join(projectPath, dirName)
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+			t.Errorf("expected directory %s to exist", dirName)
+		}
+	}
+
+	// Check gorchata_project.yml exists
+	configPath := filepath.Join(projectPath, "gorchata_project.yml")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Error("expected gorchata_project.yml to exist")
+	}
+
+	// Check profiles.yml exists
+	profilesPath := filepath.Join(projectPath, "profiles.yml")
+	if _, err := os.Stat(profilesPath); os.IsNotExist(err) {
+		t.Error("expected profiles.yml to exist")
+	}
+
+	// Verify models/ directory is EMPTY (no SQL files)
+	modelsDir := filepath.Join(projectPath, "models")
+	entries, err := os.ReadDir(modelsDir)
+	if err != nil {
+		t.Fatalf("failed to read models directory: %v", err)
+	}
+
+	// Count files in models/ should be 0
+	fileCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			fileCount++
+		}
+	}
+
+	if fileCount != 0 {
+		t.Errorf("expected models/ directory to be empty (0 files), got %d files", fileCount)
+	}
+}
+
+// TestInitCommand_EmptyFlag_ModelsDir verifies models/ directory still created but empty
+func TestInitCommand_EmptyFlag_ModelsDir(t *testing.T) {
+	// Use t.TempDir() for test project
+	tempDir := t.TempDir()
+	projectName := "test_project"
+
+	// Change to temp directory first so the project is created there
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	// Call InitCommand with --empty flag
+	err = InitCommand([]string{"--empty", projectName})
+	if err != nil {
+		t.Fatalf("expected no error from InitCommand with --empty, got: %v", err)
+	}
+
+	projectPath := filepath.Join(tempDir, projectName)
+
+	// Verify models/ directory exists
+	modelsDir := filepath.Join(projectPath, "models")
+	info, err := os.Stat(modelsDir)
+	if os.IsNotExist(err) {
+		t.Fatal("expected models/ directory to exist")
+	}
+	if err != nil {
+		t.Fatalf("failed to stat models directory: %v", err)
+	}
+
+	// Verify models/ is actually a directory (not a file)
+	if !info.IsDir() {
+		t.Error("expected models/ to be a directory, but it is not")
+	}
+
+	// Verify no SQL files in models/ directory
+	entries, err := os.ReadDir(modelsDir)
+	if err != nil {
+		t.Fatalf("failed to read models directory: %v", err)
+	}
+
+	sqlFileCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+			sqlFileCount++
+		}
+	}
+
+	if sqlFileCount != 0 {
+		t.Errorf("expected no SQL files in models/ directory, got %d SQL files", sqlFileCount)
+	}
+}
