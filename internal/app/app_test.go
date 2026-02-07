@@ -57,7 +57,7 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := app.Run(tt.args)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Run() expected error containing %q, got nil", tt.errMsg)
