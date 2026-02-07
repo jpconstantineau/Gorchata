@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestInitCommand_RequiresProjectName verifies that the init command returns an error when no project name is provided
@@ -251,5 +253,99 @@ func TestCreateProjectDirectories_ForceOverwrite(t *testing.T) {
 		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 			t.Errorf("expected subdirectory %s to exist at %s", dir, dirPath)
 		}
+	}
+}
+
+// TestGenerateProjectConfig_CorrectName verifies that project name is inserted correctly
+func TestGenerateProjectConfig_CorrectName(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectName := "my_test_project"
+
+	// Generate the config file
+	err := generateProjectConfig(tempDir, projectName)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Read the generated file
+	configPath := filepath.Join(tempDir, "gorchata_project.yml")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read generated config file: %v", err)
+	}
+
+	// Verify project name appears in the content
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "name: "+projectName) {
+		t.Errorf("expected config to contain 'name: %s', got:\n%s", projectName, contentStr)
+	}
+}
+
+// TestGenerateProjectConfig_DateVar verifies that start_date uses current year
+func TestGenerateProjectConfig_DateVar(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectName := "date_test_project"
+
+	// Generate the config file
+	err := generateProjectConfig(tempDir, projectName)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Read the generated file
+	configPath := filepath.Join(tempDir, "gorchata_project.yml")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read generated config file: %v", err)
+	}
+
+	// Verify start_date contains current year
+	contentStr := string(content)
+	// We expect format like: start_date: '2026-01-01'
+	expectedYear := fmt.Sprintf("%d", time.Now().Year())
+	expectedStartDate := fmt.Sprintf("start_date: '%s-01-01'", expectedYear)
+	if !strings.Contains(contentStr, expectedStartDate) {
+		t.Errorf("expected config to contain start_date '%s', got content:\n%s", expectedStartDate, contentStr)
+	}
+}
+
+// TestGenerateProjectConfig_FileCreation verifies file is written to correct location
+func TestGenerateProjectConfig_FileCreation(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	projectName := "file_test_project"
+
+	// Generate the config file
+	err := generateProjectConfig(tempDir, projectName)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify file exists at the correct location
+	configPath := filepath.Join(tempDir, "gorchata_project.yml")
+	info, err := os.Stat(configPath)
+	if os.IsNotExist(err) {
+		t.Fatalf("expected config file to exist at %s", configPath)
+	}
+	if err != nil {
+		t.Fatalf("failed to stat config file: %v", err)
+	}
+
+	// Verify it's a file, not a directory
+	if info.IsDir() {
+		t.Errorf("expected %s to be a file, not a directory", configPath)
+	}
+
+	// Verify permissions (should be readable)
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Errorf("failed to read config file: %v", err)
+	}
+
+	// Verify content is not empty
+	if len(content) == 0 {
+		t.Error("expected config file to have content, got empty file")
 	}
 }

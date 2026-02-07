@@ -1,0 +1,9 @@
+name: test_review_project
+version: 1.0.0
+profile: dev
+
+model-paths:
+  - models
+
+vars:
+  start_date: '2026-01-01'
