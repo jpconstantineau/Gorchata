@@ -230,7 +230,21 @@ func InitCommand(args []string) error {
 	// Placeholder for remaining implementation
 	_ = empty
 
-	return fmt.Errorf("init command not yet implemented")
+	// Print success message
+	fmt.Printf("✓ Successfully initialized Gorchata project: %s\n\n", projectName)
+	fmt.Println("Created:")
+	fmt.Println("  - Project configuration: gorchata_project.yml")
+	fmt.Println("  - Database profiles: profiles.yml")
+	fmt.Println("  - Folders: models/, seeds/, tests/, macros/")
+	fmt.Println("  - Sample models: 3 SQL files")
+	fmt.Println()
+	fmt.Println("Next steps:")
+	fmt.Printf("  1. cd %s\n", projectName)
+	fmt.Println("  2. gorchata run")
+	fmt.Println()
+	fmt.Println("Run 'gorchata --help' for more commands.")
+
+	return nil
 }
 
 // printInitHelp prints help information for the init command
