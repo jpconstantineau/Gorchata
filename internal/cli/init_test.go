@@ -677,3 +677,176 @@ func TestGenerateModels_RefSyntax(t *testing.T) {
 		t.Errorf("expected fct_order_summary.sql to contain {{ ref \"stg_orders\" }}, got:\n%s", contentStr)
 	}
 }
+
+// TestInitCommand_Integration_CompleteProject verifies entire init process creates valid project structure with all files
+func TestInitCommand_Integration_CompleteProject(t *testing.T) {
+	// Use t.TempDir() for test project
+	tempDir := t.TempDir()
+	projectName := "integration_test_project"
+
+	// Change to temp directory first so the project is created there
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	// Call InitCommand with project name
+	err = InitCommand([]string{projectName})
+	if err != nil {
+		t.Fatalf("expected no error from InitCommand, got: %v", err)
+	}
+
+	projectPath := filepath.Join(tempDir, projectName)
+
+	// Verify no error returned
+	// (already checked above)
+
+	// Check all 4 folders exist: models/, seeds/, tests/, macros/
+	expectedFolders := []string{"models", "seeds", "tests", "macros"}
+	for _, folder := range expectedFolders {
+		folderPath := filepath.Join(projectPath, folder)
+		info, err := os.Stat(folderPath)
+		if os.IsNotExist(err) {
+			t.Errorf("expected folder %s to exist at %s", folder, folderPath)
+		} else if err != nil {
+			t.Errorf("failed to stat folder %s: %v", folder, err)
+		} else if !info.IsDir() {
+			t.Errorf("expected %s to be a directory", folderPath)
+		}
+	}
+
+	// Check gorchata_project.yml exists and contains project name
+	configPath := filepath.Join(projectPath, "gorchata_project.yml")
+	configInfo, err := os.Stat(configPath)
+	if os.IsNotExist(err) {
+		t.Errorf("expected gorchata_project.yml to exist at %s", configPath)
+	} else if err != nil {
+		t.Errorf("failed to stat gorchata_project.yml: %v", err)
+	} else if configInfo.IsDir() {
+		t.Errorf("expected gorchata_project.yml to be a file, not a directory")
+	} else {
+		// Read and verify content
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Errorf("failed to read gorchata_project.yml: %v", err)
+		} else {
+			contentStr := string(content)
+			if !strings.Contains(contentStr, "name: "+projectName) {
+				t.Errorf("expected gorchata_project.yml to contain 'name: %s', got:\n%s", projectName, contentStr)
+			}
+		}
+	}
+
+	// Check profiles.yml exists and contains database config
+	profilesPath := filepath.Join(projectPath, "profiles.yml")
+	profilesInfo, err := os.Stat(profilesPath)
+	if os.IsNotExist(err) {
+		t.Errorf("expected profiles.yml to exist at %s", profilesPath)
+	} else if err != nil {
+		t.Errorf("failed to stat profiles.yml: %v", err)
+	} else if profilesInfo.IsDir() {
+		t.Errorf("expected profiles.yml to be a file, not a directory")
+	} else {
+		// Read and verify content
+		content, err := os.ReadFile(profilesPath)
+		if err != nil {
+			t.Errorf("failed to read profiles.yml: %v", err)
+		} else {
+			contentStr := string(content)
+			if !strings.Contains(contentStr, "type: sqlite") {
+				t.Errorf("expected profiles.yml to contain 'type: sqlite', got:\n%s", contentStr)
+			}
+			if !strings.Contains(contentStr, projectName) {
+				t.Errorf("expected profiles.yml to contain project name '%s', got:\n%s", projectName, contentStr)
+			}
+		}
+	}
+
+	// Check all 3 SQL model files exist: stg_users.sql, stg_orders.sql, fct_order_summary.sql
+	expectedModelFiles := []string{
+		"stg_users.sql",
+		"stg_orders.sql",
+		"fct_order_summary.sql",
+	}
+	for _, filename := range expectedModelFiles {
+		modelPath := filepath.Join(projectPath, "models", filename)
+		modelInfo, err := os.Stat(modelPath)
+		if os.IsNotExist(err) {
+			t.Errorf("expected model file %s to exist at %s", filename, modelPath)
+		} else if err != nil {
+			t.Errorf("failed to stat model file %s: %v", filename, err)
+		} else if modelInfo.IsDir() {
+			t.Errorf("expected %s to be a file, not a directory", modelPath)
+		}
+	}
+
+	// Verify at least one model file contains {{ config }} and {{ ref }} syntax
+	fctPath := filepath.Join(projectPath, "models", "fct_order_summary.sql")
+	fctContent, err := os.ReadFile(fctPath)
+	if err != nil {
+		t.Errorf("failed to read fct_order_summary.sql: %v", err)
+	} else {
+		contentStr := string(fctContent)
+		if !strings.Contains(contentStr, "{{ config") {
+			t.Errorf("expected fct_order_summary.sql to contain {{ config }} syntax")
+		}
+		if !strings.Contains(contentStr, "{{ ref") {
+			t.Errorf("expected fct_order_summary.sql to contain {{ ref }} syntax")
+		}
+	}
+}
+
+// TestInitCommand_Integration_AllFolders verifies all subdirectories exist and are actually directories
+func TestInitCommand_Integration_AllFolders(t *testing.T) {
+	// Use t.TempDir() for test project
+	tempDir := t.TempDir()
+	projectName := "folder_test_project"
+
+	// Change to temp directory first so the project is created there
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	// Call InitCommand with project name
+	err = InitCommand([]string{projectName})
+	if err != nil {
+		t.Fatalf("expected no error from InitCommand, got: %v", err)
+	}
+
+	projectPath := filepath.Join(tempDir, projectName)
+
+	// Verify all subdirectories exist and are actually directories
+	expectedDirs := []string{"models", "seeds", "tests", "macros"}
+	for _, dirName := range expectedDirs {
+		dirPath := filepath.Join(projectPath, dirName)
+
+		// Check existence
+		info, err := os.Stat(dirPath)
+		if os.IsNotExist(err) {
+			t.Errorf("expected directory %s to exist at %s", dirName, dirPath)
+			continue
+		}
+		if err != nil {
+			t.Errorf("failed to stat directory %s: %v", dirName, err)
+			continue
+		}
+
+		// Verify it's actually a directory
+		if !info.IsDir() {
+			t.Errorf("expected %s to be a directory, but it is not", dirPath)
+		}
+	}
+}
