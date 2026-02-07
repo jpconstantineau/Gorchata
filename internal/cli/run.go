@@ -9,12 +9,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pierre/gorchata/internal/config"
-	"github.com/pierre/gorchata/internal/domain/executor"
-	"github.com/pierre/gorchata/internal/domain/materialization"
-	"github.com/pierre/gorchata/internal/platform"
-	"github.com/pierre/gorchata/internal/platform/sqlite"
-	"github.com/pierre/gorchata/internal/template"
+	"github.com/jpconstantineau/gorchata/internal/config"
+	"github.com/jpconstantineau/gorchata/internal/domain/executor"
+	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
+	"github.com/jpconstantineau/gorchata/internal/platform"
+	"github.com/jpconstantineau/gorchata/internal/platform/sqlite"
+	"github.com/jpconstantineau/gorchata/internal/template"
 )
 
 // RunCommand executes SQL transformations against the database

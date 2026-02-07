@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pierre/gorchata/internal/platform"
+	"github.com/jpconstantineau/gorchata/internal/platform"
 )
 
 func TestEndToEndWorkflow(t *testing.T) {

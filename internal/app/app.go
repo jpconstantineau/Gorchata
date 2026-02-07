@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/pierre/gorchata/internal/cli"
+	"github.com/jpconstantineau/gorchata/internal/cli"
 )
 
 // App represents the Gorchata application

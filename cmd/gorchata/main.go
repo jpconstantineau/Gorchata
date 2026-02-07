@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pierre/gorchata/internal/app"
+	"github.com/jpconstantineau/gorchata/internal/app"
 )
 
 func main() {

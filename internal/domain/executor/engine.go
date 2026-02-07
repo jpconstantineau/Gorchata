@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pierre/gorchata/internal/domain/dag"
-	"github.com/pierre/gorchata/internal/domain/materialization"
-	"github.com/pierre/gorchata/internal/platform"
-	"github.com/pierre/gorchata/internal/template"
+	"github.com/jpconstantineau/gorchata/internal/domain/dag"
+	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
+	"github.com/jpconstantineau/gorchata/internal/platform"
+	"github.com/jpconstantineau/gorchata/internal/template"
 )
 
 // Engine coordinates the execution of models
