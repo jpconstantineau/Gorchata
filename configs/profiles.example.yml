@@ -1,0 +1,34 @@
+# Example profiles.yml for Gorchata
+# Copy this file to profiles.yml and configure for your environment
+
+# The default profile name
+default:
+  # The default target to use
+  target: dev
+  
+  # Available output targets
+  outputs:
+    # Development target using SQLite
+    dev:
+      type: sqlite
+      # Use environment variable with default fallback
+      database: ${GORCHATA_DB_PATH:./gorchata.db}
+    
+    # Staging target
+    staging:
+      type: sqlite
+      database: ${GORCHATA_STAGING_DB:./gorchata_staging.db}
+    
+    # Production target
+    prod:
+      type: sqlite
+      database: ${GORCHATA_PROD_DB:/data/gorchata_prod.db}
+
+# Environment Variables:
+# - GORCHATA_DB_PATH: Override dev database path
+# - GORCHATA_STAGING_DB: Override staging database path
+# - GORCHATA_PROD_DB: Override production database path
+#
+# Syntax:
+# - ${VAR}: Required variable (error if not set)
+# - ${VAR:default}: Optional variable with default value

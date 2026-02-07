@@ -1,0 +1,12 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: ${GORCHATA_DB_PATH}
+    staging:
+      type: sqlite
+      database: ${GORCHATA_STAGING_DB:./staging.db}
+    prod:
+      type: sqlite
+      database: ${GORCHATA_PROD_DB:/data/prod.db}

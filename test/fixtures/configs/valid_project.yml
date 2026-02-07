@@ -1,0 +1,22 @@
+name: my_project
+version: 1.0.0
+profile: default
+
+model-paths:
+  - models
+  - custom_models
+seed-paths:
+  - seeds
+test-paths:
+  - tests
+macro-paths:
+  - macros
+
+vars:
+  start_date: '2024-01-01'
+  environment: dev
+
+models:
+  my_project:
+    materialized: table
+    schema: analytics
