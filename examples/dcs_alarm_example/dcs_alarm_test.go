@@ -1693,3 +1693,584 @@ func TestStandingAlarmDuration(t *testing.T) {
 	}
 	t.Logf("Worst standing alarm offender: %s with %d seconds total duration", worstTag, worstDuration)
 }
+
+// TestChatteringDetection verifies chattering alarm detection logic.
+// Chattering is defined as ≥5 activations within 10 minutes (600 seconds).
+func TestChatteringDetection(t *testing.T) {
+	ctx := context.Background()
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Helper to load model files and process template references
+	loadModel := func(modelPath, tableName string) error {
+		sqlContent, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		// Remove {{ config ... }} lines and process references
+		sqlStr := string(sqlContent)
+		lines := strings.Split(sqlStr, "\n")
+		var filteredLines []string
+		for _, line := range lines {
+			if !strings.Contains(line, "{{ config") {
+				filteredLines = append(filteredLines, line)
+			}
+		}
+		sqlContent = []byte(strings.Join(filteredLines, "\n"))
+
+		// Replace template references
+		sqlStr = string(sqlContent)
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_state_change" }}`, "fct_alarm_state_change")
+
+		sqlStr = strings.TrimSpace(sqlStr)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlStr
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load all prerequisite models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_state_change.sql"), "fct_alarm_state_change"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_state_change: %v", err)
+	}
+
+	// Load the chattering rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_chattering_alarms.sql"), "rollup_chattering_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_chattering_alarms: %v", err)
+	}
+
+	// Verify chattering tags are detected
+	var chatteringCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rollup_chattering_alarms").Scan(&chatteringCount)
+	if err != nil {
+		t.Fatalf("Failed to query rollup_chattering_alarms: %v", err)
+	}
+	if chatteringCount == 0 {
+		t.Error("rollup_chattering_alarms has no rows, expected at least 1 (TIC-105)")
+	}
+
+	// Verify TIC-105 is detected as chattering
+	var tic105Chattering int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_chattering_alarms rc
+		INNER JOIN dim_alarm_tag dt ON rc.tag_key = dt.tag_key
+		WHERE dt.tag_id = 'TIC-105'
+	`).Scan(&tic105Chattering)
+	if err != nil {
+		t.Fatalf("Failed to check TIC-105 chattering: %v", err)
+	}
+	if tic105Chattering == 0 {
+		t.Error("TIC-105 not detected as chattering, expected 1")
+	}
+
+	// Verify chattering episode counts are positive
+	var zeroEpisodeCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_chattering_alarms
+		WHERE chattering_episode_count <= 0
+	`).Scan(&zeroEpisodeCount)
+	if err != nil {
+		t.Fatalf("Failed to check episode counts: %v", err)
+	}
+	if zeroEpisodeCount > 0 {
+		t.Errorf("Found %d tags with zero or negative chattering_episode_count", zeroEpisodeCount)
+	}
+
+	// Verify metrics are reasonable
+	var unreasonableCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_chattering_alarms
+		WHERE total_state_changes < chattering_episode_count * 5
+		   OR min_cycle_time_sec < 0
+		   OR avg_cycle_time_sec < 0
+		   OR max_activations_per_hour < 0
+	`).Scan(&unreasonableCount)
+	if err != nil {
+		t.Fatalf("Failed to check metric validity: %v", err)
+	}
+	if unreasonableCount > 0 {
+		t.Errorf("Found %d rows with unreasonable metric values", unreasonableCount)
+	}
+
+	t.Logf("Found %d chattering tags", chatteringCount)
+}
+
+// TestBadActorRanking verifies Pareto analysis and composite scoring for bad actor tags.
+func TestBadActorRanking(t *testing.T) {
+	ctx := context.Background()
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Helper to load model files and process template references
+	loadModel := func(modelPath, tableName string) error {
+		sqlContent, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		// Remove {{ config ... }} lines and process references
+		sqlStr := string(sqlContent)
+		lines := strings.Split(sqlStr, "\n")
+		var filteredLines []string
+		for _, line := range lines {
+			if !strings.Contains(line, "{{ config") {
+				filteredLines = append(filteredLines, line)
+			}
+		}
+		sqlContent = []byte(strings.Join(filteredLines, "\n"))
+
+		// Replace template references
+		sqlStr = string(sqlContent)
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_state_change" }}`, "fct_alarm_state_change")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_standing_alarms" }}`, "rollup_standing_alarms")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_chattering_alarms" }}`, "rollup_chattering_alarms")
+
+		sqlStr = strings.TrimSpace(sqlStr)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlStr
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load all prerequisite models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_state_change.sql"), "fct_alarm_state_change"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_state_change: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_standing_alarms.sql"), "rollup_standing_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_standing_alarms: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_chattering_alarms.sql"), "rollup_chattering_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_chattering_alarms: %v", err)
+	}
+
+	// Load the bad actor rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_bad_actor_tags.sql"), "rollup_bad_actor_tags"); err != nil {
+		t.Fatalf("Failed to load rollup_bad_actor_tags: %v", err)
+	}
+
+	// Verify bad actor tags are ranked
+	var badActorCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rollup_bad_actor_tags").Scan(&badActorCount)
+	if err != nil {
+		t.Fatalf("Failed to query rollup_bad_actor_tags: %v", err)
+	}
+	if badActorCount == 0 {
+		t.Error("rollup_bad_actor_tags has no rows, expected multiple tags")
+	}
+
+	// Verify alarm_rank is sequential starting from 1
+	var rankGaps int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM (
+			SELECT 
+				alarm_rank,
+				ROW_NUMBER() OVER (ORDER BY alarm_rank) AS expected_rank
+			FROM rollup_bad_actor_tags
+		)
+		WHERE alarm_rank != expected_rank
+	`).Scan(&rankGaps)
+	if err != nil {
+		t.Fatalf("Failed to check rank sequence: %v", err)
+	}
+	if rankGaps > 0 {
+		t.Errorf("Found %d gaps in alarm_rank sequence", rankGaps)
+	}
+
+	// Verify cumulative_pct is monotonically increasing
+	var nonMonotonicCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_bad_actor_tags r1
+		INNER JOIN rollup_bad_actor_tags r2 ON r1.alarm_rank + 1 = r2.alarm_rank
+		WHERE r1.cumulative_pct > r2.cumulative_pct
+	`).Scan(&nonMonotonicCount)
+	if err != nil {
+		t.Fatalf("Failed to check cumulative_pct monotonicity: %v", err)
+	}
+	if nonMonotonicCount > 0 {
+		t.Errorf("Found %d violations of cumulative_pct monotonicity", nonMonotonicCount)
+	}
+
+	// Verify bad_actor_score is in valid range [0, 100]
+	var invalidScoreCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_bad_actor_tags
+		WHERE bad_actor_score < 0 OR bad_actor_score > 100
+	`).Scan(&invalidScoreCount)
+	if err != nil {
+		t.Fatalf("Failed to check score range: %v", err)
+	}
+	if invalidScoreCount > 0 {
+		t.Errorf("Found %d tags with invalid bad_actor_score", invalidScoreCount)
+	}
+
+	// Verify bad_actor_category matches score thresholds
+	var categoryMismatchCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_bad_actor_tags
+		WHERE (bad_actor_score >= 70 AND bad_actor_category != 'CRITICAL')
+		   OR (bad_actor_score >= 50 AND bad_actor_score < 70 AND bad_actor_category != 'SIGNIFICANT')
+		   OR (bad_actor_score >= 30 AND bad_actor_score < 50 AND bad_actor_category != 'MODERATE')
+		   OR (bad_actor_score < 30 AND bad_actor_category != 'NORMAL')
+	`).Scan(&categoryMismatchCount)
+	if err != nil {
+		t.Fatalf("Failed to check category consistency: %v", err)
+	}
+	if categoryMismatchCount > 0 {
+		t.Errorf("Found %d tags with mismatched bad_actor_category", categoryMismatchCount)
+	}
+
+	// Verify top 10% flag is correctly applied
+	var top10FlagError int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM (
+			SELECT 
+				*,
+				COUNT(*) OVER () AS total_tags,
+				alarm_rank * 100.0 / COUNT(*) OVER () AS pct_rank
+			FROM rollup_bad_actor_tags
+		)
+		WHERE (pct_rank <= 10 AND is_top_10_pct != 1)
+		   OR (pct_rank > 10 AND is_top_10_pct != 0)
+	`).Scan(&top10FlagError)
+	if err != nil {
+		t.Fatalf("Failed to check top 10%% flag: %v", err)
+	}
+	if top10FlagError > 0 {
+		t.Errorf("Found %d tags with incorrect is_top_10_pct flag", top10FlagError)
+	}
+
+	// Identify worst offender
+	var worstTag string
+	var worstScore float64
+	err = db.QueryRowContext(ctx, `
+		SELECT dt.tag_id, rb.bad_actor_score
+		FROM rollup_bad_actor_tags rb
+		INNER JOIN dim_alarm_tag dt ON rb.tag_key = dt.tag_key
+		ORDER BY rb.alarm_rank ASC
+		LIMIT 1
+	`).Scan(&worstTag, &worstScore)
+	if err != nil {
+		t.Fatalf("Failed to find worst offender: %v", err)
+	}
+	if worstTag == "" {
+		t.Error("No worst offender found")
+	}
+
+	t.Logf("Found %d bad actor tags, worst offender: %s (score: %.1f)", badActorCount, worstTag, worstScore)
+}
+
+// TestSystemHealthMetrics verifies overall alarm system health summary and ISA compliance calculation.
+func TestSystemHealthMetrics(t *testing.T) {
+	ctx := context.Background()
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Helper to load model files and process template references
+	loadModel := func(modelPath, tableName string) error {
+		sqlContent, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		// Remove {{ config ... }} lines and process references
+		sqlStr := string(sqlContent)
+		lines := strings.Split(sqlStr, "\n")
+		var filteredLines []string
+		for _, line := range lines {
+			if !strings.Contains(line, "{{ config") {
+				filteredLines = append(filteredLines, line)
+			}
+		}
+		sqlContent = []byte(strings.Join(filteredLines, "\n"))
+
+		// Replace template references
+		sqlStr = string(sqlContent)
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "fct_alarm_state_change" }}`, "fct_alarm_state_change")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_operator_loading_hourly" }}`, "rollup_operator_loading_hourly")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_standing_alarms" }}`, "rollup_standing_alarms")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_chattering_alarms" }}`, "rollup_chattering_alarms")
+		sqlStr = strings.ReplaceAll(sqlStr, `{{ ref "rollup_bad_actor_tags" }}`, "rollup_bad_actor_tags")
+
+		sqlStr = strings.TrimSpace(sqlStr)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlStr
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load all prerequisite models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_state_change.sql"), "fct_alarm_state_change"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_state_change: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_operator_loading_hourly.sql"), "rollup_operator_loading_hourly"); err != nil {
+		t.Fatalf("Failed to load rollup_operator_loading_hourly: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_standing_alarms.sql"), "rollup_standing_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_standing_alarms: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_chattering_alarms.sql"), "rollup_chattering_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_chattering_alarms: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_bad_actor_tags.sql"), "rollup_bad_actor_tags"); err != nil {
+		t.Fatalf("Failed to load rollup_bad_actor_tags: %v", err)
+	}
+
+	// Load the system health rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_alarm_system_health.sql"), "rollup_alarm_system_health"); err != nil {
+		t.Fatalf("Failed to load rollup_alarm_system_health: %v", err)
+	}
+
+	// Verify exactly one summary row exists
+	var rowCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rollup_alarm_system_health").Scan(&rowCount)
+	if err != nil {
+		t.Fatalf("Failed to query rollup_alarm_system_health: %v", err)
+	}
+	if rowCount != 1 {
+		t.Errorf("rollup_alarm_system_health has %d rows, expected exactly 1", rowCount)
+	}
+
+	// Retrieve and validate all metrics
+	var (
+		healthKey              int
+		analysisDate           sql.NullString
+		dateKey                sql.NullInt64
+		totalAlarmCount        int
+		uniqueTagCount         int
+		avgAlarmsPerHour       float64
+		peakAlarmsPer10min     int
+		pctTimeAcceptable      float64
+		pctTimeManageable      float64
+		pctTimeUnacceptable    float64
+		alarmFloodCount        int
+		totalStandingAlarms    int
+		avgStandingDurationMin float64
+		chatteringTagCount     int
+		top10ContributionPct   float64
+		badActorCount          int
+		isaComplianceScore     float64
+	)
+
+	err = db.QueryRowContext(ctx, `
+		SELECT 
+			health_key,
+			analysis_date,
+			date_key,
+			total_alarm_count,
+			unique_tag_count,
+			avg_alarms_per_hour,
+			peak_alarms_per_10min,
+			pct_time_acceptable,
+			pct_time_manageable,
+			pct_time_unacceptable,
+			alarm_flood_count,
+			total_standing_alarms,
+			avg_standing_duration_min,
+			chattering_tag_count,
+			top_10_contribution_pct,
+			bad_actor_count,
+			isa_compliance_score
+		FROM rollup_alarm_system_health
+	`).Scan(
+		&healthKey,
+		&analysisDate,
+		&dateKey,
+		&totalAlarmCount,
+		&uniqueTagCount,
+		&avgAlarmsPerHour,
+		&peakAlarmsPer10min,
+		&pctTimeAcceptable,
+		&pctTimeManageable,
+		&pctTimeUnacceptable,
+		&alarmFloodCount,
+		&totalStandingAlarms,
+		&avgStandingDurationMin,
+		&chatteringTagCount,
+		&top10ContributionPct,
+		&badActorCount,
+		&isaComplianceScore,
+	)
+	if err != nil {
+		t.Fatalf("Failed to retrieve health metrics: %v", err)
+	}
+
+	// Verify key structure
+	if healthKey != 1 {
+		t.Errorf("health_key = %d, want 1", healthKey)
+	}
+	if analysisDate.Valid {
+		t.Errorf("analysis_date = %q, want NULL for overall summary", analysisDate.String)
+	}
+	if dateKey.Valid {
+		t.Errorf("date_key = %d, want NULL for overall summary", dateKey.Int64)
+	}
+
+	// Verify alarm counts are positive
+	if totalAlarmCount <= 0 {
+		t.Errorf("total_alarm_count = %d, want > 0", totalAlarmCount)
+	}
+	if uniqueTagCount <= 0 {
+		t.Errorf("unique_tag_count = %d, want > 0", uniqueTagCount)
+	}
+
+	// Verify operator loading metrics
+	if avgAlarmsPerHour < 0 {
+		t.Errorf("avg_alarms_per_hour = %.2f, want >= 0", avgAlarmsPerHour)
+	}
+	if peakAlarmsPer10min <= 0 {
+		t.Errorf("peak_alarms_per_10min = %d, want > 0", peakAlarmsPer10min)
+	}
+
+	// Verify loading percentages sum to ~100%
+	pctTotal := pctTimeAcceptable + pctTimeManageable + pctTimeUnacceptable
+	if pctTotal < 99.0 || pctTotal > 101.0 {
+		t.Errorf("Loading percentages sum to %.2f, want ~100", pctTotal)
+	}
+
+	// Verify ISA compliance score is in valid range [0, 100]
+	if isaComplianceScore < 0 || isaComplianceScore > 100 {
+		t.Errorf("isa_compliance_score = %.1f, want [0, 100]", isaComplianceScore)
+	}
+
+	// Verify non-negative counts
+	if totalStandingAlarms < 0 {
+		t.Errorf("total_standing_alarms = %d, want >= 0", totalStandingAlarms)
+	}
+	if chatteringTagCount < 0 {
+		t.Errorf("chattering_tag_count = %d, want >= 0", chatteringTagCount)
+	}
+	if badActorCount < 0 {
+		t.Errorf("bad_actor_count = %d, want >= 0", badActorCount)
+	}
+
+	t.Logf("System Health Summary:")
+	t.Logf("  Total Alarms: %d", totalAlarmCount)
+	t.Logf("  Unique Tags: %d", uniqueTagCount)
+	t.Logf("  Avg Alarms/Hour: %.2f", avgAlarmsPerHour)
+	t.Logf("  Peak Alarms/10min: %d", peakAlarmsPer10min)
+	t.Logf("  Time Acceptable: %.1f%%", pctTimeAcceptable)
+	t.Logf("  Standing Alarms: %d", totalStandingAlarms)
+	t.Logf("  Chattering Tags: %d", chatteringTagCount)
+	t.Logf("  Bad Actors (score >= 50): %d", badActorCount)
+	t.Logf("  ISA Compliance Score: %.1f", isaComplianceScore)
+}
