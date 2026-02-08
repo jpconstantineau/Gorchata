@@ -1,0 +1,41 @@
+models:
+  - name: users
+    columns:
+      - name: id
+        tests:
+          - not_null
+          - unique
+      - name: email
+        tests:
+          - not_null
+          - unique
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['active', 'inactive', 'pending']
+      - name: name
+        tests:
+          - not_empty_string
+
+  - name: orders
+    columns:
+      - name: id
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        tests:
+          - not_null
+          - relationships:
+              to: users
+              field: id
+      - name: total_amount
+        tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100000
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['pending', 'completed', 'cancelled']

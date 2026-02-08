@@ -22,9 +22,7 @@ func TestCommand(args []string) error {
 	// Test-specific flags
 	selectFlag := fs.String("select", "", "Run tests matching pattern")
 	excludeFlag := fs.String("exclude", "", "Exclude tests matching pattern")
-	models := fs.String("models", "", "Test models matching pattern")
 	tags := fs.String("tags", "", "Test with tags (comma-separated)")
-	failFast := fs.Bool("fail-fast", false, "Stop on first failure")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse flags: %w", err)
@@ -87,8 +85,8 @@ func TestCommand(args []string) error {
 	}
 
 	var modelFilters []string
-	if *models != "" {
-		modelFilters = []string{*models}
+	if common.Models != "" {
+		modelFilters = []string{common.Models}
 	}
 
 	var tagFilters []string
@@ -138,7 +136,7 @@ func TestCommand(args []string) error {
 		jsonWriter.Write(result)
 
 		// Check fail-fast
-		if *failFast && result.Status == "failed" {
+		if common.FailFast && result.Status == "failed" {
 			break
 		}
 	}

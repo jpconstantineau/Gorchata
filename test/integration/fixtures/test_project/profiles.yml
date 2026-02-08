@@ -1,0 +1,6 @@
+test:
+  target: test
+  outputs:
+    test:
+      type: sqlite
+      database: test.db

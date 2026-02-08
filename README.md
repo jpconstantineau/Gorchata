@@ -11,6 +11,17 @@
 - **Lightweight**: Single binary, minimal footprint
 - **Cross-Platform**: Works on Windows, Linux, and macOS
 
+## Features
+
+- 📊 **SQL-first data transformations** - Write models as SQL SELECT statements
+- 🔄 **Dependency resolution** - Automatic DAG-based execution order
+- 🎯 **Incremental models** - Efficient updates for large datasets
+- 🗃️ **Multiple materializations** - Table, view, incremental
+- 📝 **Jinja templating** - `{{ ref() }}`, `{{ source() }}`, variables, macros
+- ✅ **Data quality testing** - 14 built-in tests + custom SQL tests
+- 💾 **Pure Go SQLite** - No CGO dependencies, cross-platform
+- ⚙️ **Profile management** - Multiple environments (dev, prod)
+
 ## Requirements
 
 - **Go 1.25+** (for building from source)
@@ -253,11 +264,24 @@ gorchata compile                   # Compile all models
 gorchata compile --models orders   # Compile specific models
 ```
 
-### `test` (Coming Soon)
+### `test`
 Run data quality tests on your models.
 
 ```bash
-gorchata test
+gorchata test                      # Run all tests
+gorchata test --select "not_null_*"  # Run tests matching pattern
+gorchata test --exclude "*_temp_*"   # Exclude tests matching pattern
+gorchata test --models "users,orders"  # Test specific models
+gorchata test --tags "critical,finance"  # Test with tags
+gorchata test --fail-fast            # Stop on first failure
+```
+
+### `build`
+Run models then run tests.
+
+```bash
+gorchata build                     # Run all models then all tests
+gorchata build --profile prod      # Use specific profile
 ```
 
 ### `docs` (Coming Soon)
@@ -265,6 +289,213 @@ Generate documentation from your models.
 
 ```bash
 gorchata docs generate
+```
+
+## Testing Your Data
+
+Gorchata includes comprehensive data quality testing inspired by dbt. Define tests in your schema files or as standalone SQL queries to validate your data transformations.
+
+### Quick Start
+
+Define tests in your `schema.yml`:
+
+```yaml
+models:
+  - name: users
+    columns:
+      - name: email
+        tests:
+          - not_null
+          - unique
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['active', 'inactive', 'pending']
+```
+
+Run your tests:
+
+```bash
+# Run all tests
+gorchata test
+
+# Run specific tests
+gorchata test --select "not_null_*"
+
+# Run tests for specific models
+gorchata test --models "users,orders"
+
+# Build models and run tests
+gorchata build
+```
+
+### Built-in Generic Tests
+
+Gorchata includes 14 generic tests out of the box:
+
+| Test | Description | Required Config | Optional Config |
+|------|-------------|-----------------|-----------------|
+| `not_null` | Validates column has no NULL values | - | `severity`, `where` |
+| `unique` | Validates column values are unique | - | `severity`, `where` |
+| `accepted_values` | Validates column contains only specified values | `values: [...]` | `severity`, `where`, `quote: true/false` |
+| `relationships` | Validates foreign key relationship exists | `to: model`, `field: column` | `severity`, `where` |
+| `not_empty_string` | Validates string column has no empty strings | - | `severity`, `where` |
+| `at_least_one` | Validates table has at least one row matching condition | - | `group_by_columns`, `severity`, `where` |
+| `not_constant` | Validates column has more than one distinct value | - | `severity`, `where` |
+| `unique_combination_of_columns` | Validates combination of columns is unique | `combination_of_columns: [...]` | `severity`, `where` |
+| `relationships_where` | Validates foreign key with conditional logic | `to: model`, `field: column`, `from_condition: where`, `to_condition: where` | `severity` |
+| `accepted_range` | Validates column values within numeric range | `min_value: N`, `max_value: N` | `severity`, `where` |
+| `recency` | Validates table has recent data within timeframe | `datepart: day/hour`, `field: timestamp_col`, `interval: N` | `severity` |
+| `equal_rowcount` | Validates two models have the same rowcount | `compare_model: other_model` | `severity` |
+| `sequential_values` | Validates column contains sequential values | `interval: N` | `severity`, `where` |
+| `mutually_exclusive_ranges` | Validates date/number ranges don't overlap | `lower_bound_column: col1`, `upper_bound_column: col2`, `partition_by: col3`, `gaps: allowed/not_allowed` | `severity` |
+
+### Test Configuration
+
+All tests support these configuration options:
+
+- **`severity`**: `error` (default) or `warn` - determines test status on failure
+- **`where`**: SQL WHERE clause to filter rows before testing
+- **`store_failures`**: `true` or `false` - persist failing rows to audit tables
+- **`store_failures_as`**: Custom table name for storing failures (default: `dbt_test__audit_{test_id}`)
+- **`error_if`**: Conditional threshold for errors (e.g., `">100"`, `">5%"`)
+- **`warn_if`**: Conditional threshold for warnings
+- **`sample_size`**: Override adaptive sampling (e.g., `500000`, `null` to disable)
+- **`tags`**: List of tags for test selection
+
+Example with configuration:
+
+```yaml
+models:
+  - name: orders
+    columns:
+      - name: total_amount
+        tests:
+          - not_null:
+              severity: error
+              where: "status = 'completed'"
+              store_failures: true
+              tags: ["finance", "critical"]
+```
+
+### Singular Tests
+
+Create custom SQL tests in your `tests/` directory:
+
+```sql
+-- tests/orders_total_positive.sql
+-- Tests that all completed orders have positive totals
+SELECT order_id, total_amount
+FROM {{ ref "stg_orders" }}
+WHERE status = 'completed' 
+  AND total_amount <= 0
+```
+
+Any rows returned = test failure.
+
+### Storing Test Failures
+
+Persist failing rows for analysis:
+
+```yaml
+tests:
+  - unique:
+      store_failures: true
+      store_failures_as: "duplicate_emails"
+```
+
+When a test fails with `store_failures: true`, Gorchata creates an audit table in the `dbt_test__audit` schema and stores the failing rows with metadata:
+
+```sql
+-- Query stored failures
+SELECT test_run_id, failed_at, * 
+FROM dbt_test__audit.duplicate_emails
+ORDER BY failed_at DESC 
+LIMIT 100;
+```
+
+Failures are automatically cleaned up after 30 days.
+
+### Test Selection
+
+Filter tests with CLI flags:
+
+```bash
+# By name pattern
+gorchata test --select "not_null_*"
+
+# By tag
+gorchata test --tags "critical,finance"
+
+# By model
+gorchata test --models "users,orders"
+
+# Exclude patterns
+gorchata test --exclude "*_temp_*"
+
+# Stop on first failure
+gorchata test --fail-fast
+```
+
+### CLI Commands for Testing
+
+**`gorchata test`** - Run tests only
+```bash
+gorchata test [--select pattern] [--exclude pattern] [--models models] [--tags tags] [--fail-fast]
+```
+
+**`gorchata build`** - Run models then tests
+```bash
+gorchata build [--profile profile] [--target target]
+```
+
+**`gorchata run --test`** - Run models with optional testing
+```bash
+gorchata run --test [--profile profile] [--target target]
+```
+
+### Adaptive Sampling
+
+For large tables (≥1 million rows), Gorchata automatically samples 100,000 rows for testing to improve performance:
+
+```yaml
+# Override sampling behavior per test
+tests:
+  - unique:
+      sample_size: 500000  # Use 500K sample
+      
+  - not_null:
+      sample_size: null  # Disable sampling, scan all rows
+```
+
+### Test Results
+
+Results are output to:
+- **Console**: Color-coded output (GREEN=PASS, RED=FAIL, YELLOW=WARN)
+- **JSON**: `target/test_results.json` with detailed results
+
+Example JSON output:
+```json
+{
+  "summary": {
+    "total_tests": 10,
+    "passed": 8,
+    "failed": 1,
+    "warnings": 1,
+    "duration_ms": 1234
+  },
+  "results": [
+    {
+      "test_id": "not_null_users_email",
+      "test_name": "not_null",
+      "model": "users",
+      "column": "email",
+      "status": "passed",
+      "duration_ms": 45,
+      "failure_count": 0
+    }
+  ]
+}
 ```
 
 ## Materialization Strategies
