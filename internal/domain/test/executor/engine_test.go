@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jpconstantineau/gorchata/internal/domain/test"
+	"github.com/jpconstantineau/gorchata/internal/domain/test/storage"
 	"github.com/jpconstantineau/gorchata/internal/platform"
 )
 
@@ -81,7 +82,7 @@ func (m *MockDatabaseAdapter) BeginTransaction(ctx context.Context) (platform.Tr
 func TestNewTestEngine(t *testing.T) {
 	adapter := NewMockDatabaseAdapter()
 
-	engine, err := NewTestEngine(adapter, nil)
+	engine, err := NewTestEngine(adapter, nil, nil)
 	if err != nil {
 		t.Errorf("NewTestEngine() error = %v, want nil", err)
 	}
@@ -91,7 +92,7 @@ func TestNewTestEngine(t *testing.T) {
 }
 
 func TestNewTestEngine_NilAdapter(t *testing.T) {
-	_, err := NewTestEngine(nil, nil)
+	_, err := NewTestEngine(nil, nil, nil)
 	if err == nil {
 		t.Error("NewTestEngine() with nil adapter should return error")
 	}
@@ -107,7 +108,7 @@ func TestExecuteTest_PassingTest(t *testing.T) {
 		RowsAffected: 0,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -146,7 +147,7 @@ func TestExecuteTest_FailingTest(t *testing.T) {
 		RowsAffected: 3,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -184,7 +185,7 @@ func TestExecuteTest_WithWarnings(t *testing.T) {
 		RowsAffected: 2,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -222,7 +223,7 @@ func TestExecuteTest_WithThresholds_ErrorIf(t *testing.T) {
 		RowsAffected: 5,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -260,7 +261,7 @@ func TestExecuteTest_WithThresholds_WarnIf(t *testing.T) {
 		RowsAffected: 2,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -303,7 +304,7 @@ func TestExecuteTests_AllPass(t *testing.T) {
 		Columns: []string{"id"}, Rows: [][]interface{}{}, RowsAffected: 0,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	test1, _ := test.NewTest("test1", "not_null", "users", "email", test.GenericTest,
 		"SELECT * FROM users WHERE email IS NULL")
@@ -340,7 +341,7 @@ func TestExecuteTests_SomeFailures(t *testing.T) {
 		Columns: []string{"id"}, Rows: [][]interface{}{{1}, {2}}, RowsAffected: 2,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	test1, _ := test.NewTest("test1", "not_null", "users", "email", test.GenericTest,
 		"SELECT * FROM users WHERE email IS NULL")
@@ -376,7 +377,7 @@ func TestExecuteTests_WithWarnings(t *testing.T) {
 		Columns: []string{"id"}, Rows: [][]interface{}{{1}}, RowsAffected: 1,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	test1, _ := test.NewTest("test1", "not_null", "users", "email", test.GenericTest,
 		"SELECT * FROM users WHERE email IS NULL")
@@ -406,7 +407,7 @@ func TestExecuteTest_QueryError(t *testing.T) {
 	// Simulate SQL error
 	adapter.QueryErrors["SELECT * FROM users WHERE email IS NULL"] = errors.New("table does not exist")
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -434,7 +435,7 @@ func TestExecuteTest_ResultTiming(t *testing.T) {
 		Columns: []string{"id"}, Rows: [][]interface{}{}, RowsAffected: 0,
 	}
 
-	engine, _ := NewTestEngine(adapter, nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
 
 	testObj, _ := test.NewTest(
 		"not_null_users_email",
@@ -462,4 +463,298 @@ func TestExecuteTest_ResultTiming(t *testing.T) {
 	if result.EndTime.IsZero() {
 		t.Error("ExecuteTest() result end time should be set")
 	}
+}
+
+// TestNewTestEngine_WithFailureStore tests engine creation with failure store
+func TestNewTestEngine_WithFailureStore(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+	mockStore := &MockFailureStore{}
+
+	engine, err := NewTestEngine(adapter, nil, mockStore)
+	if err != nil {
+		t.Errorf("NewTestEngine() error = %v, want nil", err)
+	}
+	if engine == nil {
+		t.Error("NewTestEngine() returned nil engine")
+	}
+}
+
+// TestExecuteTest_StoreFailures_Enabled tests storing failures when enabled
+func TestExecuteTest_StoreFailures_Enabled(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+	mockStore := &MockFailureStore{}
+
+	// Setup test that will fail
+	sql := "SELECT * FROM users WHERE email IS NULL"
+	adapter.QueryResults[sql] = &platform.QueryResult{
+		Columns: []string{"id", "email", "name"},
+		Rows: [][]interface{}{
+			{1, nil, "John Doe"},
+			{2, nil, "Jane Smith"},
+		},
+		RowsAffected: 2,
+	}
+
+	engine, _ := NewTestEngine(adapter, nil, mockStore)
+	ctx := context.Background()
+
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, sql)
+	testObj.Config.StoreFailures = true
+
+	result, err := engine.ExecuteTest(ctx, testObj)
+	if err != nil {
+		t.Fatalf("ExecuteTest() error = %v, want nil", err)
+	}
+
+	// Test should fail
+	if result.Status != test.StatusFailed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusFailed)
+	}
+
+	// Failures should be stored
+	if len(mockStore.StoreFailuresCalls) != 1 {
+		t.Errorf("StoreFailures() called %d times, want 1", len(mockStore.StoreFailuresCalls))
+	}
+
+	// Check stored data
+	if len(mockStore.StoreFailuresCalls) > 0 {
+		call := mockStore.StoreFailuresCalls[0]
+		if call.TestID != "test_id" {
+			t.Errorf("Stored test ID = %s, want test_id", call.TestID)
+		}
+		if len(call.Failures) != 2 {
+			t.Errorf("Stored %d failures, want 2", len(call.Failures))
+		}
+	}
+}
+
+// TestExecuteTest_StoreFailures_Disabled tests no storage when disabled
+func TestExecuteTest_StoreFailures_Disabled(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+	mockStore := &MockFailureStore{}
+
+	// Setup test that will fail
+	sql := "SELECT * FROM users WHERE email IS NULL"
+	adapter.QueryResults[sql] = &platform.QueryResult{
+		Columns: []string{"id", "email"},
+		Rows: [][]interface{}{
+			{1, nil},
+		},
+		RowsAffected: 1,
+	}
+
+	engine, _ := NewTestEngine(adapter, nil, mockStore)
+	ctx := context.Background()
+
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, sql)
+	testObj.Config.StoreFailures = false // Disabled
+
+	result, err := engine.ExecuteTest(ctx, testObj)
+	if err != nil {
+		t.Fatalf("ExecuteTest() error = %v, want nil", err)
+	}
+
+	// Test should fail
+	if result.Status != test.StatusFailed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusFailed)
+	}
+
+	// Failures should NOT be stored
+	if len(mockStore.StoreFailuresCalls) != 0 {
+		t.Errorf("StoreFailures() called %d times, want 0", len(mockStore.StoreFailuresCalls))
+	}
+}
+
+// TestExecuteTest_StoreFailures_PassingTest tests no storage for passing tests
+func TestExecuteTest_StoreFailures_PassingTest(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+	mockStore := &MockFailureStore{}
+
+	// Setup test that will pass (no rows returned)
+	sql := "SELECT * FROM users WHERE email IS NULL"
+	adapter.QueryResults[sql] = &platform.QueryResult{
+		Columns:      []string{"id", "email"},
+		Rows:         [][]interface{}{}, // No failing rows
+		RowsAffected: 0,
+	}
+
+	engine, _ := NewTestEngine(adapter, nil, mockStore)
+	ctx := context.Background()
+
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, sql)
+	testObj.Config.StoreFailures = true
+
+	result, err := engine.ExecuteTest(ctx, testObj)
+	if err != nil {
+		t.Fatalf("ExecuteTest() error = %v, want nil", err)
+	}
+
+	// Test should pass
+	if result.Status != test.StatusPassed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusPassed)
+	}
+
+	// Failures should NOT be stored (test passed)
+	if len(mockStore.StoreFailuresCalls) != 0 {
+		t.Errorf("StoreFailures() called %d times, want 0", len(mockStore.StoreFailuresCalls))
+	}
+}
+
+// TestExecuteTest_StoreFailures_StorageError tests handling of storage errors
+func TestExecuteTest_StoreFailures_StorageError(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+	mockStore := &MockFailureStore{
+		StoreFailuresError: errors.New("storage error"),
+	}
+
+	// Setup test that will fail
+	sql := "SELECT * FROM users WHERE email IS NULL"
+	adapter.QueryResults[sql] = &platform.QueryResult{
+		Columns: []string{"id", "email"},
+		Rows: [][]interface{}{
+			{1, nil},
+		},
+		RowsAffected: 1,
+	}
+
+	engine, _ := NewTestEngine(adapter, nil, mockStore)
+	ctx := context.Background()
+
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, sql)
+	testObj.Config.StoreFailures = true
+
+	result, err := engine.ExecuteTest(ctx, testObj)
+
+	// Test execution should NOT fail even if storage fails
+	if err != nil {
+		t.Errorf("ExecuteTest() error = %v, want nil (storage error should not fail test)", err)
+	}
+
+	// Test should still be marked as failed
+	if result.Status != test.StatusFailed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusFailed)
+	}
+
+	// Storage should have been attempted
+	if len(mockStore.StoreFailuresCalls) != 1 {
+		t.Errorf("StoreFailures() called %d times, want 1", len(mockStore.StoreFailuresCalls))
+	}
+
+	// Result message should indicate storage error
+	if result.ErrorMessage == "" {
+		t.Error("ExecuteTest() result error message should indicate storage error")
+	}
+}
+
+// TestExecuteTest_StoreFailures_NilStore tests execution with nil failure store
+func TestExecuteTest_StoreFailures_NilStore(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+
+	// Setup test that will fail
+	sql := "SELECT * FROM users WHERE email IS NULL"
+	adapter.QueryResults[sql] = &platform.QueryResult{
+		Columns: []string{"id", "email"},
+		Rows: [][]interface{}{
+			{1, nil},
+		},
+		RowsAffected: 1,
+	}
+
+	engine, _ := NewTestEngine(adapter, nil, nil) // nil failure store
+	ctx := context.Background()
+
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, sql)
+	testObj.Config.StoreFailures = true
+
+	result, err := engine.ExecuteTest(ctx, testObj)
+
+	// Should not panic or error when store is nil
+	if err != nil {
+		t.Errorf("ExecuteTest() error = %v, want nil", err)
+	}
+
+	// Test should still fail normally
+	if result.Status != test.StatusFailed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusFailed)
+	}
+}
+
+// TestGenerateTestRunID tests test run ID generation
+func TestGenerateTestRunID(t *testing.T) {
+	id1 := generateTestRunID()
+	id2 := generateTestRunID()
+
+	if id1 == "" {
+		t.Error("generateTestRunID() returned empty string")
+	}
+	if id1 == id2 {
+		t.Error("generateTestRunID() should generate unique IDs")
+	}
+}
+
+// TestConvertToFailureRows tests conversion of query results to FailureRow
+func TestConvertToFailureRows(t *testing.T) {
+	testRunID := "run-123"
+	testObj, _ := test.NewTest("test_id", "Test Name", "users", "email", test.GenericTest, "SELECT * FROM users")
+
+	rows := []map[string]interface{}{
+		{"id": 1, "email": nil, "name": "John"},
+		{"id": 2, "email": nil, "name": "Jane"},
+	}
+
+	failures := convertToFailureRows(testRunID, testObj, rows)
+
+	if len(failures) != 2 {
+		t.Errorf("convertToFailureRows() returned %d failures, want 2", len(failures))
+	}
+
+	for i, f := range failures {
+		if f.TestID != testObj.ID {
+			t.Errorf("failures[%d].TestID = %s, want %s", i, f.TestID, testObj.ID)
+		}
+		if f.TestRunID != testRunID {
+			t.Errorf("failures[%d].TestRunID = %s, want %s", i, f.TestRunID, testRunID)
+		}
+		if f.FailedAt.IsZero() {
+			t.Errorf("failures[%d].FailedAt is zero", i)
+		}
+		if len(f.RowData) == 0 {
+			t.Errorf("failures[%d].RowData is empty", i)
+		}
+	}
+}
+
+// MockFailureStore is a test mock for storage.FailureStore
+type MockFailureStore struct {
+	StoreFailuresCalls []struct {
+		TestID    string
+		TestRunID string
+		Failures  []storage.FailureRow
+	}
+	StoreFailuresError error
+}
+
+func (m *MockFailureStore) Initialize(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockFailureStore) StoreFailures(ctx context.Context, t *test.Test, testRunID string, failures []storage.FailureRow) error {
+	m.StoreFailuresCalls = append(m.StoreFailuresCalls, struct {
+		TestID    string
+		TestRunID string
+		Failures  []storage.FailureRow
+	}{
+		TestID:    t.ID,
+		TestRunID: testRunID,
+		Failures:  failures,
+	})
+	return m.StoreFailuresError
+}
+
+func (m *MockFailureStore) CleanupOldFailures(ctx context.Context, retentionDays int) error {
+	return nil
+}
+
+func (m *MockFailureStore) GetFailures(ctx context.Context, testID string, limit int) ([]storage.FailureRow, error) {
+	return nil, nil
 }

@@ -77,6 +77,9 @@ type TestConfig struct {
 	// StoreFailures indicates whether to store failed rows for debugging
 	StoreFailures bool
 
+	// StoreFailuresAs is an optional custom table name for storing failures
+	StoreFailuresAs string
+
 	// Where is an optional SQL WHERE clause to filter test execution
 	Where string
 
@@ -93,12 +96,13 @@ type TestConfig struct {
 // DefaultTestConfig returns a TestConfig with default values
 func DefaultTestConfig() *TestConfig {
 	return &TestConfig{
-		Severity:      SeverityError,
-		StoreFailures: false,
-		Where:         "",
-		SampleSize:    0,
-		Tags:          []string{},
-		CustomName:    "",
+		Severity:        SeverityError,
+		StoreFailures:   false,
+		StoreFailuresAs: "",
+		Where:           "",
+		SampleSize:      0,
+		Tags:            []string{},
+		CustomName:      "",
 	}
 }
 
@@ -124,6 +128,11 @@ func (tc *TestConfig) SetSeverity(severity Severity) {
 // SetStoreFailures sets whether to store failed rows
 func (tc *TestConfig) SetStoreFailures(store bool) {
 	tc.StoreFailures = store
+}
+
+// SetStoreFailuresAs sets the custom failure table name
+func (tc *TestConfig) SetStoreFailuresAs(tableName string) {
+	tc.StoreFailuresAs = tableName
 }
 
 // SetWhere sets the WHERE clause
