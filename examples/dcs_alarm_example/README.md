@@ -128,7 +128,51 @@ Secondary fact table for chattering detection.
 - Equipment behavior patterns
 
 ### Rollup Tables (Phase 5)
-*Coming soon*: ISA 18.2 compliance metrics, alarm rate analysis, flood detection
+
+#### rollup_operator_loading_hourly
+Calculates operator loading per 10-minute time buckets following ISA 18.2 standards.
+
+**Grain**: One row per 10-minute time bucket (may aggregate multiple areas)
+
+**Key Columns**:
+- `date_key`: Foreign key to dim_dates (YYYYMMDD format)
+- `time_bucket_key`: 10-minute time bucket (0-143, calculated as hour*6 + minute/10)
+- `area_key`: Foreign key to dim_process_area
+
+**Alarm Counts**:
+- `alarm_count`: Total activations in this 10-minute bucket
+- `alarm_count_critical`, `alarm_count_high`, `alarm_count_medium`, `alarm_count_low`: Counts by priority
+
+**Response Metrics**:
+- `avg_time_to_ack_sec`: Average acknowledgment time (seconds)
+- `max_time_to_ack_sec`: Slowest acknowledgment (seconds)
+- `standing_alarm_count`: Count of standing alarms (>10 min) active in this bucket
+
+**ISA 18.2 Classification**:
+- `loading_category`: 'ACCEPTABLE' (1-2 alarms), 'MANAGEABLE' (3-10 alarms), or 'UNACCEPTABLE' (>10 alarms)
+- `is_alarm_flood`: 1 if >10 alarms in this bucket (alarm flood condition), 0 otherwise
+
+**Purpose**: Identifies time periods with excessive alarm rates, enabling targeted investigation of alarm floods and operator overload conditions.
+
+#### rollup_standing_alarms
+Summarizes standing alarm duration metrics (>10 minutes to acknowledge) by tag.
+
+**Grain**: One row per tag with standing alarm occurrences
+
+**Key Columns**:
+- `tag_key`: Foreign key to dim_alarm_tag
+- `area_key`: Foreign key to dim_process_area
+- `standing_alarm_count`: Count of alarms that took >10 minutes to acknowledge
+
+**Duration Metrics**:
+- `total_standing_duration_sec`: Sum of all standing durations (seconds)
+- `avg_standing_duration_sec`: Average standing duration (seconds)
+- `max_standing_duration_sec`: Maximum standing duration (seconds)
+- `avg_standing_duration_min`: Average in minutes (avg_sec / 60.0)
+- `max_standing_duration_hrs`: Maximum in hours (max_sec / 3600.0)
+- `total_standing_duration_hrs`: Total in hours (total_sec / 3600.0)
+
+**Purpose**: Identifies worst offender tags that consistently require extended response times, ordered by total standing duration descending to highlight tags needing priority attention or rationalization.
 
 ## Testing
 

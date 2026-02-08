@@ -1268,3 +1268,428 @@ func TestFactTableMetrics(t *testing.T) {
 		t.Errorf("Dimensional join count = %d, want %d (same as occurrence count)", dimensionalQueryCount, occurrenceCount)
 	}
 }
+
+// TestOperatorLoadingCalculation verifies operator loading rollup calculates 10-minute buckets
+// and ISA 18.2 categories (ACCEPTABLE/MANAGEABLE/UNACCEPTABLE) correctly
+func TestOperatorLoadingCalculation(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_time" }}`, "dim_time")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+
+	// Load the rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_operator_loading_hourly.sql"), "rollup_operator_loading_hourly"); err != nil {
+		t.Fatalf("Failed to load rollup_operator_loading_hourly: %v", err)
+	}
+
+	// Verify rollup table exists and has rows
+	var rowCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rollup_operator_loading_hourly").Scan(&rowCount)
+	if err != nil {
+		t.Fatalf("Failed to query rollup_operator_loading_hourly: %v", err)
+	}
+	if rowCount == 0 {
+		t.Error("rollup_operator_loading_hourly has no rows")
+	}
+
+	// Verify D-200 storm period (Feb 7, 08:00-08:08) is categorized as UNACCEPTABLE
+	// Time bucket for 08:00 = (8 * 6) + (0 / 10) = 48
+	var stormCategory string
+	var stormAlarmCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT loading_category, alarm_count
+		FROM rollup_operator_loading_hourly
+		WHERE date_key = 20260207 AND time_bucket_key = 48
+	`).Scan(&stormCategory, &stormAlarmCount)
+	if err != nil {
+		t.Fatalf("Failed to query D-200 storm period: %v", err)
+	}
+	if stormCategory != "UNACCEPTABLE" {
+		t.Errorf("Storm loading_category = %q, want 'UNACCEPTABLE'", stormCategory)
+	}
+	if stormAlarmCount <= 10 {
+		t.Errorf("Storm alarm_count = %d, want > 10", stormAlarmCount)
+	}
+
+	// Verify ACCEPTABLE category exists for normal periods
+	var acceptableCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_operator_loading_hourly
+		WHERE loading_category = 'ACCEPTABLE'
+	`).Scan(&acceptableCount)
+	if err != nil {
+		t.Fatalf("Failed to count ACCEPTABLE periods: %v", err)
+	}
+	if acceptableCount == 0 {
+		t.Error("No ACCEPTABLE loading periods found, expected at least one for normal operations")
+	}
+
+	// Verify MANAGEABLE category exists
+	var manageableCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_operator_loading_hourly
+		WHERE loading_category = 'MANAGEABLE'
+	`).Scan(&manageableCount)
+	if err != nil {
+		t.Fatalf("Failed to count MANAGEABLE periods: %v", err)
+	}
+	// MANAGEABLE is optional depending on data distribution, just verify query works
+	t.Logf("Found %d MANAGEABLE loading periods", manageableCount)
+
+	// Verify time_bucket_key is in valid range (0-143)
+	var invalidBucketCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_operator_loading_hourly
+		WHERE time_bucket_key < 0 OR time_bucket_key > 143
+	`).Scan(&invalidBucketCount)
+	if err != nil {
+		t.Fatalf("Failed to check time_bucket_key range: %v", err)
+	}
+	if invalidBucketCount > 0 {
+		t.Errorf("Found %d rows with invalid time_bucket_key (should be 0-143)", invalidBucketCount)
+	}
+}
+
+// TestAlarmFloodDetection verifies >10 alarms/10min periods are flagged as floods
+// The D-200 storm should be flagged with is_alarm_flood = 1
+func TestAlarmFloodDetection(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_time" }}`, "dim_time")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+
+	// Load the rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_operator_loading_hourly.sql"), "rollup_operator_loading_hourly"); err != nil {
+		t.Fatalf("Failed to load rollup_operator_loading_hourly: %v", err)
+	}
+
+	// Verify D-200 storm is flagged as a flood
+	// Time bucket for 08:00 = 48
+	var isFlood int
+	var alarmCount int
+	err := db.QueryRowContext(ctx, `
+		SELECT is_alarm_flood, alarm_count
+		FROM rollup_operator_loading_hourly
+		WHERE date_key = 20260207 AND time_bucket_key = 48
+	`).Scan(&isFlood, &alarmCount)
+	if err != nil {
+		t.Fatalf("Failed to query storm flood flag: %v", err)
+	}
+	if isFlood != 1 {
+		t.Errorf("Storm is_alarm_flood = %d, want 1 (>10 alarms)", isFlood)
+	}
+
+	// Verify non-flood periods have is_alarm_flood = 0
+	var nonFloodCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_operator_loading_hourly
+		WHERE is_alarm_flood = 0 AND alarm_count <= 10
+	`).Scan(&nonFloodCount)
+	if err != nil {
+		t.Fatalf("Failed to count non-flood periods: %v", err)
+	}
+	if nonFloodCount == 0 {
+		t.Error("No non-flood periods found, expected normal operations to have is_alarm_flood = 0")
+	}
+
+	// Verify flood flag matches alarm count logic
+	var mismatchCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_operator_loading_hourly
+		WHERE (alarm_count > 10 AND is_alarm_flood != 1)
+		   OR (alarm_count <= 10 AND is_alarm_flood != 0)
+	`).Scan(&mismatchCount)
+	if err != nil {
+		t.Fatalf("Failed to check flood flag consistency: %v", err)
+	}
+	if mismatchCount > 0 {
+		t.Errorf("Found %d rows with inconsistent is_alarm_flood flag", mismatchCount)
+	}
+}
+
+// TestStandingAlarmDuration verifies standing alarm duration metrics by tag
+// Expected: 9 total standing alarms (5 in C-100, 4 in D-200)
+func TestStandingAlarmDuration(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+
+	// Load the rollup model
+	if err := loadModel(filepath.Join("models", "rollups", "rollup_standing_alarms.sql"), "rollup_standing_alarms"); err != nil {
+		t.Fatalf("Failed to load rollup_standing_alarms: %v", err)
+	}
+
+	// Verify total count of standing alarm tags
+	var tagCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM rollup_standing_alarms").Scan(&tagCount)
+	if err != nil {
+		t.Fatalf("Failed to query rollup_standing_alarms: %v", err)
+	}
+	// We expect at least 9 tags with standing alarms (could be more if some tags have multiple standing occurrences)
+	if tagCount == 0 {
+		t.Error("rollup_standing_alarms has no rows, expected at least 9 tags")
+	}
+
+	// Verify total standing alarm count
+	var totalStandingCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT SUM(standing_alarm_count)
+		FROM rollup_standing_alarms
+	`).Scan(&totalStandingCount)
+	if err != nil {
+		t.Fatalf("Failed to sum standing alarm count: %v", err)
+	}
+	// Expected: 5 in C-100 + 4 in D-200 = 9 total
+	if totalStandingCount < 9 {
+		t.Errorf("Total standing alarm count = %d, want at least 9", totalStandingCount)
+	}
+
+	// Verify duration metrics are non-negative
+	var negativeCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_standing_alarms
+		WHERE total_standing_duration_sec < 0
+		   OR avg_standing_duration_sec < 0
+		   OR max_standing_duration_sec < 0
+	`).Scan(&negativeCount)
+	if err != nil {
+		t.Fatalf("Failed to check for negative durations: %v", err)
+	}
+	if negativeCount > 0 {
+		t.Errorf("Found %d rows with negative duration values", negativeCount)
+	}
+
+	// Verify max >= avg >= 0 for logical consistency
+	var inconsistentCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_standing_alarms
+		WHERE max_standing_duration_sec < avg_standing_duration_sec
+	`).Scan(&inconsistentCount)
+	if err != nil {
+		t.Fatalf("Failed to check duration consistency: %v", err)
+	}
+	if inconsistentCount > 0 {
+		t.Errorf("Found %d rows where max < avg duration", inconsistentCount)
+	}
+
+	// Verify converted units are calculated correctly
+	var unitMismatchCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM rollup_standing_alarms
+		WHERE ABS(avg_standing_duration_min - (avg_standing_duration_sec / 60.0)) > 0.01
+		   OR ABS(max_standing_duration_hrs - (max_standing_duration_sec / 3600.0)) > 0.01
+		   OR ABS(total_standing_duration_hrs - (total_standing_duration_sec / 3600.0)) > 0.01
+	`).Scan(&unitMismatchCount)
+	if err != nil {
+		t.Fatalf("Failed to check unit conversions: %v", err)
+	}
+	if unitMismatchCount > 0 {
+		t.Errorf("Found %d rows with incorrect unit conversions", unitMismatchCount)
+	}
+
+	// Verify worst offender (highest total duration) is identified
+	var worstTag string
+	var worstDuration int
+	err = db.QueryRowContext(ctx, `
+		SELECT dt.tag_id, rs.total_standing_duration_sec
+		FROM rollup_standing_alarms rs
+		INNER JOIN dim_alarm_tag dt ON rs.tag_key = dt.tag_key
+		ORDER BY rs.total_standing_duration_sec DESC
+		LIMIT 1
+	`).Scan(&worstTag, &worstDuration)
+	if err != nil {
+		t.Fatalf("Failed to find worst offender: %v", err)
+	}
+	if worstTag == "" {
+		t.Error("No worst offender found")
+	}
+	if worstDuration <= 0 {
+		t.Errorf("Worst offender duration = %d, want > 0", worstDuration)
+	}
+	t.Logf("Worst standing alarm offender: %s with %d seconds total duration", worstTag, worstDuration)
+}
