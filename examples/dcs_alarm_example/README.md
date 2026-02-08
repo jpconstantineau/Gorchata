@@ -61,13 +61,107 @@ gorchata run
 
 ## How to Run
 
-*Coming in Phase 2: Source data models*
-
 ```bash
 # From repository root
 cd examples/dcs_alarm_example
+
+# Run models to build the data warehouse
 gorchata run
+
+# Run data quality tests
+gorchata test
 ```
+
+## Data Quality Tests
+
+This example includes comprehensive data quality tests following DBT testing patterns:
+
+### Generic Tests (via schema.yml)
+
+**Dimension Table Tests:**
+- `dim_alarm_tag`: 8 tests
+  - Primary key constraints (unique, not_null on tag_key)
+  - Natural key validation (not_null, not_empty_string on tag_id)
+  - Alarm type validation (accepted_values: PROCESS, EQUIPMENT, SAFETY, REGULATORY)
+  - Boolean flag validation (is_safety_critical, is_active)
+  
+- `dim_equipment`: 4 tests
+  - Primary key constraints
+  - Equipment type validation (PUMP, COMPRESSOR, VALVE, etc.)
+  
+- `dim_priority`: 5 tests
+  - ISA 18.2 priority levels (CRITICAL, HIGH, MEDIUM, LOW)
+  - Response time validation (1-3600 seconds)
+  
+- `dim_operator`: 4 tests
+  - Primary key constraints
+  - Operator identification validation
+
+**Fact Table Tests:**
+- `fct_alarm_occurrence`: 12 tests
+  - Primary key uniqueness
+  - Foreign key relationships to all dimensions
+  - Duration validation (0-86400 seconds)
+  - Acknowledgment latency validation
+  - Standing alarm flag validation
+  - Data recency check (30-day window)
+  
+- `fct_alarm_state_change`: 6 tests
+  - Event type validation (ACTIVE, ACKNOWLEDGED, INACTIVE, SUPPRESSED)
+  - Timestamp validation
+  - Process value validation
+
+### Singular Tests (custom SQL)
+
+**1. test_alarm_lifecycle.sql**
+- **Purpose**: Verify alarm state transitions follow valid ISA 18.2 sequences
+- **Valid sequences**: 
+  - ACTIVE → ACKNOWLEDGED → INACTIVE
+  - ACTIVE → INACTIVE (unacknowledged clear)
+- **Detects**: Invalid state transitions, missing ACTIVE events, duplicate activations
+
+**2. test_standing_alarm_duration.sql**
+- **Purpose**: Detect standing alarms per ISA 18.2 (active >10 minutes)
+- **Thresholds**:
+  - WARNING: >10 minutes (600 seconds)
+  - CRITICAL: >30 minutes (1800 seconds)
+- **Business value**: Identifies alarms requiring rationalization
+
+**3. test_chattering_detection.sql**
+- **Purpose**: Detect fleeting/chattering alarms per ISA 18.2
+- **Threshold**: >5 activations per 10-minute window
+- **Business value**: Identifies nuisance alarms causing operator overload
+
+### Custom Generic Test Template
+
+**tests/generic/test_valid_timestamp.sql**
+- Validates timestamps are within reasonable range (2020-2030 by default)
+- Configurable via `min_date` and `max_date` parameters
+- Prevents future dates and pre-epoch timestamps
+
+### Running Tests
+
+```bash
+# Run all tests
+gorchata test
+
+# Run specific test
+gorchata test --select test_alarm_lifecycle
+
+# Run tests with verbose output
+gorchata test --verbose
+
+# Run tests and store failures
+gorchata test --store-failures
+```
+
+### Test Coverage Summary
+
+- **Total tests**: 20+ (exact count varies based on schema)
+- **Generic tests**: 15-20 (from schema.yml)
+- **Singular tests**: 3 (domain-specific SQL)
+- **Custom generic tests**: 1 (timestamp validation)
+- **Coverage**: All dimensions, facts, and critical ISA 18.2 metrics
 
 ## Schema Overview
 
