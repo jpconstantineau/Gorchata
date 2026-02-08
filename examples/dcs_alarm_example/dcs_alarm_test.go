@@ -1,9 +1,11 @@
 package dcs_alarm_test
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jpconstantineau/gorchata/internal/config"
@@ -212,5 +214,264 @@ func TestDirectoryStructure(t *testing.T) {
 		if !info.IsDir() {
 			t.Errorf("%s exists but is not a directory", dirPath)
 		}
+	}
+}
+
+// TestSourceModelsExist verifies that the raw alarm source model files exist
+func TestSourceModelsExist(t *testing.T) {
+	requiredFiles := []string{
+		filepath.Join("models", "sources", "raw_alarm_events.sql"),
+		filepath.Join("models", "sources", "raw_alarm_config.sql"),
+	}
+
+	for _, file := range requiredFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			t.Errorf("Required source model file %s does not exist", file)
+		} else if err != nil {
+			t.Errorf("Error checking file %s: %v", file, err)
+		}
+	}
+}
+
+// TestRawAlarmEventsParse verifies raw_alarm_events.sql contains valid SQL and Go template config
+func TestRawAlarmEventsParse(t *testing.T) {
+	modelPath := filepath.Join("models", "sources", "raw_alarm_events.sql")
+
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Go template config header exists (not Jinja)
+	if !strings.Contains(contentStr, `{{ config`) {
+		t.Error("File does not contain Go template config directive {{ config ... }}")
+	}
+
+	// Verify it's NOT Jinja syntax
+	if strings.Contains(contentStr, `config(materialized='table')`) {
+		t.Error("File contains Jinja syntax, should use Go template syntax: {{ config \"materialized\" \"table\" }}")
+	}
+
+	// Verify SQL keywords
+	requiredKeywords := []string{"SELECT", "FROM", "VALUES"}
+	for _, keyword := range requiredKeywords {
+		if !strings.Contains(strings.ToUpper(contentStr), keyword) {
+			t.Errorf("File does not contain SQL keyword: %s", keyword)
+		}
+	}
+
+	// Verify required columns are mentioned
+	requiredColumns := []string{"event_id", "tag_id", "event_timestamp", "event_type", "priority_code", "area_code"}
+	for _, col := range requiredColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("File does not reference column: %s", col)
+		}
+	}
+}
+
+// TestAlarmConfigParse verifies raw_alarm_config.sql contains valid SQL and Go template config
+func TestAlarmConfigParse(t *testing.T) {
+	modelPath := filepath.Join("models", "sources", "raw_alarm_config.sql")
+
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Go template config header exists
+	if !strings.Contains(contentStr, `{{ config`) {
+		t.Error("File does not contain Go template config directive {{ config ... }}")
+	}
+
+	// Verify SQL keywords
+	requiredKeywords := []string{"SELECT", "FROM", "VALUES"}
+	for _, keyword := range requiredKeywords {
+		if !strings.Contains(strings.ToUpper(contentStr), keyword) {
+			t.Errorf("File does not contain SQL keyword: %s", keyword)
+		}
+	}
+
+	// Verify required columns are mentioned
+	requiredColumns := []string{"tag_id", "tag_name", "alarm_type", "priority_code", "area_code"}
+	for _, col := range requiredColumns {
+		if !strings.Contains(contentStr, col) {
+			t.Errorf("File does not reference column: %s", col)
+		}
+	}
+}
+
+// TestAlarmEventData verifies the raw_alarm_events model loads correctly with expected data
+func TestAlarmEventData(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Read model file
+	modelPath := filepath.Join("models", "sources", "raw_alarm_events.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_alarm_events.sql: %v", err)
+	}
+
+	// Extract SQL (remove Go template config directive)
+	contentStr := string(content)
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	// Wrap in CREATE TABLE for testing
+	createTableSQL := "CREATE TABLE raw_alarm_events AS " + sqlContent
+
+	// Execute SQL
+	ctx := context.Background()
+	_, err = db.ExecContext(ctx, createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute raw_alarm_events model: %v", err)
+	}
+
+	// Verify table has data
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM raw_alarm_events").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count events: %v", err)
+	}
+
+	// Should have at least 30 events
+	if count < 30 {
+		t.Errorf("Event count = %d, want at least 30", count)
+	}
+
+	// Verify required columns exist and have correct types
+	rows, err := db.QueryContext(ctx, `
+		SELECT event_id, tag_id, event_timestamp, event_type, priority_code, 
+		       alarm_value, setpoint_value, operator_id, area_code
+		FROM raw_alarm_events 
+		LIMIT 1
+	`)
+	if err != nil {
+		t.Fatalf("Failed to query columns: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		t.Fatal("No rows returned")
+	}
+
+	var eventID int
+	var tagID, eventTimestamp, eventType, priorityCode, areaCode string
+	var alarmValue, setpointValue float64
+	var operatorID sql.NullString
+
+	err = rows.Scan(&eventID, &tagID, &eventTimestamp, &eventType, &priorityCode,
+		&alarmValue, &setpointValue, &operatorID, &areaCode)
+	if err != nil {
+		t.Fatalf("Failed to scan row: %v", err)
+	}
+
+	// Verify timestamp format (ISO 8601: YYYY-MM-DD HH:MM:SS)
+	if len(eventTimestamp) != 19 {
+		t.Errorf("event_timestamp format = %q, want format 'YYYY-MM-DD HH:MM:SS'", eventTimestamp)
+	}
+
+	// Verify event_type is one of expected values
+	validEventTypes := []string{"ACTIVE", "ACKNOWLEDGED", "INACTIVE"}
+	found := false
+	for _, vt := range validEventTypes {
+		if eventType == vt {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("event_type = %q, want one of %v", eventType, validEventTypes)
+	}
+
+	// Verify priority_code is one of expected values
+	validPriorities := []string{"CRITICAL", "HIGH", "MEDIUM", "LOW"}
+	found = false
+	for _, vp := range validPriorities {
+		if priorityCode == vp {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("priority_code = %q, want one of %v", priorityCode, validPriorities)
+	}
+}
+
+// TestTwoProcessAreas verifies C-100 and D-200 areas are present in the data
+func TestTwoProcessAreas(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Read and execute model file
+	modelPath := filepath.Join("models", "sources", "raw_alarm_events.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_alarm_events.sql: %v", err)
+	}
+
+	contentStr := string(content)
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+	sqlContent = strings.TrimSpace(sqlContent)
+	createTableSQL := "CREATE TABLE raw_alarm_events AS " + sqlContent
+
+	ctx := context.Background()
+	_, err = db.ExecContext(ctx, createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute raw_alarm_events model: %v", err)
+	}
+
+	// Verify both process areas exist
+	areas := []string{"C-100", "D-200"}
+	for _, area := range areas {
+		var count int
+		err = db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM raw_alarm_events WHERE area_code = ?",
+			area).Scan(&count)
+		if err != nil {
+			t.Fatalf("Failed to count events for area %s: %v", area, err)
+		}
+
+		if count == 0 {
+			t.Errorf("No events found for area_code = %s", area)
+		} else {
+			t.Logf("Found %d events for area %s", count, area)
+		}
+	}
+
+	// Verify area distribution (C-100 should have ~50-60%, D-200 ~40-50%)
+	var totalCount, c100Count, d200Count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM raw_alarm_events").Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("Failed to count total events: %v", err)
+	}
+
+	err = db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM raw_alarm_events WHERE area_code = 'C-100'").Scan(&c100Count)
+	if err != nil {
+		t.Fatalf("Failed to count C-100 events: %v", err)
+	}
+
+	err = db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM raw_alarm_events WHERE area_code = 'D-200'").Scan(&d200Count)
+	if err != nil {
+		t.Fatalf("Failed to count D-200 events: %v", err)
+	}
+
+	c100Pct := float64(c100Count) / float64(totalCount) * 100
+	d200Pct := float64(d200Count) / float64(totalCount) * 100
+
+	t.Logf("Area distribution: C-100 = %.1f%%, D-200 = %.1f%%", c100Pct, d200Pct)
+
+	// Very loose check - just verify both areas have reasonable representation
+	if c100Pct < 30 || c100Pct > 70 {
+		t.Errorf("C-100 percentage = %.1f%%, expected roughly 50-60%%", c100Pct)
+	}
+	if d200Pct < 30 || d200Pct > 70 {
+		t.Errorf("D-200 percentage = %.1f%%, expected roughly 40-50%%", d200Pct)
 	}
 }
