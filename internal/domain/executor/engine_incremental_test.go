@@ -80,6 +80,11 @@ func TestEnginePassesIncrementalContext(t *testing.T) {
 				UniqueKey:   []string{"id"},
 			})
 
+			// For incremental tests that expect the table to exist, mark it as existing
+			if tt.expectedIsIncremental {
+				adapter.tableExists["test_model"] = true
+			}
+
 			// Execute the model
 			ctx := context.Background()
 			result, err := engine.ExecuteModel(ctx, model)
@@ -204,6 +209,9 @@ WHERE sale_date > (SELECT COALESCE(MAX(sale_date), '1900-01-01') FROM {{ this }}
 		Type:      materialization.MaterializationIncremental,
 		UniqueKey: []string{"sale_id"},
 	})
+
+	// Mark the table as existing so incremental mode is triggered
+	adapter.tableExists["fct_sales"] = true
 
 	ctx := context.Background()
 	result, err := engine.ExecuteModel(ctx, model)
