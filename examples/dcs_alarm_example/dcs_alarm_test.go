@@ -768,3 +768,503 @@ func TestTimeBuckets(t *testing.T) {
 		t.Errorf("time_display for time_key=143 = %q, want '23:50'", timeDisplay)
 	}
 }
+
+// TestFactTablesExist verifies fact table files exist
+func TestFactTablesExist(t *testing.T) {
+	factTables := []string{
+		"fct_alarm_occurrence.sql",
+		"fct_alarm_state_change.sql",
+	}
+
+	for _, table := range factTables {
+		factPath := filepath.Join("models", "facts", table)
+		if _, err := os.Stat(factPath); os.IsNotExist(err) {
+			t.Errorf("Fact table %s does not exist at %s", table, factPath)
+		}
+	}
+}
+
+// TestFactTableJoins verifies foreign keys to dimensions are valid (no orphan records)
+func TestFactTableJoins(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		// Remove config directives and template references
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace all {{ ref "model_name" }} with actual table names
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load sources
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+
+	// Load dimensions
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+
+	// Load fact tables
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_state_change.sql"), "fct_alarm_state_change"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_state_change: %v", err)
+	}
+
+	// Verify no orphan records in fct_alarm_occurrence
+	// Check tag_key FK
+	var orphanTagCount int
+	err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_occurrence f 
+		LEFT JOIN dim_alarm_tag d ON f.tag_key = d.tag_key 
+		WHERE d.tag_key IS NULL
+	`).Scan(&orphanTagCount)
+	if err != nil {
+		t.Fatalf("Failed to check orphan tag_key: %v", err)
+	}
+	if orphanTagCount > 0 {
+		t.Errorf("Found %d orphan tag_key records in fct_alarm_occurrence", orphanTagCount)
+	}
+
+	// Check area_key FK
+	var orphanAreaCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_occurrence f 
+		LEFT JOIN dim_process_area d ON f.area_key = d.area_key 
+		WHERE d.area_key IS NULL
+	`).Scan(&orphanAreaCount)
+	if err != nil {
+		t.Fatalf("Failed to check orphan area_key: %v", err)
+	}
+	if orphanAreaCount > 0 {
+		t.Errorf("Found %d orphan area_key records in fct_alarm_occurrence", orphanAreaCount)
+	}
+
+	// Check priority_key FK
+	var orphanPriorityCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_occurrence f 
+		LEFT JOIN dim_priority d ON f.priority_key = d.priority_key 
+		WHERE d.priority_key IS NULL
+	`).Scan(&orphanPriorityCount)
+	if err != nil {
+		t.Fatalf("Failed to check orphan priority_key: %v", err)
+	}
+	if orphanPriorityCount > 0 {
+		t.Errorf("Found %d orphan priority_key records in fct_alarm_occurrence", orphanPriorityCount)
+	}
+}
+
+// TestAlarmDurationCalculations verifies duration_to_ack_sec and duration_to_resolve_sec calculations
+func TestAlarmDurationCalculations(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+
+	// Test case: FIC-101 (first alarm in data)
+	// ACTIVE: 2026-02-06 08:15:30
+	// ACKNOWLEDGED: 2026-02-06 08:17:45
+	// INACTIVE: 2026-02-06 08:20:10
+	// Expected duration_to_ack: 135 seconds (2 min 15 sec)
+	// Expected duration_to_resolve: 280 seconds (4 min 40 sec)
+
+	var durationToAck, durationToResolve sql.NullInt64
+	err := db.QueryRowContext(ctx, `
+		SELECT duration_to_ack_sec, duration_to_resolve_sec
+		FROM fct_alarm_occurrence
+		WHERE alarm_id LIKE 'FIC-101_%'
+		ORDER BY activation_timestamp
+		LIMIT 1
+	`).Scan(&durationToAck, &durationToResolve)
+	if err != nil {
+		t.Fatalf("Failed to query FIC-101 durations: %v", err)
+	}
+
+	// Verify duration_to_ack is approximately 135 seconds (2:15) - allow ±1 sec for floating point precision
+	if !durationToAck.Valid {
+		t.Error("duration_to_ack_sec should not be NULL for FIC-101")
+	} else if durationToAck.Int64 < 134 || durationToAck.Int64 > 136 {
+		t.Errorf("FIC-101 duration_to_ack_sec = %d, want approximately 135 (2 min 15 sec, ±1 sec tolerance)", durationToAck.Int64)
+	}
+
+	// Verify duration_to_resolve is approximately 280 seconds (4:40) - allow ±1 sec for floating point precision
+	if !durationToResolve.Valid {
+		t.Error("duration_to_resolve_sec should not be NULL for FIC-101")
+	} else if durationToResolve.Int64 < 279 || durationToResolve.Int64 > 281 {
+		t.Errorf("FIC-101 duration_to_resolve_sec = %d, want approximately 280 (4 min 40 sec, ±1 sec tolerance)", durationToResolve.Int64)
+	}
+
+	// Test unacknowledged alarms have NULL duration_to_ack
+	var unackedCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_occurrence 
+		WHERE is_acknowledged = 0 AND duration_to_ack_sec IS NOT NULL
+	`).Scan(&unackedCount)
+	if err != nil {
+		t.Fatalf("Failed to check unacknowledged alarms: %v", err)
+	}
+	if unackedCount > 0 {
+		t.Errorf("Found %d unacknowledged alarms with non-NULL duration_to_ack_sec", unackedCount)
+	}
+}
+
+// TestStandingAlarmFlags verifies is_standing_10min and is_standing_24hr flags are correctly set
+func TestStandingAlarmFlags(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+
+	// Verify standing alarm flags
+	// LIC-115: acknowledged after 15:30 (930 seconds) - should be standing 10min
+	var isStanding10min int
+	err := db.QueryRowContext(ctx, `
+		SELECT is_standing_10min
+		FROM fct_alarm_occurrence
+		WHERE alarm_id LIKE 'LIC-115_%'
+	`).Scan(&isStanding10min)
+	if err != nil {
+		t.Fatalf("Failed to query LIC-115: %v", err)
+	}
+	if isStanding10min != 1 {
+		t.Errorf("LIC-115 is_standing_10min = %d, want 1 (acknowledged after 930 seconds)", isStanding10min)
+	}
+
+	// FIC-101: acknowledged quickly (135 seconds) - should NOT be standing
+	err = db.QueryRowContext(ctx, `
+		SELECT is_standing_10min
+		FROM fct_alarm_occurrence
+		WHERE alarm_id LIKE 'FIC-101_%'
+	`).Scan(&isStanding10min)
+	if err != nil {
+		t.Fatalf("Failed to query FIC-101: %v", err)
+	}
+	if isStanding10min != 0 {
+		t.Errorf("FIC-101 is_standing_10min = %d, want 0 (acknowledged after 135 seconds)", isStanding10min)
+	}
+
+	// Count total standing alarms (>600 seconds = 10 minutes)
+	var standingCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_occurrence 
+		WHERE is_standing_10min = 1
+	`).Scan(&standingCount)
+	if err != nil {
+		t.Fatalf("Failed to count standing alarms: %v", err)
+	}
+
+	// Based on the data, we have several standing alarms (>10 min to acknowledge)
+	// LIC-115 (930s), TAH-120 (1335s), PSL-111 (1545s), FIC-112 (2120s), TIC-135 (2550s),
+	// plus alarms in the storm that took >14 minutes
+	if standingCount < 5 {
+		t.Errorf("Standing alarm count = %d, want at least 5", standingCount)
+	}
+}
+
+// TestFactTableMetrics verifies fact tables produce expected metrics
+func TestFactTableMetrics(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Helper to load a model into the database
+	loadModel := func(modelPath string, tableName string) error {
+		content, err := os.ReadFile(modelPath)
+		if err != nil {
+			return err
+		}
+
+		contentStr := string(content)
+		sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+
+		// Replace template references
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_events" }}`, "raw_alarm_events")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_alarm_tag" }}`, "dim_alarm_tag")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_equipment" }}`, "dim_equipment")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_process_area" }}`, "dim_process_area")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_priority" }}`, "dim_priority")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_operator" }}`, "dim_operator")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
+		sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_alarm_occurrence" }}`, "fct_alarm_occurrence")
+
+		sqlContent = strings.TrimSpace(sqlContent)
+
+		createTableSQL := "CREATE TABLE " + tableName + " AS " + sqlContent
+
+		_, err = db.ExecContext(ctx, createTableSQL)
+		return err
+	}
+
+	// Load required models
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_events.sql"), "raw_alarm_events"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_events: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "sources", "raw_alarm_config.sql"), "raw_alarm_config"); err != nil {
+		t.Fatalf("Failed to load raw_alarm_config: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_alarm_tag.sql"), "dim_alarm_tag"); err != nil {
+		t.Fatalf("Failed to load dim_alarm_tag: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_equipment.sql"), "dim_equipment"); err != nil {
+		t.Fatalf("Failed to load dim_equipment: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_process_area.sql"), "dim_process_area"); err != nil {
+		t.Fatalf("Failed to load dim_process_area: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_priority.sql"), "dim_priority"); err != nil {
+		t.Fatalf("Failed to load dim_priority: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_operator.sql"), "dim_operator"); err != nil {
+		t.Fatalf("Failed to load dim_operator: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "dimensions", "dim_dates.sql"), "dim_dates"); err != nil {
+		t.Fatalf("Failed to load dim_dates: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_occurrence.sql"), "fct_alarm_occurrence"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_occurrence: %v", err)
+	}
+	if err := loadModel(filepath.Join("models", "facts", "fct_alarm_state_change.sql"), "fct_alarm_state_change"); err != nil {
+		t.Fatalf("Failed to load fct_alarm_state_change: %v", err)
+	}
+
+	// Verify fct_alarm_occurrence row count
+	var occurrenceCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM fct_alarm_occurrence").Scan(&occurrenceCount)
+	if err != nil {
+		t.Fatalf("Failed to count occurrences: %v", err)
+	}
+
+	// We have 25 ACTIVE events in the raw data
+	if occurrenceCount != 25 {
+		t.Errorf("Occurrence count = %d, want 25 (one per ACTIVE event)", occurrenceCount)
+	}
+
+	// Verify fct_alarm_state_change row count
+	var stateChangeCount int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM fct_alarm_state_change").Scan(&stateChangeCount)
+	if err != nil {
+		t.Fatalf("Failed to count state changes: %v", err)
+	}
+
+	// We have 54 total events in the raw data
+	if stateChangeCount != 54 {
+		t.Errorf("State change count = %d, want 54 (all events)", stateChangeCount)
+	}
+
+	// Verify chattering alarm has multiple state changes
+	// TIC-105 has 11 events (5 cycles + final ack)
+	var ticStateChanges int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) 
+		FROM fct_alarm_state_change sc
+		INNER JOIN dim_alarm_tag dt ON sc.tag_key = dt.tag_key
+		WHERE dt.tag_id = 'TIC-105'
+	`).Scan(&ticStateChanges)
+	if err != nil {
+		t.Fatalf("Failed to count TIC-105 state changes: %v", err)
+	}
+	if ticStateChanges != 11 {
+		t.Errorf("TIC-105 state changes = %d, want 11", ticStateChanges)
+	}
+
+	// Verify ISA 18.2 metrics exist and have reasonable values
+	var avgAckTime sql.NullFloat64
+	err = db.QueryRowContext(ctx, `
+		SELECT AVG(duration_to_ack_sec) 
+		FROM fct_alarm_occurrence 
+		WHERE is_acknowledged = 1
+	`).Scan(&avgAckTime)
+	if err != nil {
+		t.Fatalf("Failed to calculate avg ack time: %v", err)
+	}
+	if !avgAckTime.Valid {
+		t.Error("Average acknowledgment time is NULL")
+	} else if avgAckTime.Float64 < 0 {
+		t.Errorf("Average acknowledgment time = %f, want >= 0", avgAckTime.Float64)
+	}
+
+	// Verify we can join to all dimensions
+	var dimensionalQueryCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM fct_alarm_occurrence f
+		INNER JOIN dim_alarm_tag dt ON f.tag_key = dt.tag_key
+		INNER JOIN dim_process_area da ON f.area_key = da.area_key
+		INNER JOIN dim_priority dp ON f.priority_key = dp.priority_key
+		INNER JOIN dim_dates dd ON f.activation_date_key = dd.date_key
+	`).Scan(&dimensionalQueryCount)
+	if err != nil {
+		t.Fatalf("Failed to join all dimensions: %v", err)
+	}
+	if dimensionalQueryCount != occurrenceCount {
+		t.Errorf("Dimensional join count = %d, want %d (same as occurrence count)", dimensionalQueryCount, occurrenceCount)
+	}
+}
