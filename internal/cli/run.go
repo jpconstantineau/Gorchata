@@ -12,6 +12,8 @@ import (
 	"github.com/jpconstantineau/gorchata/internal/config"
 	"github.com/jpconstantineau/gorchata/internal/domain/executor"
 	"github.com/jpconstantineau/gorchata/internal/domain/materialization"
+	testExecutor "github.com/jpconstantineau/gorchata/internal/domain/test/executor"
+	"github.com/jpconstantineau/gorchata/internal/domain/test/generic"
 	"github.com/jpconstantineau/gorchata/internal/platform"
 	"github.com/jpconstantineau/gorchata/internal/platform/sqlite"
 	"github.com/jpconstantineau/gorchata/internal/template"
@@ -23,6 +25,9 @@ func RunCommand(args []string) error {
 
 	var common CommonFlags
 	AddCommonFlags(fs, &common)
+
+	// Add --test flag for run command
+	runTests := fs.Bool("test", false, "Run tests after executing models")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse flags: %w", err)
@@ -171,6 +176,78 @@ func RunCommand(args []string) error {
 
 	if result.FailureCount() > 0 {
 		return fmt.Errorf("%d model(s) failed", result.FailureCount())
+	}
+
+	// Run tests if --test flag is set
+	if *runTests {
+		fmt.Println("\n========================================")
+		fmt.Println("Running tests...")
+		fmt.Println("========================================")
+
+		// Run tests using TestCommand logic
+		if err := runTestsAfterModels(ctx, cfg, adapter, common.Verbose); err != nil {
+			return fmt.Errorf("tests failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// runTestsAfterModels executes tests after models have been run
+func runTestsAfterModels(ctx context.Context, cfg *config.Config, adapter platform.DatabaseAdapter, verbose bool) error {
+	// Create test registry
+	registry := generic.NewDefaultRegistry()
+
+	// Discover all tests
+	if verbose {
+		fmt.Println("Discovering tests...")
+	}
+
+	allTests, err := testExecutor.DiscoverAllTests(cfg, registry)
+	if err != nil {
+		return fmt.Errorf("failed to discover tests: %w", err)
+	}
+
+	if len(allTests) == 0 {
+		fmt.Println("No tests found")
+		return nil
+	}
+
+	if verbose {
+		fmt.Printf("Found %d test(s)\n", len(allTests))
+	}
+
+	fmt.Printf("Running %d test(s)...\n\n", len(allTests))
+
+	// Create test engine
+	engine, err := testExecutor.NewTestEngine(adapter, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create test engine: %w", err)
+	}
+
+	// Create result writers
+	consoleWriter := testExecutor.NewConsoleResultWriter(os.Stdout, true)
+	jsonWriter := testExecutor.NewJSONResultWriter("target/test_results.json")
+
+	// Execute tests
+	summary, err := engine.ExecuteTests(ctx, allTests)
+	if err != nil {
+		return fmt.Errorf("failed to execute tests: %w", err)
+	}
+
+	// Write results
+	for _, result := range summary.TestResults {
+		consoleWriter.Write(result)
+		jsonWriter.Write(result)
+	}
+
+	// Write summary
+	consoleWriter.WriteSummary(summary)
+	jsonWriter.WriteSummary(summary)
+
+	// Return error if failures
+	if summary.FailedTests > 0 {
+		return fmt.Errorf("%d test(s) failed", summary.FailedTests)
 	}
 
 	return nil

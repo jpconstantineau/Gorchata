@@ -40,6 +40,8 @@ func Run(args []string) error {
 		return CompileCommand(commandArgs)
 	case "test":
 		return TestCommand(commandArgs)
+	case "build":
+		return BuildCommand(commandArgs)
 	case "docs":
 		return DocsCommand(commandArgs)
 	default:
@@ -58,7 +60,8 @@ func printUsage() {
 	fmt.Println("  init      Initialize a new Gorchata project")
 	fmt.Println("  run       Execute SQL transformations against the database")
 	fmt.Println("  compile   Compile SQL templates without executing them")
-	fmt.Println("  test      Run data quality tests (not yet implemented)")
+	fmt.Println("  test      Run data quality tests")
+	fmt.Println("  build     Run models and tests (full build workflow)")
 	fmt.Println("  docs      Generate documentation (not yet implemented)")
 	fmt.Println()
 	fmt.Println("Flags:")
