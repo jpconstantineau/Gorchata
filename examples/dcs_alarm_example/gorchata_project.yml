@@ -1,0 +1,12 @@
+name: dcs_alarm_example
+version: 1.0.0
+profile: dev
+
+model-paths:
+  - models
+
+vars:
+  start_date: '2026-02-06'
+  end_date: '2026-02-07'
+  alarm_rate_threshold_acceptable: 2    # alarms per 10 minutes
+  alarm_rate_threshold_unacceptable: 10 # alarms per 10 minutes
