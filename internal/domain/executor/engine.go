@@ -44,8 +44,21 @@ func (e *Engine) ExecuteModel(ctx context.Context, model *Model) (ModelResult, e
 	// If TemplateContent is set, render it with the correct incremental context
 	if model.TemplateContent != "" {
 		// Determine if this is an incremental run
+		// First check if the table actually exists - if not, treat as full refresh (first run)
+		tableExists := false
+		if model.MaterializationConfig.Type == materialization.MaterializationIncremental {
+			exists, err := e.adapter.TableExists(ctx, model.ID)
+			if err != nil {
+				// If we can't check table existence, log but continue (assume doesn't exist)
+				tableExists = false
+			} else {
+				tableExists = exists
+			}
+		}
+
 		isIncremental := model.MaterializationConfig.Type == materialization.MaterializationIncremental &&
-			!model.MaterializationConfig.FullRefresh
+			!model.MaterializationConfig.FullRefresh &&
+			tableExists
 
 		// Build template context with incremental settings
 		tmplCtx := template.NewContext(

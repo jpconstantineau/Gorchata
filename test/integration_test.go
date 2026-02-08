@@ -382,9 +382,8 @@ func TestIntegration_IncrementalModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query table: %v", err)
 	}
-	rows, _ := queryResult.FetchAll()
-	if len(rows) == 0 || rows[0]["count"] != int64(3) {
-		t.Errorf("expected 3 rows after first run, got %v", rows)
+	if len(queryResult.Rows) == 0 || queryResult.Rows[0][0].(int64) != int64(3) {
+		t.Errorf("expected 3 rows after first run, got %v", queryResult.Rows)
 	}
 
 	// Add more data to source
@@ -410,9 +409,8 @@ func TestIntegration_IncrementalModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query table after second run: %v", err)
 	}
-	rows2, _ := queryResult2.FetchAll()
-	if len(rows2) == 0 || rows2[0]["count"] != int64(5) {
-		t.Errorf("expected 5 rows after second run, got %v", rows2)
+	if len(queryResult2.Rows) == 0 || queryResult2.Rows[0][0].(int64) != int64(5) {
+		t.Errorf("expected 5 rows after second run, got %v", queryResult2.Rows)
 	}
 
 	// Third run with full refresh - should rebuild from scratch
@@ -436,9 +434,8 @@ func TestIntegration_IncrementalModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query table after full refresh: %v", err)
 	}
-	rows3, _ := queryResult3.FetchAll()
-	if len(rows3) == 0 || rows3[0]["count"] != int64(5) {
-		t.Errorf("expected 5 rows after full refresh, got %v", rows3)
+	if len(queryResult3.Rows) == 0 || queryResult3.Rows[0][0].(int64) != int64(5) {
+		t.Errorf("expected 5 rows after full refresh, got %v", queryResult3.Rows)
 	}
 
 	t.Logf("✓ Incremental model test completed successfully")
