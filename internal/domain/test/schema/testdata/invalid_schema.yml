@@ -1,0 +1,6 @@
+version: 2
+models:
+  - name: invalid
+    columns:
+      - name: col1
+        data_tests: "this should be an array"
