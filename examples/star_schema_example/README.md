@@ -175,6 +175,29 @@ For just the integration test:
 go test -v -run TestEndToEndIntegration
 ```
 
+### Run Data Quality Tests
+
+Execute data quality tests using Gorchata's testing framework:
+
+```bash
+# Run all data quality tests
+gorchata test
+
+# Run specific test
+gorchata test --select test_fact_integrity
+
+# Run tests on specific model
+gorchata test --select dim_customers
+
+# Run with verbose output
+gorchata test --verbose
+
+# Store failures for analysis
+gorchata test --store-failures
+```
+
+See the [Data Quality Tests](#data-quality-tests) section below for detailed test documentation.
+
 ### Configuration Variables
 
 The project uses variables defined in [gorchata_project.yml](gorchata_project.yml):
@@ -247,6 +270,96 @@ customer_sk | customer_id | customer_name  | customer_city | customer_state | va
 1001002     | 1001        | Alice Johnson  | Portland      | OR             | 2024-06-10 | 2024-11-08 | 0
 1001003     | 1001        | Alice Johnson  | Portland      | OR             | 2024-11-08 | 9999-12-31 | 1
 ```
+
+## Data Quality Tests
+
+This example includes comprehensive data quality tests following DBT testing patterns. These tests ensure data integrity, referential relationships, and business rule compliance.
+
+### Generic Tests (via models/schema.yml)
+
+**Dimension Table Tests:**
+
+1. **dim_customers** (SCD Type 2): 11 tests
+   - Primary key: unique, not_null on customer_sk
+   - Natural key: not_null on customer_id
+   - Attribute validation: not_null, not_empty_string on name, email, city, state
+   - SCD Type 2 fields: not_null on valid_from, valid_to
+   - Current flag: accepted_values [0, 1] on is_current
+   - Table-level: at_least_one (ensure data exists)
+
+2. **dim_products**: 5 tests
+   - Primary key: unique, not_null on product_id
+   - Name validation: not_null, not_empty_string
+   - Category validation: accepted_values ['Electronics', 'Clothing', 'Food', 'Books']
+   - Price validation: not_null, accepted_range [0-10000]
+
+3. **dim_dates**: 9 tests
+   - Primary key: unique, not_null on sale_date
+   - Year validation: accepted_range [2020-2030]
+   - Quarter validation: accepted_values [1, 2, 3, 4]
+   - Month validation: accepted_range [1-12]
+   - Day validation: accepted_range [1-31]
+   - Weekend flag: accepted_values [0, 1]
+
+**Fact Table Tests:**
+
+4. **fct_sales**: 9 tests
+   - Primary key: unique, not_null on sale_id
+   - Foreign keys: not_null + relationships for customer_sk, product_id, sale_date
+   - Measures: not_null on sale_amount, quantity
+   - Business rules:
+     - sale_amount: accepted_range [0-1000000]
+     - quantity: accepted_range [1-1000]
+   - Table-level:
+     - at_least_one (ensure data exists)
+     - recency: data within 365 days of current date
+
+### Singular Tests (custom SQL)
+
+**test_fact_integrity.sql**
+- **Purpose**: Comprehensive fact table validation with 6 integrity checks
+- **Checks**:
+  1. **Orphaned Sales**: Detects sales with missing customer, product, or date references
+  2. **Invalid Amounts**: Identifies negative, zero, or unreasonably high sale amounts
+  3. **Invalid Quantities**: Detects non-positive or non-integer quantities
+  4. **SCD Type 2 Integrity**: Verifies point-in-time joins are correct (sale_date within customer version validity)
+  5. **Duplicate Sales**: Detects grain violations (duplicate sale_id)
+  6. **Price Consistency**: Validates sale_amount vs (product_price × quantity) within reasonable bounds
+     - Allows up to 50% discount
+     - Detects overcharges >10%
+
+### Test Coverage Summary
+
+| Layer | Models | Tests | Coverage |
+|-------|--------|-------|----------|
+| Dimensions | 3 | 25 | Primary keys, attributes, SCD logic |
+| Facts | 1 | 9 | Keys, measures, relationships |
+| Singular | 1 | 6 | Business rules, integrity |
+| **Total** | **5** | **40+** | **Comprehensive** |
+
+### Expected Test Results
+
+With the provided sample data (30 sales, 10 customer versions, 12 products):
+- **All generic tests should PASS**: Data is clean and follows all constraints
+- **Singular test should PASS**: No integrity violations in sample data
+
+To test failure scenarios, you can:
+1. Modify `raw_sales` data to introduce violations
+2. Run tests again to see failure detection
+3. Examine failure details in the output
+
+### Test-Driven Development
+
+These tests follow TDD principles:
+1. ✅ Tests written first (Phase 8)
+2. ✅ Tests run and verify data quality
+3. ✅ Tests serve as living documentation of data contracts
+
+When extending this example:
+1. Add new tests to `schema.yml` for new columns/models
+2. Create singular tests for complex business rules
+3. Run tests before and after changes
+4. Use test failures to guide data quality improvements
 
 ### 2. Star Schema Join: Monthly Revenue by Category
 

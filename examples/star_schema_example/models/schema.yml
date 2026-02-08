@@ -1,0 +1,204 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Data Quality Tests
+  # ===================================================================
+  
+  - name: dim_customers
+    description: "Customer dimension with SCD Type 2 for historical tracking"
+    columns:
+      - name: customer_sk
+        description: "Surrogate key (customer_id * 1000 + version_num)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: customer_id
+        description: "Natural key for customer"
+        data_tests:
+          - not_null
+      
+      - name: customer_name
+        description: "Customer full name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: customer_email
+        description: "Customer email address"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: customer_city
+        description: "Customer city"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: customer_state
+        description: "Customer state (2-letter code)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: valid_from
+        description: "SCD Type 2: Version start date"
+        data_tests:
+          - not_null
+      
+      - name: valid_to
+        description: "SCD Type 2: Version end date (9999-12-31 for current)"
+        data_tests:
+          - not_null
+      
+      - name: is_current
+        description: "SCD Type 2: Current version flag"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+    
+    # Table-level tests - verify SCD Type 2 logic
+    data_tests:
+      - at_least_one
+  
+  - name: dim_products
+    description: "Product dimension"
+    columns:
+      - name: product_id
+        description: "Primary key for products"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: product_name
+        description: "Product name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_category
+        description: "Product category"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Electronics', 'Clothing', 'Food', 'Books']
+      
+      - name: product_price
+        description: "Product price"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+  
+  - name: dim_dates
+    description: "Date dimension for temporal analysis"
+    columns:
+      - name: sale_date
+        description: "Date (primary key)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Year (4-digit)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 2020
+              max_value: 2030
+      
+      - name: quarter
+        description: "Quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+      
+      - name: month
+        description: "Month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: day
+        description: "Day of month (1-31)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 31
+      
+      - name: is_weekend
+        description: "Weekend flag (0=weekday, 1=weekend)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+  
+  # ===================================================================
+  # FACT TABLES - Data Quality Tests
+  # ===================================================================
+  
+  - name: fct_sales
+    description: "Sales fact table with point-in-time dimension joins"
+    columns:
+      - name: sale_id
+        description: "Primary key for sales"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: customer_sk
+        description: "Foreign key to dim_customers (surrogate key)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_customers
+              field: customer_sk
+      
+      - name: product_id
+        description: "Foreign key to dim_products"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_products
+              field: product_id
+      
+      - name: sale_date
+        description: "Foreign key to dim_dates"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_dates
+              field: sale_date
+      
+      - name: sale_amount
+        description: "Sale amount (revenue)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000000
+      
+      - name: quantity
+        description: "Quantity sold"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 1000
+    
+    # Table-level tests
+    data_tests:
+      - at_least_one
+      - recency:
+          datepart: day
+          field: sale_date
+          interval: 365  # Data should be within 1 year
+          severity: warn

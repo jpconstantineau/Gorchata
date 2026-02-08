@@ -1,0 +1,251 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Data Quality Tests
+  # ===================================================================
+  
+  - name: dim_alarm_tag
+    description: "Alarm tag dimension with SCD Type 2 versioning"
+    columns:
+      - name: tag_key
+        description: "Surrogate key for alarm tag version"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: tag_id
+        description: "Natural key for alarm tag"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: tag_name
+        description: "Human-readable alarm tag name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: alarm_type
+        description: "Type of alarm (PROCESS, EQUIPMENT, SAFETY)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['PROCESS', 'EQUIPMENT', 'SAFETY', 'REGULATORY']
+      
+      - name: equipment_id
+        description: "Reference to equipment this alarm monitors"
+        data_tests:
+          - not_null
+      
+      - name: is_safety_critical
+        description: "Flag indicating if alarm is safety-critical (ISA 18.2)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: is_active
+        description: "Flag indicating if alarm configuration is currently active"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+  
+  - name: dim_equipment
+    description: "Equipment hierarchy dimension"
+    columns:
+      - name: equipment_key
+        description: "Surrogate key for equipment"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: equipment_id
+        description: "Natural key for equipment"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_type
+        description: "Type of equipment (PUMP, COMPRESSOR, VALVE, etc.)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['PUMP', 'COMPRESSOR', 'VALVE', 'HEAT_EXCHANGER', 'REACTOR', 'VESSEL']
+  
+  - name: dim_priority
+    description: "Alarm priority levels per ISA 18.2"
+    columns:
+      - name: priority_key
+        description: "Surrogate key for priority"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: priority_code
+        description: "Priority code (CRITICAL, HIGH, MEDIUM, LOW)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+      
+      - name: response_time_seconds
+        description: "Expected operator response time in seconds"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 3600  # 1 hour maximum
+  
+  - name: dim_operator
+    description: "Console operator dimension"
+    columns:
+      - name: operator_key
+        description: "Surrogate key for operator"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: operator_id
+        description: "Natural key for operator (badge number)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: operator_name
+        description: "Operator full name"
+        data_tests:
+          - not_null
+          - not_empty_string
+  
+  # ===================================================================
+  # FACT TABLES - Data Quality Tests  
+  # ===================================================================
+  
+  - name: fct_alarm_occurrence
+    description: "Primary fact table capturing alarm lifecycle events"
+    columns:
+      - name: occurrence_key
+        description: "Primary key (event_id of ACTIVE event)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: alarm_id
+        description: "Business key (tag_id || activation_timestamp)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: tag_key
+        description: "Foreign key to dim_alarm_tag"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_alarm_tag
+              field: tag_key
+      
+      - name: equipment_key
+        description: "Foreign key to dim_equipment"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_key
+      
+      - name: area_key
+        description: "Foreign key to dim_process_area"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_process_area
+              field: area_key
+      
+      - name: priority_key
+        description: "Foreign key to dim_priority"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_priority
+              field: priority_key
+      
+      - name: activation_timestamp
+        description: "When alarm became active"
+        data_tests:
+          - not_null
+      
+      - name: duration_seconds
+        description: "Time alarm was active in seconds"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 86400  # 24 hours max
+              severity: warn
+      
+      - name: ack_latency_seconds
+        description: "Time to acknowledge alarm (ISA 18.2 metric)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 3600  # 1 hour max
+              severity: warn
+      
+      - name: standing_alarm_flag
+        description: "Flag indicating if alarm is a standing alarm (>10 min)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+    
+    # Table-level tests
+    data_tests:
+      - at_least_one         # Ensure we have alarm data
+      - recency:
+          datepart: day
+          field: activation_timestamp
+          interval: 30       # Data should be within 30 days
+          severity: warn
+  
+  - name: fct_alarm_state_change
+    description: "Detailed fact table tracking all alarm state transitions"
+    columns:
+      - name: event_id
+        description: "Primary key from source alarm events"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: tag_key
+        description: "Foreign key to dim_alarm_tag"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_alarm_tag
+              field: tag_key
+      
+      - name: event_timestamp
+        description: "When state change occurred"
+        data_tests:
+          - not_null
+      
+      - name: event_type
+        description: "Type of state change (ACTIVE, ACKNOWLEDGED, INACTIVE)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['ACTIVE', 'ACKNOWLEDGED', 'INACTIVE', 'SUPPRESSED']
+      
+      - name: alarm_value
+        description: "Process variable value at time of alarm"
+        data_tests:
+          - not_null
+      
+      - name: setpoint_value
+        description: "Alarm setpoint/threshold value"
+        data_tests:
+          - not_null
