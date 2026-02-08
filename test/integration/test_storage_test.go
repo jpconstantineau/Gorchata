@@ -96,7 +96,7 @@ func TestIntegration_StoreFailures(t *testing.T) {
 	// Verify audit table was created
 	queryResult, err := adapter.ExecuteQuery(ctx, `
 		SELECT name FROM sqlite_master 
-		WHERE type='table' AND name='test_table_email_nulls'
+		WHERE type='table' AND name='dbt_test__audit_test_table_email_nulls'
 	`)
 	if err != nil {
 		t.Fatalf("failed to check for audit table: %v", err)
@@ -186,6 +186,9 @@ func TestIntegration_CustomTableName(t *testing.T) {
 	testObj.Config.StoreFailures = true
 	testObj.Config.StoreFailuresAs = customTableName
 
+	// Calculate actual table name with prefix
+	actualTableName := "dbt_test__audit_" + customTableName
+
 	// Initialize failure store
 	failureStore := storage.NewSQLiteFailureStore(adapter)
 	if err := failureStore.Initialize(ctx); err != nil {
@@ -213,17 +216,17 @@ func TestIntegration_CustomTableName(t *testing.T) {
 	queryResult, err := adapter.ExecuteQuery(ctx, `
 		SELECT name FROM sqlite_master 
 		WHERE type='table' AND name=?
-	`, customTableName)
+	`, actualTableName)
 	if err != nil {
 		t.Fatalf("failed to check for custom table: %v", err)
 	}
 
 	if len(queryResult.Rows) == 0 {
-		t.Fatalf("custom audit table '%s' was not created", customTableName)
+		t.Fatalf("custom audit table '%s' was not created", actualTableName)
 	}
 
 	// Verify data was stored in custom table
-	queryResult, err = adapter.ExecuteQuery(ctx, "SELECT COUNT(*) as cnt FROM "+customTableName)
+	queryResult, err = adapter.ExecuteQuery(ctx, "SELECT COUNT(*) as cnt FROM "+actualTableName)
 	if err != nil {
 		t.Fatalf("failed to query custom table: %v", err)
 	}

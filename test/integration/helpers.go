@@ -63,11 +63,12 @@ func CreateSampleData(t *testing.T, adapter *sqlite.SQLiteAdapter) {
 	ctx := context.Background()
 
 	// Create raw_users table
+	// Note: email does not have NOT NULL to allow testing data quality issues
 	err := adapter.ExecuteDDL(ctx, `
 		CREATE TABLE IF NOT EXISTS raw_users (
 			id INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,
-			email TEXT NOT NULL,
+			email TEXT,
 			status TEXT NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
@@ -290,8 +291,8 @@ func LoadTestConfig(t *testing.T, projectDir string) *config.Config {
 		t.Fatalf("failed to change to project directory: %v", err)
 	}
 
-	// Load config
-	cfg, err := config.Discover("test")
+	// Load config (using default profile)
+	cfg, err := config.Discover("default")
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}

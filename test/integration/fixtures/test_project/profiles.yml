@@ -1,6 +1,6 @@
-test:
-  target: test
+default:
+  target: default
   outputs:
-    test:
+    default:
       type: sqlite
       database: test.db
