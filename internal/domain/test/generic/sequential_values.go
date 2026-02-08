@@ -23,7 +23,7 @@ func (t *SequentialValuesTest) GenerateSQL(model, column string, args map[string
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	// Default interval is 1
 	interval := 1
 	if args != nil {
@@ -36,19 +36,19 @@ func (t *SequentialValuesTest) GenerateSQL(model, column string, args map[string
 			}
 		}
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	var sqlBuilder strings.Builder
 	sqlBuilder.WriteString("WITH ordered_values AS (\n")
 	sqlBuilder.WriteString(fmt.Sprintf("  SELECT %s, ROW_NUMBER() OVER (ORDER BY %s) as rn\n", column, column))
 	sqlBuilder.WriteString(fmt.Sprintf("  FROM %s\n", model))
-	
+
 	if whereClause != "" {
 		cleanWhere := strings.TrimPrefix(whereClause, " AND ")
 		sqlBuilder.WriteString(fmt.Sprintf("  WHERE %s\n", cleanWhere))
 	}
-	
+
 	sqlBuilder.WriteString(")\n")
 	sqlBuilder.WriteString("SELECT\n")
 	sqlBuilder.WriteString(fmt.Sprintf("  %s as current_value,\n", column))
@@ -57,6 +57,6 @@ func (t *SequentialValuesTest) GenerateSQL(model, column string, args map[string
 	sqlBuilder.WriteString("FROM ordered_values\n")
 	sqlBuilder.WriteString(fmt.Sprintf("WHERE (%s - LAG(%s) OVER (ORDER BY %s)) != %d\n", column, column, column, interval))
 	sqlBuilder.WriteString(fmt.Sprintf("  AND LAG(%s) OVER (ORDER BY %s) IS NOT NULL", column, column))
-	
+
 	return sqlBuilder.String(), nil
 }

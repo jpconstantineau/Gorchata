@@ -8,11 +8,11 @@ import (
 type GenericTest interface {
 	// Name returns the unique identifier for this test type
 	Name() string
-	
+
 	// GenerateSQL generates the SQL query for this test
 	// Returns SQL that selects failing rows (0 rows = test passes)
 	GenerateSQL(model, column string, args map[string]interface{}) (string, error)
-	
+
 	// Validate checks if the test arguments are valid
 	Validate(model, column string, args map[string]interface{}) error
 }
@@ -22,17 +22,17 @@ func BuildWhereClause(args map[string]interface{}) string {
 	if args == nil {
 		return ""
 	}
-	
+
 	whereStr, ok := args["where"]
 	if !ok {
 		return ""
 	}
-	
+
 	whereClause, ok := whereStr.(string)
 	if !ok || whereClause == "" {
 		return ""
 	}
-	
+
 	return fmt.Sprintf(" AND (%s)", whereClause)
 }
 
@@ -41,23 +41,23 @@ func ValidateRequired(args map[string]interface{}, required []string) error {
 	if len(required) == 0 {
 		return nil
 	}
-	
+
 	if args == nil {
 		return fmt.Errorf("missing required arguments: %v", required)
 	}
-	
+
 	for _, field := range required {
 		val, ok := args[field]
 		if !ok {
 			return fmt.Errorf("missing required argument: %s", field)
 		}
-		
+
 		// Check for empty strings
 		if str, ok := val.(string); ok && str == "" {
 			return fmt.Errorf("required argument %s cannot be empty", field)
 		}
 	}
-	
+
 	return nil
 }
 

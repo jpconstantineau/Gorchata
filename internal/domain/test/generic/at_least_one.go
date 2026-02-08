@@ -23,17 +23,17 @@ func (t *AtLeastOneTest) GenerateSQL(model, column string, args map[string]inter
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	var sqlBuilder strings.Builder
 	sqlBuilder.WriteString("SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END as failure\n")
 	sqlBuilder.WriteString(fmt.Sprintf("FROM %s\n", model))
 	sqlBuilder.WriteString(fmt.Sprintf("WHERE %s IS NOT NULL", column))
-	
+
 	if whereClause != "" {
 		sqlBuilder.WriteString(whereClause)
 	}
-	
+
 	return sqlBuilder.String(), nil
 }

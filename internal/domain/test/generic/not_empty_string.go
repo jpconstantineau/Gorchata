@@ -22,9 +22,9 @@ func (t *NotEmptyStringTest) GenerateSQL(model, column string, args map[string]i
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	sql := fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s IS NOT NULL AND TRIM(%s) = ''%s",
 		model,
@@ -32,6 +32,6 @@ func (t *NotEmptyStringTest) GenerateSQL(model, column string, args map[string]i
 		column,
 		whereClause,
 	)
-	
+
 	return sql, nil
 }

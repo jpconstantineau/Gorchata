@@ -37,12 +37,12 @@ func (r *Registry) Get(name string) (GenericTest, bool) {
 func (r *Registry) List() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(r.tests))
 	for name := range r.tests {
 		names = append(names, name)
 	}
-	
+
 	sort.Strings(names)
 	return names
 }
@@ -50,13 +50,13 @@ func (r *Registry) List() []string {
 // NewDefaultRegistry creates a registry with all core and extended tests
 func NewDefaultRegistry() *Registry {
 	r := NewRegistry()
-	
+
 	// Core tests (DBT built-in)
 	r.Register("not_null", &NotNullTest{})
 	r.Register("unique", &UniqueTest{})
 	r.Register("accepted_values", &AcceptedValuesTest{})
 	r.Register("relationships", &RelationshipsTest{})
-	
+
 	// Extended tests (dbt-utils style)
 	r.Register("not_empty_string", &NotEmptyStringTest{})
 	r.Register("at_least_one", &AtLeastOneTest{})
@@ -68,6 +68,6 @@ func NewDefaultRegistry() *Registry {
 	r.Register("equal_rowcount", &EqualRowcountTest{})
 	r.Register("sequential_values", &SequentialValuesTest{})
 	r.Register("mutually_exclusive_ranges", &MutuallyExclusiveRangesTest{})
-	
+
 	return r
 }
