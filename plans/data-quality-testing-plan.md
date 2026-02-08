@@ -2,7 +2,7 @@
 
 Implement a comprehensive data quality testing framework inspired by DBT's test architecture with 14-18 built-in generic tests, custom test templates, and extensibility for future Monte Carlo-style observability features. The framework provides DBT-compatible test configuration, adaptive sampling for performance, multiple execution modes, and robust failure tracking - all in pure Go with no CGO dependencies.
 
-**Phases: 7 phases (core testing) + 4 future phases (observability)**
+**Phases: 8 phases (core testing + examples) + 4 future phases (observability)**
 
 ### 1. **Phase 1: Test Domain Models & Core Abstractions**
    - **Objective:** Design and implement the core domain models for representing tests, test results, and test execution context
@@ -184,15 +184,12 @@ Implement a comprehensive data quality testing framework inspired by DBT's test 
      9. Implement CleanupOldFailures with configurable retention (default 30 days)
      10. Run all tests until passing
 
-### 7. **Phase 7: Documentation, Examples & Integration Testing**
-   - **Objective:** Create comprehensive documentation, example project with realistic tests, and end-to-end testing
+### 7. **Phase 7: Documentation & Core Integration Testing**
+   - **Objective:** Create comprehensive documentation and framework-level integration tests
    - **Files/Functions to Modify/Create:**
      - [README.md](README.md) - Add "Testing Your Data" section
-     - [examples/dcs_alarm_example/models/schema.yml](examples/dcs_alarm_example/models/schema.yml) - Add generic tests config
-     - [examples/dcs_alarm_example/tests/test_alarm_lifecycle.sql](examples/dcs_alarm_example/tests/test_alarm_lifecycle.sql) - Singular test
-     - [examples/dcs_alarm_example/tests/test_standing_alarm_duration.sql](examples/dcs_alarm_example/tests/test_standing_alarm_duration.sql) - Business rule test
-     - [examples/dcs_alarm_example/tests/generic/test_valid_timestamp.sql](examples/dcs_alarm_example/tests/generic/test_valid_timestamp.sql) - Custom generic test
      - [test/integration_test_framework.go](test/integration_test_framework.go) - End-to-end test framework
+     - [docs/testing-guide.md](docs/testing-guide.md) - Comprehensive testing guide (if needed)
    - **Tests to Write:**
      - `TestIntegration_TestCommand_CoreGenericTests`
      - `TestIntegration_TestCommand_ExtendedGenericTests`
@@ -204,16 +201,10 @@ Implement a comprehensive data quality testing framework inspired by DBT's test 
    - **Steps:**
      1. Write end-to-end integration tests for all test execution modes
      2. Run tests and confirm failures
-     3. Create realistic schema.yml with 15-20 tests covering:
-        - Core: not_null, unique on primary keys
-        - Relationships: event → config FK validation
-        - Accepted values: event_type, priority_code enums
-        - Extended: recency (events within 7 days), not_empty_string (tag_id)
-        - Ranges: accepted_range for alarm_value, setpoint_value
-        - Recency: Check raw_alarm_events freshness
-     4. Create singular test: test_alarm_lifecycle.sql validating ACTIVE → ACKNOWLEDGED → INACTIVE sequence
-     5. Create singular test: test_standing_alarm_duration.sql ensuring no alarms unacknowledged >60 minutes
-     6. Create custom generic test template: test_valid_timestamp.sql for ISO 8601 validation
+     3. Implement integration test framework with temp databases
+     4. Test all three execution modes (test, run --test, build)
+     5. Test adaptive sampling with large dataset
+     6. Test failure storage in dbt_test__audit schema
      7. Update README.md with:
         - "gorchata test" command documentation
         - Generic tests reference table (all 14-18 tests)
@@ -223,7 +214,53 @@ Implement a comprehensive data quality testing framework inspired by DBT's test 
         - Troubleshooting guide
      8. Run integration tests and verify all workflows
      9. Build and run via PowerShell script
-     10. Confirm full end-to-end functionality
+     10. Confirm framework functionality
+
+### 8. **Phase 8: Example Project Test Implementation & Validation**
+   - **Objective:** Add comprehensive data quality tests to all example projects and validate they work correctly
+   - **Files/Functions to Modify/Create:**
+     - [examples/dcs_alarm_example/models/schema.yml](examples/dcs_alarm_example/models/schema.yml) - Add generic tests config
+     - [examples/dcs_alarm_example/tests/test_alarm_lifecycle.sql](examples/dcs_alarm_example/tests/test_alarm_lifecycle.sql) - Singular test
+     - [examples/dcs_alarm_example/tests/test_standing_alarm_duration.sql](examples/dcs_alarm_example/tests/test_standing_alarm_duration.sql) - Business rule test
+     - [examples/dcs_alarm_example/tests/test_chattering_detection.sql](examples/dcs_alarm_example/tests/test_chattering_detection.sql) - Chattering alarm test
+     - [examples/dcs_alarm_example/tests/generic/test_valid_timestamp.sql](examples/dcs_alarm_example/tests/generic/test_valid_timestamp.sql) - Custom generic test
+     - [examples/star_schema_example/models/schema.yml](examples/star_schema_example/models/schema.yml) - Add generic tests
+     - [examples/star_schema_example/tests/test_fact_integrity.sql](examples/star_schema_example/tests/test_fact_integrity.sql) - Fact table tests
+     - [examples/dcs_alarm_example/README.md](examples/dcs_alarm_example/README.md) - Document test coverage
+     - [examples/star_schema_example/README.md](examples/star_schema_example/README.md) - Document test coverage
+   - **Tests to Write:**
+     - `TestDCSAlarmExample_AllTestsPass` - Verify all DCS alarm tes9+), here are planned future enhancements:
+
+### **Phase 9: Table-Level Monitors (Monte Carlo-Inspired)**
+- Freshness monitoring: Alert on stale data
+- Volume anomaly detection: Warn on unusual row count changes
+- Schema drift detection: Track schema evolution
+- Metadata-based (no expensive queries)
+
+### **Phase 10: Statistical Profiling & Baseline Generation**
+- Automatic metric collection: null%, cardinality, min/max, mean, stdev
+- Store baselines in test history tables
+- Detect distribution drift over time
+- Percentile-based alerting
+
+### **Phase 11: Anomaly Detection & ML-Based Testing**
+- Time-series anomaly detection on test metrics
+- Seasonal pattern recognition
+- Predictive thresholds (95th percentile from history)
+- Integration with test result storage for trend analysis
+
+### **Phase 12 comprehensive schema.yml for star schema example:
+        - Dimension uniqueness tests
+        - Fact table FK integrity tests
+        - Not null on key columns
+        - SCD Type 2 validity tests (effective dates)
+     9. Create singular tests for star schema business rules
+     10. Update example README files documenting test coverage
+     11. Run `gorchata test` in each example directory
+     12. Verify all tests pass (except intentional failure examples)
+     13. Test failure storage and debugging workflow
+     14. Validate adaptive sampling on larger datasets (if applicable)
+     15. Build and run via PowerShell script for end-to-end validation
 
 ---
 
