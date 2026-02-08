@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: orders
+    description: "Order table"
+    columns:
+      - name: order_id
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('users')
+              field: user_id
+              severity: error
+      
+      - name: amount
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000000
+    
+    data_tests:
+      - recency:
+          datepart: day
+          field: created_at
+          interval: 7
+          severity: warn

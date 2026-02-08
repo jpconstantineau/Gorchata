@@ -1,0 +1,129 @@
+# Example schema.yml file demonstrating DBT-compatible test configuration
+# This file shows all supported test patterns and configurations
+
+version: 2
+
+models:
+  # Example 1: Basic column tests with simple syntax
+  - name: users
+    description: "User account information"
+    columns:
+      - name: user_id
+        description: "Primary key"
+        data_tests:
+          - unique                    # Simple string test
+          - not_null                  # Simple string test
+      
+      - name: email
+        description: "User email address"
+        data_tests:
+          - not_null
+          - not_empty_string
+          - unique
+      
+      - name: username
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      # Example 2: Test with arguments
+      - name: status
+        description: "Account status"
+        data_tests:
+          - accepted_values:
+              values: ['active', 'inactive', 'pending', 'suspended']
+              severity: warn          # Severity: 'error' or 'warn'
+      
+      # Example 3: Test with WHERE clause
+      - name: created_at
+        data_tests:
+          - not_null:
+              where: "status = 'active'"
+      
+      # Example 4: Range validation
+      - name: age
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 150
+              severity: error
+      
+      # Example 5: Custom test name
+      - name: phone_number
+        data_tests:
+          - not_null:
+              name: phone_required_for_active_users
+              where: "status = 'active'"
+              severity: error
+    
+    # Example 6: Table-level tests (no specific column)
+    data_tests:
+      - recency:
+          datepart: day
+          field: created_at           # Field to check for recency
+          interval: 7                 # Days
+          severity: warn
+      
+      - at_least_one                  # Ensure table has at least one row
+
+  # Example 7: Referential integrity
+  - name: orders
+    description: "Customer orders"
+    columns:
+      - name: order_id
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: user_id
+        description: "Foreign key to users"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('users')        # DBT ref() syntax
+              field: user_id
+              severity: error
+      
+      - name: amount
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000000
+      
+      - name: order_date
+        data_tests:
+          - not_null
+    
+    data_tests:
+      - recency:
+          datepart: hour
+          field: order_date
+          interval: 24
+          severity: warn
+
+  # Example 8: Multiple column uniqueness
+  - name: user_addresses
+    columns:
+      - name: user_id
+        data_tests:
+          - not_null
+      
+      - name: address_type
+        data_tests:
+          - accepted_values:
+              values: ['home', 'work', 'billing', 'shipping']
+    
+    data_tests:
+      - unique_combination_of_columns:
+          combination_of_columns: ['user_id', 'address_type']
+          severity: error
+
+  # Example 9: Sequential values check
+  - name: id_sequence
+    columns:
+      - name: id
+        data_tests:
+          - not_null
+          - sequential_values:
+              interval: 1

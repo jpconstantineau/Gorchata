@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: users
+    description: "User table"
+    columns:
+      - name: user_id
+        description: "Primary key"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: email
+        data_tests:
+          - not_null
+          - not_empty_string
+          - unique
+      
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['active', 'inactive']
+              severity: warn
