@@ -475,3 +475,296 @@ func TestTwoProcessAreas(t *testing.T) {
 		t.Errorf("D-200 percentage = %.1f%%, expected roughly 40-50%%", d200Pct)
 	}
 }
+
+// TestDimensionModelsExist verifies all 7 dimension SQL files exist
+func TestDimensionModelsExist(t *testing.T) {
+	requiredFiles := []string{
+		filepath.Join("models", "dimensions", "dim_alarm_tag.sql"),
+		filepath.Join("models", "dimensions", "dim_equipment.sql"),
+		filepath.Join("models", "dimensions", "dim_process_area.sql"),
+		filepath.Join("models", "dimensions", "dim_operator.sql"),
+		filepath.Join("models", "dimensions", "dim_priority.sql"),
+		filepath.Join("models", "dimensions", "dim_dates.sql"),
+		filepath.Join("models", "dimensions", "dim_time.sql"),
+	}
+
+	for _, file := range requiredFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			t.Errorf("Required dimension file %s does not exist", file)
+		} else if err != nil {
+			t.Errorf("Error checking file %s: %v", file, err)
+		}
+	}
+}
+
+// TestDimensionReferences verifies {{ ref "raw_alarm_config" }} usage in dim_alarm_tag
+func TestDimensionReferences(t *testing.T) {
+	modelPath := filepath.Join("models", "dimensions", "dim_alarm_tag.sql")
+
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Go template config header exists
+	if !strings.Contains(contentStr, `{{ config`) {
+		t.Error("dim_alarm_tag.sql does not contain Go template config directive")
+	}
+
+	// Verify reference to raw_alarm_config
+	if !strings.Contains(contentStr, `{{ ref "raw_alarm_config" }}`) {
+		t.Error("dim_alarm_tag.sql does not reference raw_alarm_config using {{ ref }}")
+	}
+}
+
+// TestAlarmTagDimension verifies SCD Type 2 structure with valid_from/valid_to/is_current
+func TestAlarmTagDimension(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// First load raw_alarm_config
+	configPath := filepath.Join("models", "sources", "raw_alarm_config.sql")
+	configContent, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("Failed to read raw_alarm_config.sql: %v", err)
+	}
+
+	configSQL := strings.ReplaceAll(string(configContent), `{{ config "materialized" "table" }}`, "")
+	createConfigSQL := "CREATE TABLE raw_alarm_config AS " + configSQL
+
+	_, err = db.ExecContext(ctx, createConfigSQL)
+	if err != nil {
+		t.Fatalf("Failed to create raw_alarm_config: %v", err)
+	}
+
+	// Now load dim_alarm_tag
+	modelPath := filepath.Join("models", "dimensions", "dim_alarm_tag.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+	// Replace template references
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_alarm_config" }}`, "raw_alarm_config")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_alarm_tag AS " + sqlContent
+
+	_, err = db.ExecContext(ctx, createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_alarm_tag model: %v", err)
+	}
+
+	// Verify SCD Type 2 columns exist
+	requiredColumns := []string{
+		"tag_key", "tag_id", "tag_name", "alarm_type", "equipment_id", "area_code",
+		"is_safety_critical", "is_active", "valid_from", "valid_to", "is_current",
+	}
+
+	for _, col := range requiredColumns {
+		var count int
+		err = db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM pragma_table_info('dim_alarm_tag') WHERE name = ?",
+			col).Scan(&count)
+		if err != nil {
+			t.Fatalf("Failed to check column %s: %v", col, err)
+		}
+		if count == 0 {
+			t.Errorf("Column %s does not exist in dim_alarm_tag", col)
+		}
+	}
+
+	// Verify all records have is_current = 1 (no historical records in this example)
+	var currentCount, totalCount int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_alarm_tag WHERE is_current = 1").Scan(&currentCount)
+	if err != nil {
+		t.Fatalf("Failed to count current records: %v", err)
+	}
+
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_alarm_tag").Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("Failed to count total records: %v", err)
+	}
+
+	if currentCount != totalCount {
+		t.Errorf("is_current = 1 count = %d, total count = %d, all records should be current", currentCount, totalCount)
+	}
+
+	// Verify valid_to = '9999-12-31' for current records
+	var futureCount int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_alarm_tag WHERE valid_to = '9999-12-31'").Scan(&futureCount)
+	if err != nil {
+		t.Fatalf("Failed to count future valid_to: %v", err)
+	}
+
+	if futureCount != totalCount {
+		t.Errorf("valid_to = '9999-12-31' count = %d, total count = %d, all records should have future end date", futureCount, totalCount)
+	}
+
+	// Verify we have 21 tags (from raw_alarm_config: 9 from C-100, 12 from D-200)
+	if totalCount != 21 {
+		t.Errorf("Total tag count = %d, want 21", totalCount)
+	}
+}
+
+// TestTwoProcessAreasInDimensions verifies exactly C-100 and D-200 exist in dim_process_area
+func TestTwoProcessAreasInDimensions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Load dim_process_area
+	modelPath := filepath.Join("models", "dimensions", "dim_process_area.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_process_area AS " + sqlContent
+
+	_, err = db.ExecContext(ctx, createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_process_area model: %v", err)
+	}
+
+	// Verify exactly 2 rows
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_process_area").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count process areas: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Process area count = %d, want exactly 2", count)
+	}
+
+	// Verify C-100 exists
+	var c100Count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_process_area WHERE area_code = 'C-100'").Scan(&c100Count)
+	if err != nil {
+		t.Fatalf("Failed to check C-100: %v", err)
+	}
+	if c100Count != 1 {
+		t.Errorf("C-100 count = %d, want 1", c100Count)
+	}
+
+	// Verify D-200 exists
+	var d200Count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_process_area WHERE area_code = 'D-200'").Scan(&d200Count)
+	if err != nil {
+		t.Fatalf("Failed to check D-200: %v", err)
+	}
+	if d200Count != 1 {
+		t.Errorf("D-200 count = %d, want 1", d200Count)
+	}
+
+	// Verify required columns
+	requiredColumns := []string{"area_key", "area_code", "area_name", "plant_id"}
+	for _, col := range requiredColumns {
+		var colCount int
+		err = db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM pragma_table_info('dim_process_area') WHERE name = ?",
+			col).Scan(&colCount)
+		if err != nil {
+			t.Fatalf("Failed to check column %s: %v", col, err)
+		}
+		if colCount == 0 {
+			t.Errorf("Column %s does not exist in dim_process_area", col)
+		}
+	}
+}
+
+// TestTimeBuckets verifies dim_time has exactly 144 rows (10-minute buckets 0-143)
+func TestTimeBuckets(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Load dim_time
+	modelPath := filepath.Join("models", "dimensions", "dim_time.sql")
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", modelPath, err)
+	}
+
+	contentStr := string(content)
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
+	sqlContent = strings.TrimSpace(sqlContent)
+
+	createTableSQL := "CREATE TABLE dim_time AS " + sqlContent
+
+	_, err = db.ExecContext(ctx, createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to execute dim_time model: %v", err)
+	}
+
+	// Verify exactly 144 rows
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dim_time").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count time buckets: %v", err)
+	}
+
+	if count != 144 {
+		t.Errorf("Time bucket count = %d, want exactly 144", count)
+	}
+
+	// Verify time_key ranges from 0 to 143
+	var minKey, maxKey int
+	err = db.QueryRowContext(ctx, "SELECT MIN(time_key), MAX(time_key) FROM dim_time").Scan(&minKey, &maxKey)
+	if err != nil {
+		t.Fatalf("Failed to get min/max time_key: %v", err)
+	}
+
+	if minKey != 0 {
+		t.Errorf("Min time_key = %d, want 0", minKey)
+	}
+	if maxKey != 143 {
+		t.Errorf("Max time_key = %d, want 143", maxKey)
+	}
+
+	// Verify required columns
+	requiredColumns := []string{"time_key", "time_bucket_10min", "hour", "minute_start", "time_display", "shift"}
+	for _, col := range requiredColumns {
+		var colCount int
+		err = db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM pragma_table_info('dim_time') WHERE name = ?",
+			col).Scan(&colCount)
+		if err != nil {
+			t.Fatalf("Failed to check column %s: %v", col, err)
+		}
+		if colCount == 0 {
+			t.Errorf("Column %s does not exist in dim_time", col)
+		}
+	}
+
+	// Verify calculation: time_key 0 should be 00:00, time_key 143 should be 23:50
+	var timeDisplay string
+	err = db.QueryRowContext(ctx, "SELECT time_display FROM dim_time WHERE time_key = 0").Scan(&timeDisplay)
+	if err != nil {
+		t.Fatalf("Failed to get time_display for time_key=0: %v", err)
+	}
+	if timeDisplay != "00:00" {
+		t.Errorf("time_display for time_key=0 = %q, want '00:00'", timeDisplay)
+	}
+
+	err = db.QueryRowContext(ctx, "SELECT time_display FROM dim_time WHERE time_key = 143").Scan(&timeDisplay)
+	if err != nil {
+		t.Fatalf("Failed to get time_display for time_key=143: %v", err)
+	}
+	if timeDisplay != "23:50" {
+		t.Errorf("time_display for time_key=143 = %q, want '23:50'", timeDisplay)
+	}
+}
