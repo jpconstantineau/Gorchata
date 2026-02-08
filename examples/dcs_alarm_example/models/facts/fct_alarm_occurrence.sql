@@ -63,11 +63,14 @@ alarm_lifecycle AS (
   LEFT JOIN inactive_events inact
     ON a.tag_id = inact.tag_id
     AND inact.inactive_timestamp > a.activation_timestamp
+    -- If acknowledged, inactive must come after acknowledgment
+    AND (ack.acknowledged_timestamp IS NULL OR inact.inactive_timestamp >= ack.acknowledged_timestamp)
     AND inact.inactive_seq = (
       SELECT MIN(inact2.inactive_seq)
       FROM inactive_events inact2
       WHERE inact2.tag_id = a.tag_id
         AND inact2.inactive_timestamp > a.activation_timestamp
+        AND (ack.acknowledged_timestamp IS NULL OR inact2.inactive_timestamp >= ack.acknowledged_timestamp)
     )
 )
 
