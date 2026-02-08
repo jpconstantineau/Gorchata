@@ -3,4 +3,4 @@ default:
   outputs:
     dev:
       type: sqlite
-      database: ${DCS_ALARM_DB:./examples/dcs_alarm_example/dcs_alarms.db}
+      database: ${DCS_ALARM_DB:dcs_alarms.db}

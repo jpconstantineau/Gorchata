@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Process Area Dimension
 -- Two refinery process units for alarm analytics

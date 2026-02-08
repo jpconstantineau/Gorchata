@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Time Dimension with 10-minute buckets
 -- Pre-computed time buckets for optimized time-based queries (144 buckets per day)

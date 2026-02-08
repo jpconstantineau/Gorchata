@@ -3,7 +3,10 @@ version: 1.0.0
 profile: dev
 
 model-paths:
-  - models
+  - models/sources
+  - models/dimensions
+  - models/facts
+  - models/rollups
 
 vars:
   start_date: '2026-02-06'

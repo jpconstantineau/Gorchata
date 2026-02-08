@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Standing Alarm Duration Rollup
 -- Calculates duration metrics for standing alarms (>10 min to acknowledge) by tag

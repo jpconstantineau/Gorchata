@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Chattering Alarms Detection
 -- Identifies tags exhibiting rapid state cycling behavior (≥5 activations within 10 minutes)

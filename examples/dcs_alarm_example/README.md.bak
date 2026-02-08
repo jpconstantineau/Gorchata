@@ -1,4 +1,4 @@
-﻿# DCS Alarm Analytics Example
+# DCS Alarm Analytics Example
 
 ## Overview
 
@@ -26,14 +26,14 @@ This example uses Go's built-in `text/template` library (NOT Jinja). Template sy
 
 ```
 dcs_alarm_example/
-â”œâ”€â”€ gorchata_project.yml          # Project configuration
-â”œâ”€â”€ profiles.yml                   # Database connection profiles
-â”œâ”€â”€ README.md                      # This file
-â””â”€â”€ models/
-    â”œâ”€â”€ sources/                   # Raw alarm data models
-    â”œâ”€â”€ dimensions/                # Dimension tables (operators, alarm types, etc.)
-    â”œâ”€â”€ facts/                     # Fact tables (alarm events)
-    â””â”€â”€ rollups/                   # Aggregations and analytics models
+├── gorchata_project.yml          # Project configuration
+├── profiles.yml                   # Database connection profiles
+├── README.md                      # This file
+└── models/
+    ├── sources/                   # Raw alarm data models
+    ├── dimensions/                # Dimension tables (operators, alarm types, etc.)
+    ├── facts/                     # Fact tables (alarm events)
+    └── rollups/                   # Aggregations and analytics models
 ```
 
 ## Configuration

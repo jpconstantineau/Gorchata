@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Operator Dimension
 -- Console operators for alarm response analysis
