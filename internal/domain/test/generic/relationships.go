@@ -17,7 +17,7 @@ func (t *RelationshipsTest) Validate(model, column string, args map[string]inter
 	if err := ValidateModelColumn(model, column); err != nil {
 		return err
 	}
-	
+
 	return ValidateRequired(args, []string{"to", "field"})
 }
 
@@ -26,11 +26,11 @@ func (t *RelationshipsTest) GenerateSQL(model, column string, args map[string]in
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	toTable := args["to"].(string)
 	toField := args["field"].(string)
 	whereClause := BuildWhereClause(args)
-	
+
 	sql := fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s NOT IN (SELECT %s FROM %s) AND %s IS NOT NULL%s",
 		model,
@@ -40,6 +40,6 @@ func (t *RelationshipsTest) GenerateSQL(model, column string, args map[string]in
 		column,
 		whereClause,
 	)
-	
+
 	return sql, nil
 }

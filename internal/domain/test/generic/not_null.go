@@ -22,15 +22,15 @@ func (t *NotNullTest) GenerateSQL(model, column string, args map[string]interfac
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	sql := fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s IS NULL%s",
 		model,
 		column,
 		whereClause,
 	)
-	
+
 	return sql, nil
 }

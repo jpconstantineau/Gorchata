@@ -17,7 +17,7 @@ func (t *AcceptedRangeTest) Validate(model, column string, args map[string]inter
 	if err := ValidateModelColumn(model, column); err != nil {
 		return err
 	}
-	
+
 	return ValidateRequired(args, []string{"min_value", "max_value"})
 }
 
@@ -26,11 +26,11 @@ func (t *AcceptedRangeTest) GenerateSQL(model, column string, args map[string]in
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	minValue := args["min_value"]
 	maxValue := args["max_value"]
 	whereClause := BuildWhereClause(args)
-	
+
 	sql := fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s NOT BETWEEN %v AND %v%s",
 		model,
@@ -39,6 +39,6 @@ func (t *AcceptedRangeTest) GenerateSQL(model, column string, args map[string]in
 		maxValue,
 		whereClause,
 	)
-	
+
 	return sql, nil
 }

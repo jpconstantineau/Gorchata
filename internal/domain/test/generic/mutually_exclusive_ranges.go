@@ -18,7 +18,7 @@ func (t *MutuallyExclusiveRangesTest) Validate(model, column string, args map[st
 	if model == "" {
 		return fmt.Errorf("model name cannot be empty")
 	}
-	
+
 	return ValidateRequired(args, []string{"lower_bound_column", "upper_bound_column"})
 }
 
@@ -27,10 +27,10 @@ func (t *MutuallyExclusiveRangesTest) GenerateSQL(model, column string, args map
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	lowerBound := args["lower_bound_column"].(string)
 	upperBound := args["upper_bound_column"].(string)
-	
+
 	// Optional partition_by for checking overlaps within groups
 	partitionBy := ""
 	if val, ok := args["partition_by"]; ok {
@@ -38,28 +38,28 @@ func (t *MutuallyExclusiveRangesTest) GenerateSQL(model, column string, args map
 			partitionBy = str
 		}
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	var sqlBuilder strings.Builder
 	sqlBuilder.WriteString("SELECT\n")
 	sqlBuilder.WriteString("  a.*\n")
 	sqlBuilder.WriteString(fmt.Sprintf("FROM %s a\n", model))
 	sqlBuilder.WriteString(fmt.Sprintf("INNER JOIN %s b\n", model))
 	sqlBuilder.WriteString("  ON a.rowid != b.rowid\n")
-	
+
 	if partitionBy != "" {
 		sqlBuilder.WriteString(fmt.Sprintf("  AND a.%s = b.%s\n", partitionBy, partitionBy))
 	}
-	
+
 	// Check for overlap: ranges overlap if one starts before the other ends
 	sqlBuilder.WriteString(fmt.Sprintf("  AND a.%s < b.%s\n", lowerBound, upperBound))
 	sqlBuilder.WriteString(fmt.Sprintf("  AND a.%s > b.%s\n", upperBound, lowerBound))
-	
+
 	if whereClause != "" {
 		cleanWhere := strings.TrimPrefix(whereClause, " AND ")
 		sqlBuilder.WriteString(fmt.Sprintf("WHERE %s", cleanWhere))
 	}
-	
+
 	return sqlBuilder.String(), nil
 }

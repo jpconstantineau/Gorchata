@@ -23,22 +23,22 @@ func (t *NotConstantTest) GenerateSQL(model, column string, args map[string]inte
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	whereClause := BuildWhereClause(args)
-	
+
 	var sqlBuilder strings.Builder
 	sqlBuilder.WriteString(fmt.Sprintf("SELECT COUNT(DISTINCT %s) as distinct_count\n", column))
 	sqlBuilder.WriteString(fmt.Sprintf("FROM %s\n", model))
-	
+
 	if whereClause != "" {
 		// Remove leading " AND " from whereClause and use WHERE
 		cleanWhere := strings.TrimPrefix(whereClause, " AND ")
 		sqlBuilder.WriteString(fmt.Sprintf("WHERE %s\n", cleanWhere))
 	}
-	
-	sqlBuilder.WriteString("HAVING COUNT(DISTINCT ") 
+
+	sqlBuilder.WriteString("HAVING COUNT(DISTINCT ")
 	sqlBuilder.WriteString(column)
 	sqlBuilder.WriteString(") <= 1")
-	
+
 	return sqlBuilder.String(), nil
 }

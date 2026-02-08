@@ -18,26 +18,26 @@ func (t *AcceptedValuesTest) Validate(model, column string, args map[string]inte
 	if err := ValidateModelColumn(model, column); err != nil {
 		return err
 	}
-	
+
 	if err := ValidateRequired(args, []string{"values"}); err != nil {
 		return err
 	}
-	
+
 	// Validate that values is actually an array
 	values, ok := args["values"]
 	if !ok {
 		return fmt.Errorf("missing required argument: values")
 	}
-	
+
 	valuesSlice, ok := values.([]interface{})
 	if !ok {
 		return fmt.Errorf("values must be an array")
 	}
-	
+
 	if len(valuesSlice) == 0 {
 		return fmt.Errorf("values array cannot be empty")
 	}
-	
+
 	return nil
 }
 
@@ -46,9 +46,9 @@ func (t *AcceptedValuesTest) GenerateSQL(model, column string, args map[string]i
 	if err := t.Validate(model, column, args); err != nil {
 		return "", err
 	}
-	
+
 	valuesSlice := args["values"].([]interface{})
-	
+
 	// Build the IN clause
 	var valueStrings []string
 	for _, v := range valuesSlice {
@@ -61,10 +61,10 @@ func (t *AcceptedValuesTest) GenerateSQL(model, column string, args map[string]i
 			valueStrings = append(valueStrings, fmt.Sprintf("'%v'", val))
 		}
 	}
-	
+
 	inClause := strings.Join(valueStrings, ", ")
 	whereClause := BuildWhereClause(args)
-	
+
 	sql := fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s NOT IN (%s) AND %s IS NOT NULL%s",
 		model,
@@ -73,6 +73,6 @@ func (t *AcceptedValuesTest) GenerateSQL(model, column string, args map[string]i
 		column,
 		whereClause,
 	)
-	
+
 	return sql, nil
 }
