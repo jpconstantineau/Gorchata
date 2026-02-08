@@ -71,12 +71,64 @@ gorchata run
 
 ## Schema Overview
 
-*Coming in Phase 3-5: Full dimensional model structure*
-
 The example implements a star schema with:
-- **Dimension tables**: Time, operators, alarm tags, alarm priorities
-- **Fact table**: Individual alarm events (activate/clear/acknowledge)
-- **Rollup tables**: ISA 18.2 compliance metrics, alarm rate analysis, flood detection
+
+### Dimension Tables (Phase 3)
+- **dim_alarm_tag**: Alarm tag configurations with SCD Type 2 versioning
+- **dim_equipment**: Equipment hierarchy (pumps, compressors, etc.)
+- **dim_process_area**: Process area organization
+- **dim_priority**: Alarm priority levels (CRITICAL, HIGH, MEDIUM, LOW)
+- **dim_operator**: Console operators for alarm response tracking
+- **dim_dates**: Date dimension for temporal analysis
+- **dim_time**: Time buckets (10-minute intervals for ISA 18.2 rate calculations)
+
+### Fact Tables (Phase 4)
+
+#### fct_alarm_occurrence
+Primary fact table capturing alarm lifecycle events.
+
+**Grain**: One row per alarm activation/lifecycle
+
+**Key Columns**:
+- `occurrence_key`: Primary key (event_id of ACTIVE event)
+- `alarm_id`: Business key (tag_id || activation_timestamp)
+- Foreign keys to dimension tables (tag_key, equipment_key, area_key, priority_key, operator_key_ack)
+
+**Timestamps & Metrics**:
+- `activation_timestamp`: When alarm became active
+- `acknowledged_timestamp`: When operator acknowledged (nullable)
+- `inactive_timestamp`: When alarm cleared (nullable)
+- `duration_to_ack_sec`: Time to acknowledgment in seconds
+- `duration_to_resolve_sec`: Time to resolution in seconds
+- `alarm_value`, `setpoint_value`: Process measurements
+
+**ISA 18.2 Derived Flags**:
+- `is_standing_10min`: 1 if alarm took >10 minutes to acknowledge
+- `is_standing_24hr`: 1 if alarm took >24 hours to acknowledge
+- `is_fleeting`: 1 if alarm duration <2 seconds
+- `is_acknowledged`: 1 if operator acknowledged
+- `is_resolved`: 1 if alarm cleared
+
+#### fct_alarm_state_change
+Secondary fact table for chattering detection.
+
+**Grain**: One row per state transition
+
+**Key Columns**:
+- `state_change_key`: Primary key (event_id)
+- `occurrence_key`: Link to parent alarm occurrence (nullable)
+- `tag_key`: Foreign key to dim_alarm_tag
+- `from_state`, `to_state`: State transition (ACTIVE, ACKNOWLEDGED, INACTIVE)
+- `sequence_number`: Order within tag (1, 2, 3, ...)
+- `time_since_last_change_sec`: Time since previous state change
+
+**Purpose**: Enables identification of:
+- Chattering alarms (rapid state cycling)
+- Alarm storms (many alarms in short time)
+- Equipment behavior patterns
+
+### Rollup Tables (Phase 5)
+*Coming soon*: ISA 18.2 compliance metrics, alarm rate analysis, flood detection
 
 ## Testing
 
