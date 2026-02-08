@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/jpconstantineau/gorchata/internal/domain/test"
@@ -27,6 +29,17 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 	// Load configuration
 	cfg := LoadTestConfig(t, projectDir)
 
+	// Change to project directory for test discovery (LoadTestConfig changes back on return)
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to change to project directory: %v", err)
+	}
+
 	// Update database path in config to use test database
 	cfg.Output.Database = dbPath
 
@@ -36,11 +49,55 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
 
-	// Create sample data tables
-	CreateSampleData(t, adapter)
+	// Note: sample data already created by CreateTestDatabase()
+
+	// Build models first (required for schema tests to reference model tables)
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS users AS
+		SELECT id, name, email, status, created_at FROM raw_users
+	`); err != nil {
+		t.Fatalf("failed to create users model: %v", err)
+	}
+
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS orders AS
+		SELECT id, user_id, total_amount, status, order_date FROM raw_orders
+	`); err != nil {
+		t.Fatalf("failed to create orders model: %v", err)
+	}
 
 	// Create test registry
 	registry := generic.NewDefaultRegistry()
+
+	// Debug: check config paths
+	t.Logf("Project dir: %s", projectDir)
+	t.Logf("Config model paths: %v", cfg.Project.ModelPaths)
+	t.Logf("Config test paths: %v", cfg.Project.TestPaths)
+	t.Logf("Database: %s", cfg.Output.Database)
+
+	// Debug: check if files exist
+	schemaPath := filepath.Join(projectDir, "models", "schema.yml")
+	if _, err := os.Stat(schemaPath); err != nil {
+		t.Logf("WARNING: schema.yml not found at %s: %v", schemaPath, err)
+	} else {
+		t.Logf("Found schema.yml at %s", schemaPath)
+	}
+
+	testsDir := filepath.Join(projectDir, "tests")
+	if entries, err := os.ReadDir(testsDir); err != nil {
+		t.Logf("WARNING: cannot read tests dir %s: %v", testsDir, err)
+	} else {
+		t.Logf("Tests dir contents (%d files): %v", len(entries), entries)
+	}
+
+	// Debug: check current working directory before discovery
+	if cwd, err := os.Getwd(); err == nil {
+		t.Logf("Current working directory at discovery: %s", cwd)
+		t.Logf("Project directory: %s", projectDir)
+		if cwd != projectDir {
+			t.Logf("WARNING: Not in project directory for discovery!")
+		}
+	}
 
 	// Discover all tests
 	allTests, err := executor.DiscoverAllTests(cfg, registry)
@@ -49,7 +106,8 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 	}
 
 	if len(allTests) == 0 {
-		t.Fatal("no tests discovered")
+		t.Fatalf("no tests discovered (project: %s, model-paths: %v, test-paths: %v)",
+			projectDir, cfg.Project.ModelPaths, cfg.Project.TestPaths)
 	}
 
 	t.Logf("Discovered %d tests", len(allTests))
@@ -436,8 +494,22 @@ func TestIntegration_SingularTest(t *testing.T) {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
 
-	// Create sample data
-	CreateSampleData(t, adapter)
+	// Note: sample data already created by CreateTestDatabase()
+
+	// Build models (required for test discovery)
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS users AS
+		SELECT id, name, email, status, created_at FROM raw_users
+	`); err != nil {
+		t.Fatalf("failed to create users model: %v", err)
+	}
+
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS orders AS
+		SELECT id, user_id, total_amount, status, order_date FROM raw_orders
+	`); err != nil {
+		t.Fatalf("failed to create orders model: %v", err)
+	}
 
 	// Insert order with negative amount (will fail singular test)
 	err := adapter.ExecuteDDL(ctx, `
@@ -600,7 +672,22 @@ func TestIntegration_TestSelection(t *testing.T) {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
 
-	CreateSampleData(t, adapter)
+	// Note: sample data already created by CreateTestDatabase()
+
+	// Build models (required for test discovery)
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS users AS
+		SELECT id, name, email, status, created_at FROM raw_users
+	`); err != nil {
+		t.Fatalf("failed to create users model: %v", err)
+	}
+
+	if err := adapter.ExecuteDDL(ctx, `
+		CREATE TABLE IF NOT EXISTS orders AS
+		SELECT id, user_id, total_amount, status, order_date FROM raw_orders
+	`); err != nil {
+		t.Fatalf("failed to create orders model: %v", err)
+	}
 
 	// Create registry
 	registry := generic.NewDefaultRegistry()
