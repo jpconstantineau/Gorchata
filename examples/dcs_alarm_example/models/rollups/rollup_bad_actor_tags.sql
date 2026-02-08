@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Bad Actor Tags Analysis
 -- Identifies high-frequency alarm tags using Pareto analysis and composite scoring

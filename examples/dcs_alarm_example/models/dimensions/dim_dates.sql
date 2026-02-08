@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Date Dimension
 -- Standard date dimension for temporal analysis

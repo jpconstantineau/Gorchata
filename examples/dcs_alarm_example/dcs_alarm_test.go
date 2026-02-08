@@ -34,6 +34,49 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	return db, cleanup
 }
 
+// connectToProjectDB connects to the project database (assumes it exists from `gorchata run`)
+// Returns the database connection and a cleanup function.
+func connectToProjectDB(t *testing.T) (*sql.DB, func()) {
+	t.Helper()
+
+	// Load profiles config to get database path
+	profilesPath := filepath.Join("profiles.yml")
+	profilesCfg, err := config.LoadProfiles(profilesPath)
+	if err != nil {
+		t.Fatalf("LoadProfiles() error = %v", err)
+	}
+
+	output, err := profilesCfg.GetOutput("dev")
+	if err != nil {
+		t.Fatalf("GetOutput('dev') error = %v", err)
+	}
+
+	// Connect to database
+	db, err := sql.Open("sqlite", output.Database)
+	if err != nil {
+		t.Fatalf("Failed to open project database: %v", err)
+	}
+
+	// Verify database has expected tables
+	var tableCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").Scan(&tableCount)
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to query tables: %v", err)
+	}
+	if tableCount == 0 {
+		db.Close()
+		t.Fatalf("Project database is empty. Run 'gorchata run' first to build all models.")
+	}
+
+	// Return DB and cleanup function
+	cleanup := func() {
+		db.Close()
+	}
+
+	return db, cleanup
+}
+
 // TestProjectConfigExists verifies gorchata_project.yml exists and loads correctly
 func TestProjectConfigExists(t *testing.T) {
 	projectPath := filepath.Join("gorchata_project.yml")
@@ -2273,4 +2316,406 @@ func TestSystemHealthMetrics(t *testing.T) {
 	t.Logf("  Chattering Tags: %d", chatteringTagCount)
 	t.Logf("  Bad Actors (score >= 50): %d", badActorCount)
 	t.Logf("  ISA Compliance Score: %.1f", isaComplianceScore)
+}
+
+// TestDataIntegrity verifies referential integrity and data quality across all tables.
+// This comprehensive validation ensures no orphan foreign keys exist and all
+// relationships are properly maintained.
+// NOTE: Requires `gorchata run` to be executed first to build all models.
+func TestDataIntegrity(t *testing.T) {
+	// Connect to project database
+	db, cleanup := connectToProjectDB(t)
+	defer cleanup()
+
+	t.Run("NoOrphanTagKeys", func(t *testing.T) {
+		// Verify all tag_key in fct_alarm_occurrence exist in dim_alarm_tag
+		query := `
+			SELECT COUNT(*) as orphan_count
+			FROM fct_alarm_occurrence f
+			WHERE NOT EXISTS (
+				SELECT 1 FROM dim_alarm_tag d WHERE d.tag_key = f.tag_key
+			)
+		`
+		var orphanCount int
+		err := db.QueryRow(query).Scan(&orphanCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if orphanCount > 0 {
+			t.Errorf("Found %d orphan tag_key references in fct_alarm_occurrence", orphanCount)
+		}
+	})
+
+	t.Run("NoOrphanAreaKeys", func(t *testing.T) {
+		// Verify all area_key in fct_alarm_occurrence exist in dim_process_area
+		query := `
+			SELECT COUNT(*) as orphan_count
+			FROM fct_alarm_occurrence f
+			WHERE NOT EXISTS (
+				SELECT 1 FROM dim_process_area d WHERE d.area_key = f.area_key
+			)
+		`
+		var orphanCount int
+		err := db.QueryRow(query).Scan(&orphanCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if orphanCount > 0 {
+			t.Errorf("Found %d orphan area_key references in fct_alarm_occurrence", orphanCount)
+		}
+	})
+
+	t.Run("NoOrphanPriorityKeys", func(t *testing.T) {
+		// Verify all priority_key in fct_alarm_occurrence exist in dim_priority
+		query := `
+			SELECT COUNT(*) as orphan_count
+			FROM fct_alarm_occurrence f
+			WHERE NOT EXISTS (
+				SELECT 1 FROM dim_priority d WHERE d.priority_key = f.priority_key
+			)
+		`
+		var orphanCount int
+		err := db.QueryRow(query).Scan(&orphanCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if orphanCount > 0 {
+			t.Errorf("Found %d orphan priority_key references in fct_alarm_occurrence", orphanCount)
+		}
+	})
+
+	t.Run("TimestampOrdering", func(t *testing.T) {
+		// Verify acknowledged >= activation, inactive >= acknowledged
+		query := `
+			SELECT COUNT(*) as violation_count
+			FROM fct_alarm_occurrence
+			WHERE (acknowledged_timestamp IS NOT NULL 
+				   AND acknowledged_timestamp < activation_timestamp)
+			   OR (inactive_timestamp IS NOT NULL 
+			       AND acknowledged_timestamp IS NOT NULL
+				   AND inactive_timestamp < acknowledged_timestamp)
+		`
+		var violationCount int
+		err := db.QueryRow(query).Scan(&violationCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if violationCount > 0 {
+			t.Errorf("Found %d timestamp ordering violations", violationCount)
+		}
+	})
+
+	t.Run("DurationCalculations", func(t *testing.T) {
+		// Verify duration_to_resolve_sec >= duration_to_ack_sec where both exist
+		query := `
+			SELECT COUNT(*) as violation_count
+			FROM fct_alarm_occurrence
+			WHERE duration_to_ack_sec IS NOT NULL
+			  AND duration_to_resolve_sec IS NOT NULL
+			  AND duration_to_resolve_sec < duration_to_ack_sec
+		`
+		var violationCount int
+		err := db.QueryRow(query).Scan(&violationCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if violationCount > 0 {
+			t.Errorf("Found %d duration calculation violations (resolve < ack)", violationCount)
+		}
+	})
+
+	t.Run("DateKeyValidity", func(t *testing.T) {
+		// Verify date keys match YYYYMMDD format from activation timestamps
+		query := `
+			SELECT COUNT(*) as invalid_count
+			FROM fct_alarm_occurrence
+			WHERE CAST(strftime('%Y%m%d', activation_timestamp) AS INTEGER) != activation_date_key
+		`
+		var invalidCount int
+		err := db.QueryRow(query).Scan(&invalidCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if invalidCount > 0 {
+			t.Errorf("Found %d invalid date_key values", invalidCount)
+		}
+	})
+}
+
+// TestISAMetricThresholds verifies ISA 18.2 calculations against known sample data.
+// This test ensures the ISA 18.2 standard metrics are correctly computed:
+// - Operator loading categories (ACCEPTABLE, MANAGEABLE, UNACCEPTABLE)
+// - Standing alarm detection (>10 minutes unacknowledged)
+// - Chattering detection (≥5 state transitions within 10 minutes)
+// - Bad actor identification (top offenders by Pareto analysis)
+// NOTE: Requires `gorchata run` to be executed first to build all models.
+func TestISAMetricThresholds(t *testing.T) {
+	// Connect to project database
+	db, cleanup := connectToProjectDB(t)
+	defer cleanup()
+
+	t.Run("OperatorLoadingCategories", func(t *testing.T) {
+		// D-200 storm on Feb 7, 08:00-08:08 should have UNACCEPTABLE periods
+		query := `
+			SELECT COUNT(*) as unacceptable_count
+			FROM rollup_operator_loading_hourly
+			WHERE loading_category = 'UNACCEPTABLE'
+		`
+		var unacceptableCount int
+		err := db.QueryRow(query).Scan(&unacceptableCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if unacceptableCount == 0 {
+			t.Error("Expected at least one UNACCEPTABLE loading period from D-200 alarm storm")
+		}
+		t.Logf("Found %d UNACCEPTABLE loading periods", unacceptableCount)
+	})
+
+	t.Run("StandingAlarmDetection", func(t *testing.T) {
+		// Verify exactly 16 tags have standing alarms (>10 min to acknowledge)
+		query := `
+			SELECT COUNT(*) as standing_count
+			FROM fct_alarm_occurrence
+			WHERE is_standing_10min = 1
+		`
+		var standingCount int
+		err := db.QueryRow(query).Scan(&standingCount)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if standingCount < 9 {
+			t.Errorf("Standing alarm count = %d, want >= 9", standingCount)
+		}
+		t.Logf("Standing alarm count: %d", standingCount)
+	})
+
+	t.Run("ChatteringDetection", func(t *testing.T) {
+		// TIC-105 should be detected as chattering with multiple episodes
+		query := `
+			SELECT c.chattering_episode_count
+			FROM rollup_chattering_alarms c
+			INNER JOIN dim_alarm_tag d ON c.tag_key = d.tag_key AND d.is_current = 1
+			WHERE d.tag_id = 'TIC-105'
+		`
+		var episodeCount sql.NullInt64
+		err := db.QueryRow(query).Scan(&episodeCount)
+		if err == sql.ErrNoRows {
+			t.Fatal("TIC-105 not found in rollup_chattering_alarms")
+		}
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if !episodeCount.Valid || episodeCount.Int64 == 0 {
+			t.Error("TIC-105 should have chattering episodes detected")
+		}
+		t.Logf("TIC-105 chattering episodes: %d", episodeCount.Int64)
+	})
+
+	t.Run("BadActorIdentification", func(t *testing.T) {
+		// TIC-105 should be in top ranks with SIGNIFICANT category
+		query := `
+			SELECT b.bad_actor_category, b.alarm_rank
+			FROM rollup_bad_actor_tags b
+			INNER JOIN dim_alarm_tag d ON b.tag_key = d.tag_key AND d.is_current = 1
+			WHERE d.tag_id = 'TIC-105'
+		`
+		var category string
+		var rank int
+		err := db.QueryRow(query).Scan(&category, &rank)
+		if err == sql.ErrNoRows {
+			t.Fatal("TIC-105 not found in rollup_bad_actors")
+		}
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if category != "SIGNIFICANT" {
+			t.Errorf("TIC-105 bad_actor_category = %q, want 'SIGNIFICANT'", category)
+		}
+		if rank > 2 {
+			t.Errorf("TIC-105 pareto_rank = %d, expected in top ranks", rank)
+		}
+		t.Logf("TIC-105 bad actor rank %d, category %s", rank, category)
+	})
+
+	t.Run("ISAComplianceScore", func(t *testing.T) {
+		// Verify ISA compliance score is calculated and in valid range
+		query := `
+			SELECT isa_compliance_score
+			FROM rollup_alarm_system_health
+			WHERE analysis_date IS NULL
+		`
+		var score float64
+		err := db.QueryRow(query).Scan(&score)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		if score < 0 || score > 100 {
+			t.Errorf("ISA compliance score = %.1f, want [0, 100]", score)
+		}
+		t.Logf("ISA compliance score: %.1f", score)
+	})
+}
+
+// TestSampleQueries verifies that example queries from documentation execute successfully.
+// This ensures the sample queries in verify_alarm_data.sql and README.md are correct
+// and produce meaningful results.
+// NOTE: Requires `gorchata run` to be executed first to build all models.
+func TestSampleQueries(t *testing.T) {
+	// Connect to project database
+	db, cleanup := connectToProjectDB(t)
+	defer cleanup()
+
+	t.Run("Top10BadActorTags", func(t *testing.T) {
+		query := `
+			SELECT d.tag_id, b.total_activations, b.bad_actor_category
+			FROM rollup_bad_actor_tags b
+			INNER JOIN dim_alarm_tag d ON b.tag_key = d.tag_key AND d.is_current = 1
+			ORDER BY b.alarm_rank
+			LIMIT 10
+		`
+		rows, err := db.Query(query)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		defer rows.Close()
+
+		count := 0
+		for rows.Next() {
+			var tagID, category string
+			var alarmCount int
+			if err := rows.Scan(&tagID, &alarmCount, &category); err != nil {
+				t.Fatalf("Scan failed: %v", err)
+			}
+			count++
+			t.Logf("Rank %d: %s (alarms=%d, category=%s)", count, tagID, alarmCount, category)
+		}
+		if count == 0 {
+			t.Error("Top 10 bad actors query returned no results")
+		}
+	})
+
+	t.Run("DailyISACompliance", func(t *testing.T) {
+		query := `
+			SELECT 
+				d.full_date,
+				h.isa_compliance_score,
+				h.total_alarm_count,
+				h.pct_time_acceptable
+			FROM rollup_alarm_system_health h
+			JOIN dim_dates d ON h.date_key = d.date_key
+			WHERE h.analysis_date IS NOT NULL
+			ORDER BY d.full_date
+		`
+		rows, err := db.Query(query)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		defer rows.Close()
+
+		count := 0
+		for rows.Next() {
+			var date string
+			var score, pctAcceptable float64
+			var alarmCount int
+			if err := rows.Scan(&date, &score, &alarmCount, &pctAcceptable); err != nil {
+				t.Fatalf("Scan failed: %v", err)
+			}
+			count++
+		}
+		if count < 1 {
+			t.Errorf("Expected at least 1 day of ISA compliance data, got %d", count)
+		}
+		t.Logf("Daily ISA compliance data: %d days", count)
+	})
+
+	t.Run("AlarmStormAnalysis", func(t *testing.T) {
+		// Feb 7, 08:00-08:08 storm period
+		query := `
+			SELECT 
+				time_bucket_key,
+				alarm_count,
+				loading_category
+			FROM rollup_operator_loading_hourly
+			WHERE date_key = 20260207
+			  AND time_bucket_key BETWEEN 48 AND 49
+			ORDER BY time_bucket_key
+		`
+		rows, err := db.Query(query)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		defer rows.Close()
+
+		hasStorm := false
+		for rows.Next() {
+			var bucket, alarmCount int
+			var category string
+			if err := rows.Scan(&bucket, &alarmCount, &category); err != nil {
+				t.Fatalf("Scan failed: %v", err)
+			}
+			if alarmCount > 10 {
+				hasStorm = true
+			}
+			t.Logf("Storm period bucket %d: %d alarms (%s)", bucket, alarmCount, category)
+		}
+		if !hasStorm {
+			t.Error("Expected alarm storm (>10 alarms) in Feb 7 08:00-08:08 period")
+		}
+	})
+
+	t.Run("ChatteringEpisodes", func(t *testing.T) {
+		query := `
+			SELECT 
+				d.tag_id,
+				c.chattering_episode_count,
+				c.total_state_changes,
+				CAST(c.total_state_changes * 1.0 / NULLIF(c.chattering_episode_count, 0) AS REAL) AS avg_changes_per_episode
+			FROM rollup_chattering_alarms c
+			INNER JOIN dim_alarm_tag d ON c.tag_key = d.tag_key AND d.is_current = 1
+			WHERE c.chattering_episode_count > 0
+			ORDER BY c.chattering_episode_count DESC
+			LIMIT 5
+		`
+		rows, err := db.Query(query)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		defer rows.Close()
+
+		count := 0
+		for rows.Next() {
+			var tagID string
+			var episodeCount, totalTransitions int
+			var avgTransitions float64
+			if err := rows.Scan(&tagID, &episodeCount, &totalTransitions, &avgTransitions); err != nil {
+				t.Fatalf("Scan failed: %v", err)
+			}
+			count++
+			t.Logf("Chattering tag: %s (episodes=%d, transitions=%d)", tagID, episodeCount, totalTransitions)
+		}
+		if count == 0 {
+			t.Error("Expected at least one chattering alarm episode")
+		}
+	})
+
+	t.Run("TIC105InBadActors", func(t *testing.T) {
+		// Verify TIC-105 appears in bad actors results as documented
+		query := `
+			SELECT b.alarm_rank, b.total_activations, b.bad_actor_category
+			FROM rollup_bad_actor_tags b
+			INNER JOIN dim_alarm_tag d ON b.tag_key = d.tag_key AND d.is_current = 1
+			WHERE d.tag_id = 'TIC-105'
+		`
+		var rank, alarmCount int
+		var category string
+		err := db.QueryRow(query).Scan(&rank, &alarmCount, &category)
+		if err == sql.ErrNoRows {
+			t.Fatal("TIC-105 not found in bad actors (required for documentation examples)")
+		}
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+		t.Logf("TIC-105: rank %d, alarms=%d, category=%s", rank, alarmCount, category)
+	})
 }

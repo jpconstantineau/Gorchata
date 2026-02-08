@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Primary Fact Table: Alarm Occurrences
 -- Grain: One row per alarm activation/lifecycle

@@ -1,4 +1,4 @@
-{{ config "materialized" "table" }}
+{{ config(materialized='table') }}
 
 -- Alarm System Health Summary
 -- Generates overall alarm system health metrics and ISA compliance score
