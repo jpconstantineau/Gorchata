@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jpconstantineau/gorchata/internal/domain/test"
+	"github.com/jpconstantineau/gorchata/internal/domain/test/storage"
 	"github.com/jpconstantineau/gorchata/internal/platform"
 	"github.com/jpconstantineau/gorchata/internal/template"
 )
@@ -15,10 +17,11 @@ type TestEngine struct {
 	adapter        platform.DatabaseAdapter
 	templateEngine *template.Engine
 	sampler        *Sampler
+	failureStore   storage.FailureStore
 }
 
 // NewTestEngine creates a new test execution engine
-func NewTestEngine(adapter platform.DatabaseAdapter, templateEngine *template.Engine) (*TestEngine, error) {
+func NewTestEngine(adapter platform.DatabaseAdapter, templateEngine *template.Engine, failureStore storage.FailureStore) (*TestEngine, error) {
 	if adapter == nil {
 		return nil, fmt.Errorf("database adapter cannot be nil")
 	}
@@ -27,6 +30,7 @@ func NewTestEngine(adapter platform.DatabaseAdapter, templateEngine *template.En
 		adapter:        adapter,
 		templateEngine: templateEngine,
 		sampler:        NewSampler(adapter),
+		failureStore:   failureStore,
 	}, nil
 }
 
@@ -80,8 +84,22 @@ func (e *TestEngine) ExecuteTest(ctx context.Context, t *test.Test) (*test.TestR
 	// Determine test status based on failures and thresholds
 	status := e.determineStatus(t, failureCount)
 
-	// Complete the result
-	result.Complete(status, failureCount, "")
+	// Store failures if enabled and test failed
+	if t.Config.StoreFailures && status == test.StatusFailed && e.failureStore != nil && len(queryResult.Rows) > 0 {
+		testRunID := generateTestRunID()
+		failingRows := e.captureFailingRows(queryResult)
+		failures := convertToFailureRows(testRunID, t, failingRows)
+
+		if err := e.failureStore.StoreFailures(ctx, t, testRunID, failures); err != nil {
+			// Log warning but don't fail test execution
+			result.Complete(status, failureCount, fmt.Sprintf("Test failed. Warning: could not store failures: %v", err))
+		} else {
+			result.Complete(status, failureCount, fmt.Sprintf("Test failed. %d failures stored", len(failures)))
+		}
+	} else {
+		// Complete the result normally
+		result.Complete(status, failureCount, "")
+	}
 
 	return result, nil
 }
@@ -108,4 +126,51 @@ func (e *TestEngine) determineStatus(t *test.Test, failureCount int64) test.Test
 	}
 
 	return test.StatusFailed
+}
+
+// captureFailingRows converts query results to a slice of maps
+func (e *TestEngine) captureFailingRows(queryResult *platform.QueryResult) []map[string]interface{} {
+	rows := make([]map[string]interface{}, 0, len(queryResult.Rows))
+
+	// Limit to 1000 rows for performance
+	maxRows := len(queryResult.Rows)
+	if maxRows > 1000 {
+		maxRows = 1000
+	}
+
+	for i := 0; i < maxRows; i++ {
+		row := make(map[string]interface{})
+		for j, col := range queryResult.Columns {
+			if j < len(queryResult.Rows[i]) {
+				row[col] = queryResult.Rows[i][j]
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return rows
+}
+
+// generateTestRunID generates a unique ID for this test run
+func generateTestRunID() string {
+	return uuid.New().String()
+}
+
+// convertToFailureRows converts query result rows to FailureRow instances
+func convertToFailureRows(testRunID string, t *test.Test, rows []map[string]interface{}) []storage.FailureRow {
+	failures := make([]storage.FailureRow, 0, len(rows))
+	now := time.Now()
+
+	for _, row := range rows {
+		failure := storage.FailureRow{
+			TestID:        t.ID,
+			TestRunID:     testRunID,
+			FailedAt:      now,
+			FailureReason: fmt.Sprintf("Test '%s' failed", t.Name),
+			RowData:       row,
+		}
+		failures = append(failures, failure)
+	}
+
+	return failures
 }

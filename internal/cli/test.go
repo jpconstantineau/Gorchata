@@ -9,6 +9,7 @@ import (
 	"github.com/jpconstantineau/gorchata/internal/config"
 	"github.com/jpconstantineau/gorchata/internal/domain/test/executor"
 	"github.com/jpconstantineau/gorchata/internal/domain/test/generic"
+	"github.com/jpconstantineau/gorchata/internal/domain/test/storage"
 )
 
 // TestCommand executes data quality tests
@@ -106,8 +107,17 @@ func TestCommand(args []string) error {
 
 	fmt.Printf("Running %d test(s)...\n\n", len(selectedTests))
 
+	// Create and initialize failure store
+	failureStore := storage.NewSQLiteFailureStore(adapter)
+	if failureStore != nil {
+		if err := failureStore.Initialize(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to initialize failure store: %v\n", err)
+			failureStore = nil
+		}
+	}
+
 	// Create test engine
-	engine, err := executor.NewTestEngine(adapter, nil)
+	engine, err := executor.NewTestEngine(adapter, nil, failureStore)
 	if err != nil {
 		return fmt.Errorf("failed to create test engine: %w", err)
 	}
@@ -136,6 +146,14 @@ func TestCommand(args []string) error {
 	// Write summary
 	consoleWriter.WriteSummary(summary)
 	jsonWriter.WriteSummary(summary)
+
+	// Run cleanup if failure store was initialized
+	if failureStore != nil {
+		cleanupConfig := storage.DefaultCleanupConfig()
+		if err := storage.CleanupOldFailures(ctx, failureStore, cleanupConfig); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: cleanup failed: %v\n", err)
+		}
+	}
 
 	// Exit with non-zero if failures
 	if summary.FailedTests > 0 {

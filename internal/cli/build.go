@@ -8,6 +8,7 @@ import (
 	"github.com/jpconstantineau/gorchata/internal/config"
 	testExecutor "github.com/jpconstantineau/gorchata/internal/domain/test/executor"
 	"github.com/jpconstantineau/gorchata/internal/domain/test/generic"
+	"github.com/jpconstantineau/gorchata/internal/domain/test/storage"
 	"github.com/jpconstantineau/gorchata/internal/platform"
 )
 
@@ -69,8 +70,17 @@ func runTestsForBuild(ctx context.Context, cfg *config.Config, adapter platform.
 
 	fmt.Printf("Running %d test(s)...\n\n", len(allTests))
 
+	// Create and initialize failure store
+	failureStore := storage.NewSQLiteFailureStore(adapter)
+	if failureStore != nil {
+		if err := failureStore.Initialize(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to initialize failure store: %v\n", err)
+			failureStore = nil
+		}
+	}
+
 	// Create test engine
-	engine, err := testExecutor.NewTestEngine(adapter, nil)
+	engine, err := testExecutor.NewTestEngine(adapter, nil, failureStore)
 	if err != nil {
 		return fmt.Errorf("failed to create test engine: %w", err)
 	}
@@ -94,6 +104,14 @@ func runTestsForBuild(ctx context.Context, cfg *config.Config, adapter platform.
 	// Write summary
 	consoleWriter.WriteSummary(summary)
 	jsonWriter.WriteSummary(summary)
+
+	// Run cleanup if failure store was initialized
+	if failureStore != nil {
+		cleanupConfig := storage.DefaultCleanupConfig()
+		if err := storage.CleanupOldFailures(ctx, failureStore, cleanupConfig); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: cleanup failed: %v\n", err)
+		}
+	}
 
 	// Return error if failures
 	if summary.FailedTests > 0 {
