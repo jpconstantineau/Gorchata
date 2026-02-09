@@ -1,0 +1,39 @@
+name: bottleneck_analysis
+version: "1.0"
+profile: dev
+
+model-paths:
+  - models
+  - models/sources
+  - models/dimensions
+  - models/facts
+  - models/rollups
+
+seed-paths:
+  - seeds
+
+test-paths:
+  - tests
+
+vars:
+  # Analysis time period
+  analysis_start_date: '2026-01-01'
+  analysis_end_date: '2026-03-31'
+  
+  # Shift configuration (8-hour shifts)
+  shift_hours: 8
+  first_shift_start: '06:00:00'
+  second_shift_start: '14:00:00'
+  third_shift_start: '22:00:00'
+  
+  # Bottleneck identification thresholds
+  utilization_threshold_high: 0.90    # 90% utilization indicates bottleneck
+  utilization_threshold_low: 0.60     # 60% utilization indicates underutilization
+  
+  # Performance metrics
+  target_throughput_units_per_hour: 25
+  acceptable_downtime_minutes: 30
+  
+  # Resource constraints
+  ncx10_capacity_parts_per_hour: 25
+  heat_treat_capacity_parts_per_hour: 15
