@@ -150,3 +150,235 @@ func TestREADMEExists(t *testing.T) {
 		t.Error("README.md is empty, want non-empty")
 	}
 }
+
+// ==================== Phase 2: Seed Data Tests ====================
+
+// TestSeedConfigExists verifies seeds/seed.yml exists and has correct structure
+func TestSeedConfigExists(t *testing.T) {
+	seedPath := filepath.Join("seeds", "seed.yml")
+
+	// Verify file exists
+	if _, err := os.Stat(seedPath); os.IsNotExist(err) {
+		t.Fatalf("seeds/seed.yml does not exist at %s", seedPath)
+	}
+
+	// Load and validate seed config
+	seedCfg, err := config.ParseSeedConfig(seedPath)
+	if err != nil {
+		t.Fatalf("ParseSeedConfig() error = %v, want nil", err)
+	}
+
+	// Verify batch size
+	if seedCfg.Import.BatchSize != 1000 {
+		t.Errorf("Import.BatchSize = %d, want %d", seedCfg.Import.BatchSize, 1000)
+	}
+
+	// Verify naming strategy
+	if seedCfg.Naming.Strategy != "filename" {
+		t.Errorf("Naming.Strategy = %q, want %q", seedCfg.Naming.Strategy, "filename")
+	}
+
+	// Verify scope
+	if seedCfg.Import.Scope != "folder" {
+		t.Errorf("Import.Scope = %q, want %q", seedCfg.Import.Scope, "folder")
+	}
+}
+
+// TestSeedCSVFilesExist verifies all required CSV seed files exist
+func TestSeedCSVFilesExist(t *testing.T) {
+	requiredFiles := []string{
+		"seeds/raw_resources.csv",
+		"seeds/raw_work_orders.csv",
+		"seeds/raw_operations.csv",
+		"seeds/raw_downtime.csv",
+	}
+
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("Required seed file %s does not exist", filePath)
+		}
+	}
+}
+
+// TestResourcesCSVStructure verifies raw_resources.csv has correct headers and valid data
+func TestResourcesCSVStructure(t *testing.T) {
+	filePath := filepath.Join("seeds", "raw_resources.csv")
+
+	// Read CSV file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	lines := string(content)
+	if lines == "" {
+		t.Fatal("raw_resources.csv is empty")
+	}
+
+	// Verify header row
+	expectedHeader := "resource_id,resource_name,resource_type,available_hours_per_shift,shifts_per_day,theoretical_capacity_per_hour"
+	if len(lines) < len(expectedHeader) {
+		t.Fatalf("File too short to contain header")
+	}
+
+	// Check if header is present (simple check - contains key columns)
+	if !containsSubstring(lines, "resource_id") || !containsSubstring(lines, "resource_name") {
+		t.Error("Missing expected header columns in raw_resources.csv")
+	}
+
+	// Verify at least some data rows exist
+	lineCount := countLines(lines)
+	if lineCount < 6 { // Header + at least 5 resources (NCX-10, Heat Treat, Milling, Assembly, Grinding)
+		t.Errorf("raw_resources.csv has %d lines, want at least 6 (header + 5 resources)", lineCount)
+	}
+
+	// Verify NCX-10 and Heat Treat are present (bottleneck resources)
+	if !containsSubstring(lines, "NCX-10") {
+		t.Error("NCX-10 resource not found in raw_resources.csv")
+	}
+	if !containsSubstring(lines, "Heat Treat") {
+		t.Error("Heat Treat resource not found in raw_resources.csv")
+	}
+}
+
+// TestWorkOrdersCSVStructure verifies raw_work_orders.csv has correct headers and valid data
+func TestWorkOrdersCSVStructure(t *testing.T) {
+	filePath := filepath.Join("seeds", "raw_work_orders.csv")
+
+	// Read CSV file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	lines := string(content)
+	if lines == "" {
+		t.Fatal("raw_work_orders.csv is empty")
+	}
+
+	// Verify key header columns
+	if !containsSubstring(lines, "work_order_id") || !containsSubstring(lines, "part_number") {
+		t.Error("Missing expected header columns in raw_work_orders.csv")
+	}
+
+	// Verify at least ~50 work orders exist
+	lineCount := countLines(lines)
+	if lineCount < 40 { // Header + at least 39 work orders (some flexibility)
+		t.Errorf("raw_work_orders.csv has %d lines, want at least 40 (header + ~50 orders)", lineCount)
+	}
+
+	// Verify part numbers are present
+	if !containsSubstring(lines, "PART-") {
+		t.Error("No PART- prefix found in work orders")
+	}
+}
+
+// TestOperationsCSVStructure verifies raw_operations.csv has correct headers and valid data
+func TestOperationsCSVStructure(t *testing.T) {
+	filePath := filepath.Join("seeds", "raw_operations.csv")
+
+	// Read CSV file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	lines := string(content)
+	if lines == "" {
+		t.Fatal("raw_operations.csv is empty")
+	}
+
+	// Verify key header columns
+	requiredColumns := []string{"operation_id", "work_order_id", "operation_seq", "resource_id", "start_timestamp", "end_timestamp"}
+	for _, col := range requiredColumns {
+		if !containsSubstring(lines, col) {
+			t.Errorf("Missing expected header column %q in raw_operations.csv", col)
+		}
+	}
+
+	// Verify at least ~300 operations exist
+	lineCount := countLines(lines)
+	if lineCount < 250 { // Header + at least 249 operations (some flexibility)
+		t.Errorf("raw_operations.csv has %d lines, want at least 250 (header + ~300 operations)", lineCount)
+	}
+
+	// Verify operation types are present
+	if !containsSubstring(lines, "SETUP") && !containsSubstring(lines, "PROCESSING") {
+		t.Error("No operation types (SETUP/PROCESSING) found in raw_operations.csv")
+	}
+}
+
+// TestDowntimeCSVStructure verifies raw_downtime.csv has correct headers and valid data
+func TestDowntimeCSVStructure(t *testing.T) {
+	filePath := filepath.Join("seeds", "raw_downtime.csv")
+
+	// Read CSV file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	lines := string(content)
+	if lines == "" {
+		t.Fatal("raw_downtime.csv is empty")
+	}
+
+	// Verify key header columns
+	requiredColumns := []string{"downtime_id", "resource_id", "downtime_start", "downtime_end", "downtime_type", "reason_code"}
+	for _, col := range requiredColumns {
+		if !containsSubstring(lines, col) {
+			t.Errorf("Missing expected header column %q in raw_downtime.csv", col)
+		}
+	}
+
+	// Verify at least ~30 downtime events exist
+	lineCount := countLines(lines)
+	if lineCount < 25 { // Header + at least 24 events (some flexibility)
+		t.Errorf("raw_downtime.csv has %d lines, want at least 25 (header + ~30 events)", lineCount)
+	}
+
+	// Verify downtime types are present
+	if !containsSubstring(lines, "SCHEDULED") && !containsSubstring(lines, "UNSCHEDULED") {
+		t.Error("No downtime types found in raw_downtime.csv")
+	}
+
+	// Verify reason codes are present
+	hasReasonCode := containsSubstring(lines, "BREAKDOWN") ||
+		containsSubstring(lines, "PREVENTIVE_MAINTENANCE") ||
+		containsSubstring(lines, "CHANGEOVER")
+	if !hasReasonCode {
+		t.Error("No reason codes found in raw_downtime.csv")
+	}
+}
+
+// Helper functions
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && findSubstring(s, substr)
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	count := 1
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			count++
+		}
+	}
+	// Don't count trailing newline as an extra line
+	if s[len(s)-1] == '\n' {
+		count--
+	}
+	return count
+}

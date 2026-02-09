@@ -1,0 +1,7 @@
+resource_id,resource_name,resource_type,available_hours_per_shift,shifts_per_day,theoretical_capacity_per_hour
+R001,NCX-10,CNC Machine,8,2,6
+R002,Heat Treat,Furnace,8,2,10
+R003,Milling Machine,Mill,8,2,15
+R004,Assembly Station,Assembly,8,2,12
+R005,Grinding Machine,Grinder,8,2,20
+R006,QA Inspection,QA,8,2,25
