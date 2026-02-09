@@ -5,10 +5,9 @@
 
 - [x] Star Schema
 - [x] DCS Alarm Analytics
+- [x] Manufacturing Data for Bottleneck Analysis
 
 ### In Progress 🚧
-
-- [] Manufacturing Data for Bottleneck Analysis
 
 ### Future Examples 🔮
 
