@@ -16,7 +16,6 @@ import (
 // TestIntegration_StoreFailures verifies failure storage end-to-end
 func TestIntegration_StoreFailures(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -136,7 +135,6 @@ func TestIntegration_StoreFailures(t *testing.T) {
 // TestIntegration_CustomTableName verifies store_failures_as config
 func TestIntegration_CustomTableName(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -239,7 +237,6 @@ func TestIntegration_CustomTableName(t *testing.T) {
 // TestIntegration_CleanupOldFailures verifies retention policy
 func TestIntegration_CleanupOldFailures(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -343,7 +340,6 @@ func TestIntegration_CleanupOldFailures(t *testing.T) {
 // TestIntegration_MultipleTestRuns verifies multiple test run IDs
 func TestIntegration_MultipleTestRuns(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -454,7 +450,6 @@ func TestIntegration_MultipleTestRuns(t *testing.T) {
 // TestIntegration_StoreFailuresDisabled verifies no storage when disabled
 func TestIntegration_StoreFailuresDisabled(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 

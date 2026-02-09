@@ -24,7 +24,6 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 
 	// Create database with valid data
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	// Load configuration
 	cfg := LoadTestConfig(t, projectDir)
@@ -43,8 +42,11 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 	// Update database path in config to use test database
 	cfg.Output.Database = dbPath
 
-	// Reconnect adapter with correct path
+	// Close and reconnect adapter with correct path
 	ctx := context.Background()
+	if err := adapter.Close(); err != nil {
+		t.Fatalf("failed to close adapter: %v", err)
+	}
 	if err := adapter.Connect(ctx); err != nil {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
@@ -145,7 +147,6 @@ func TestIntegration_ExecuteTestsEndToEnd(t *testing.T) {
 // TestIntegration_NotNullTest verifies not_null test execution
 func TestIntegration_NotNullTest(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -221,7 +222,6 @@ func TestIntegration_NotNullTest(t *testing.T) {
 // TestIntegration_UniqueTest verifies unique test execution
 func TestIntegration_UniqueTest(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -298,7 +298,6 @@ func TestIntegration_UniqueTest(t *testing.T) {
 // TestIntegration_AcceptedValuesTest verifies accepted_values test
 func TestIntegration_AcceptedValuesTest(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -379,7 +378,6 @@ func TestIntegration_AcceptedValuesTest(t *testing.T) {
 // TestIntegration_RelationshipsTest verifies foreign key relationships
 func TestIntegration_RelationshipsTest(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -481,7 +479,6 @@ func TestIntegration_SingularTest(t *testing.T) {
 
 	// Create database
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -489,7 +486,21 @@ func TestIntegration_SingularTest(t *testing.T) {
 	cfg := LoadTestConfig(t, projectDir)
 	cfg.Output.Database = dbPath
 
-	// Reconnect
+	// Change to project directory for test discovery (LoadTestConfig changes back on return)
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to change to project directory: %v", err)
+	}
+
+	// Close and reconnect
+	if err := adapter.Close(); err != nil {
+		t.Fatalf("failed to close adapter: %v", err)
+	}
 	if err := adapter.Connect(ctx); err != nil {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
@@ -512,7 +523,7 @@ func TestIntegration_SingularTest(t *testing.T) {
 	}
 
 	// Insert order with negative amount (will fail singular test)
-	err := adapter.ExecuteDDL(ctx, `
+	err = adapter.ExecuteDDL(ctx, `
 		INSERT INTO raw_orders (id, user_id, total_amount, status)
 		VALUES (100, 1, -50.00, 'completed')
 	`)
@@ -572,7 +583,6 @@ func TestIntegration_SingularTest(t *testing.T) {
 // TestIntegration_ThresholdEvaluation verifies error_if/warn_if
 func TestIntegration_ThresholdEvaluation(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -659,7 +669,6 @@ func TestIntegration_TestSelection(t *testing.T) {
 
 	// Create database
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -667,7 +676,21 @@ func TestIntegration_TestSelection(t *testing.T) {
 	cfg := LoadTestConfig(t, projectDir)
 	cfg.Output.Database = dbPath
 
-	// Reconnect
+	// Change to project directory for test discovery (LoadTestConfig changes back on return)
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to change to project directory: %v", err)
+	}
+
+	// Close and reconnect
+	if err := adapter.Close(); err != nil {
+		t.Fatalf("failed to close adapter: %v", err)
+	}
 	if err := adapter.Connect(ctx); err != nil {
 		t.Fatalf("failed to reconnect: %v", err)
 	}
