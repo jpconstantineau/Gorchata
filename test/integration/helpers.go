@@ -53,6 +53,14 @@ func CreateTestDatabase(t *testing.T) (*sqlite.SQLiteAdapter, string) {
 	// Create raw tables with sample data
 	CreateSampleData(t, adapter)
 
+	// Register cleanup to properly close WAL before test ends
+	t.Cleanup(func() {
+		// Checkpoint and close WAL to release file locks on Windows
+		adapter.ExecuteDDL(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)")
+		adapter.ExecuteDDL(context.Background(), "PRAGMA journal_mode=DELETE")
+		adapter.Close()
+	})
+
 	return adapter, dbPath
 }
 

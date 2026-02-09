@@ -15,8 +15,7 @@ func TestIntegration_TestCommand(t *testing.T) {
 	projectDir := SetupTestProject(t)
 
 	// Create database (already contains sample data)
-	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
+	_, dbPath := CreateTestDatabase(t)
 
 	// Update profiles.yml to use test database
 	profilesPath := filepath.Join(projectDir, "profiles.yml")
@@ -62,8 +61,7 @@ func TestIntegration_TestCommand_WithSelection(t *testing.T) {
 	projectDir := SetupTestProject(t)
 
 	// Create database
-	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
+	_, dbPath := CreateTestDatabase(t)
 
 	// Update profiles.yml
 	profilesPath := filepath.Join(projectDir, "profiles.yml")
@@ -123,7 +121,6 @@ func TestIntegration_TestCommand_FailFast(t *testing.T) {
 
 	// Create database with invalid data (already has sample data)
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	CreateInvalidData(t, adapter) // Add data that will fail tests
 
@@ -167,7 +164,6 @@ func TestIntegration_BuildCommand(t *testing.T) {
 
 	// Create database (already contains sample data)
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	// Update profiles.yml
 	profilesPath := filepath.Join(projectDir, "profiles.yml")
@@ -221,7 +217,6 @@ func TestIntegration_RunWithTestFlag(t *testing.T) {
 
 	// Create database (already contains sample data)
 	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	// Update profiles.yml
 	profilesPath := filepath.Join(projectDir, "profiles.yml")
@@ -288,8 +283,7 @@ test-paths:
 	}
 
 	// Create database
-	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
+	_, dbPath := CreateTestDatabase(t)
 
 	profilesConfig := `default:
   target: test
@@ -331,8 +325,7 @@ func TestIntegration_TestCommand_Verbose(t *testing.T) {
 	projectDir := SetupTestProject(t)
 
 	// Create database
-	adapter, dbPath := CreateTestDatabase(t)
-	defer adapter.Close()
+	_, dbPath := CreateTestDatabase(t)
 
 	// Update profiles.yml
 	profilesPath := filepath.Join(projectDir, "profiles.yml")

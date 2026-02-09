@@ -20,7 +20,6 @@ func TestIntegration_AdaptiveSampling_LargeTable(t *testing.T) {
 	}
 
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -98,7 +97,6 @@ func TestIntegration_AdaptiveSampling_LargeTable(t *testing.T) {
 // TestIntegration_AdaptiveSampling_SmallTable verifies no sampling <1M rows
 func TestIntegration_AdaptiveSampling_SmallTable(t *testing.T) {
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -172,7 +170,6 @@ func TestIntegration_SampleSizeOverride(t *testing.T) {
 	}
 
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -238,7 +235,6 @@ func TestIntegration_DisableSampling(t *testing.T) {
 	}
 
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -304,7 +300,6 @@ func TestIntegration_SamplingAccuracy(t *testing.T) {
 	}
 
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 
@@ -434,7 +429,6 @@ func TestIntegration_SamplingPerformance(t *testing.T) {
 	}
 
 	adapter, _ := CreateTestDatabase(t)
-	defer adapter.Close()
 
 	ctx := context.Background()
 

@@ -116,11 +116,11 @@ func TestProjectConfigExists(t *testing.T) {
 	}
 
 	// Verify model paths
-	if len(cfg.ModelPaths) != 4 {
-		t.Errorf("ModelPaths length = %d, want 4", len(cfg.ModelPaths))
+	if len(cfg.ModelPaths) != 5 {
+		t.Errorf("ModelPaths length = %d, want 5", len(cfg.ModelPaths))
 	}
-	if len(cfg.ModelPaths) > 0 && cfg.ModelPaths[0] != "models/sources" {
-		t.Errorf("ModelPaths[0] = %q, want %q", cfg.ModelPaths[0], "models/sources")
+	if len(cfg.ModelPaths) > 0 && cfg.ModelPaths[0] != "models" {
+		t.Errorf("ModelPaths[0] = %q, want %q", cfg.ModelPaths[0], "models")
 	}
 
 	// Verify vars exist
