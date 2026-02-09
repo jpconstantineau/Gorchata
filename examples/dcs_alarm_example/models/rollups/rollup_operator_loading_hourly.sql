@@ -1,4 +1,4 @@
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 -- Operator Loading Rollup (10-minute buckets per ISA 18.2 standards)
 -- Calculates alarm rate and categorizes loading as ACCEPTABLE, MANAGEABLE, or UNACCEPTABLE

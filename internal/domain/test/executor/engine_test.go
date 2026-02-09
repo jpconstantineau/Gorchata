@@ -758,3 +758,37 @@ func (m *MockFailureStore) CleanupOldFailures(ctx context.Context, retentionDays
 func (m *MockFailureStore) GetFailures(ctx context.Context, testID string, limit int) ([]storage.FailureRow, error) {
 	return nil, nil
 }
+
+// TestExecuteTest_WithoutTemplateEngine tests that tests work without template engine
+func TestExecuteTest_WithoutTemplateEngine(t *testing.T) {
+	adapter := NewMockDatabaseAdapter()
+
+	// Test without templates (direct table names)
+	adapter.QueryResults["SELECT * FROM users WHERE email IS NULL"] = &platform.QueryResult{
+		Columns:      []string{"id", "email"},
+		Rows:         [][]interface{}{},
+		RowsAffected: 0,
+	}
+
+	// Create engine without template engine (nil)
+	engine, _ := NewTestEngine(adapter, nil, nil)
+
+	testObj, _ := test.NewTest(
+		"not_null_users_email",
+		"not_null",
+		"users",
+		"email",
+		test.GenericTest,
+		"SELECT * FROM users WHERE email IS NULL",
+	)
+
+	ctx := context.Background()
+	result, err := engine.ExecuteTest(ctx, testObj)
+
+	if err != nil {
+		t.Errorf("ExecuteTest() error = %v, want nil", err)
+	}
+	if result.Status != test.StatusPassed {
+		t.Errorf("ExecuteTest() status = %v, want %v", result.Status, test.StatusPassed)
+	}
+}

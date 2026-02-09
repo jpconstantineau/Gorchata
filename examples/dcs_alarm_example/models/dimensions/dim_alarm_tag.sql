@@ -1,4 +1,4 @@
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 -- SCD Type 2 Alarm Tag Dimension
 -- Tracks alarm tag configurations with version history support

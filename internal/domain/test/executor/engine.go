@@ -57,8 +57,28 @@ func (e *TestEngine) ExecuteTests(ctx context.Context, tests []*test.Test) (*tes
 func (e *TestEngine) ExecuteTest(ctx context.Context, t *test.Test) (*test.TestResult, error) {
 	result := test.NewTestResult(t.ID, test.StatusRunning)
 
-	// Get SQL to execute (with potential sampling)
+	// Get SQL to execute (render template if template engine is available)
 	sql := t.SQLTemplate
+
+	// Render template if template engine is available
+	if e.templateEngine != nil {
+		tmpl, err := e.templateEngine.Parse(t.ID, sql)
+		if err != nil {
+			// If template parsing fails, fall back to original SQL
+			// This allows tests without templates to work
+			sql = t.SQLTemplate
+		} else {
+			// Create a context for template rendering
+			templateCtx := template.NewContext()
+			rendered, err := template.Render(tmpl, templateCtx, nil)
+			if err != nil {
+				// If rendering fails, fall back to original SQL
+				sql = t.SQLTemplate
+			} else {
+				sql = rendered
+			}
+		}
+	}
 
 	// Apply adaptive sampling if needed
 	if t.ModelName != "" {

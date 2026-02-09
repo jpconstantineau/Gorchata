@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -34,9 +35,9 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Failed to read raw_sales.sql: %v", err)
 	}
 
-	// Extract SQL (remove Jinja-like config directive for raw execution test)
+	// Extract SQL (remove config directive for raw execution test)
 	contentStr := string(content)
-	sqlContent := strings.ReplaceAll(contentStr, "{{ config(materialized='table') }}", "")
+	sqlContent := strings.ReplaceAll(contentStr, `{{ config "materialized" "table" }}`, "")
 	sqlContent = strings.TrimSpace(sqlContent)
 
 	// Wrap in CREATE TABLE for testing
@@ -55,6 +56,17 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	}
 
 	return db, cleanup
+}
+
+// removeConfigDirectives removes config directives from SQL (both Go template and legacy Jinja syntax)
+func removeConfigDirectives(sql string) string {
+	// Remove Go template syntax: {{ config "key" "value" }}
+	goTemplateRe := regexp.MustCompile(`\{\{\s*config\s+"[^"]+"\s+"[^"]+"\s*\}\}`)
+	sql = goTemplateRe.ReplaceAllString(sql, "")
+
+	// Remove legacy Jinja-style syntax: {{ config(key='value') }}
+	legacyRe := regexp.MustCompile(`\{\{\s*config\s*\([^}]+\)\s*\}\}`)
+	return legacyRe.ReplaceAllString(sql, "")
 }
 
 // TestStarSchemaProjectConfig tests that the star_schema_example project config can be loaded
@@ -259,7 +271,7 @@ func TestRawSalesModelContent(t *testing.T) {
 	contentStr := string(content)
 
 	// Check for config directive
-	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+	if !strings.Contains(contentStr, "{{ config \"materialized\" \"table\" }}") {
 		t.Error("raw_sales.sql missing config directive with materialized='table'")
 	}
 
@@ -501,7 +513,7 @@ func TestDimProductsModelContent(t *testing.T) {
 	contentStr := string(content)
 
 	// Check for config directive
-	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+	if !strings.Contains(contentStr, "{{ config \"materialized\" \"table\" }}") {
 		t.Error("dim_products.sql missing config directive with materialized='table'")
 	}
 
@@ -533,7 +545,8 @@ func TestDimProductsModelExecution(t *testing.T) {
 
 	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -566,7 +579,8 @@ func TestDimProductsColumns(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -627,7 +641,8 @@ func TestDimProductsUniqueProducts(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -675,7 +690,8 @@ func TestDimProductsDataIntegrity(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -724,7 +740,7 @@ func TestDimDatesModelContent(t *testing.T) {
 	contentStr := string(content)
 
 	// Check for config directive
-	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+	if !strings.Contains(contentStr, "{{ config \"materialized\" \"table\" }}") {
 		t.Error("dim_dates.sql missing config directive with materialized='table'")
 	}
 
@@ -761,7 +777,8 @@ func TestDimDatesModelExecution(t *testing.T) {
 
 	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -794,7 +811,8 @@ func TestDimDatesColumns(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -855,7 +873,8 @@ func TestDimDatesUniqueDates(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -903,7 +922,8 @@ func TestDimDatesTimeAttributes(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -959,7 +979,8 @@ func TestDimDatesWeekendDetection(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1020,15 +1041,12 @@ func TestDimCustomersModelContent(t *testing.T) {
 
 	contentStr := string(content)
 
-	// Check for config directive with incremental materialization
-	if !strings.Contains(contentStr, "materialized='incremental'") {
-		t.Error("dim_customers.sql missing config directive with materialized='incremental'")
+	// Check for config directive with incremental materialization (Go template syntax)
+	if !strings.Contains(contentStr, `{{ config "materialized" "incremental" }}`) {
+		t.Error("dim_customers.sql missing config directive {{ config \"materialized\" \"incremental\" }}")
 	}
 
-	// Check for unique_key in config
-	if !strings.Contains(contentStr, "unique_key") {
-		t.Error("dim_customers.sql missing unique_key in config directive")
-	}
+	// Note: unique_key is set programmatically for incremental models, not in config directive
 
 	// Check for ref to raw_sales
 	if !strings.Contains(contentStr, `{{ ref "raw_sales" }}`) {
@@ -1061,15 +1079,14 @@ func TestDimCustomersModelExecution(t *testing.T) {
 
 	// Compile SQL: replace {{ config(...) }} and {{ ref "raw_sales" }}
 	sqlContent := string(content)
-	// Remove config directive (we'll treat as table for testing)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
+	// Remove config directives (both Go template and Jinja-style)
+	// Go template: {{ config "materialized" "incremental" }}
+	goTemplateRe := regexp.MustCompile(`\{\{\s*config\s+"[^"]+"\s+"[^"]+"\s*\}\}`)
+	sqlContent = goTemplateRe.ReplaceAllString(sqlContent, "")
+	// Legacy Jinja: {{ config(materialized='incremental') }}
+	legacyRe := regexp.MustCompile(`\{\{\s*config\s*\([^}]+\)\s*\}\}`)
+	sqlContent = legacyRe.ReplaceAllString(sqlContent, "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1102,14 +1119,7 @@ func TestDimCustomersColumns(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1173,14 +1183,7 @@ func TestDimCustomersSurrogateKeyUnique(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1216,14 +1219,7 @@ func TestDimCustomersMultipleVersions(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1260,14 +1256,7 @@ func TestDimCustomersCustomer1001Versions(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1393,14 +1382,7 @@ func TestDimCustomersValidFromValidTo(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1464,14 +1446,7 @@ func TestDimCustomersIsCurrentFlag(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1540,14 +1515,7 @@ func TestDimCustomersDataIntegrity(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 
@@ -1609,7 +1577,7 @@ func TestFctSalesModelContent(t *testing.T) {
 	contentStr := string(content)
 
 	// Check for config directive
-	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
+	if !strings.Contains(contentStr, "{{ config \"materialized\" \"table\" }}") {
 		t.Error("fct_sales.sql missing config directive with materialized='table'")
 	}
 
@@ -1682,14 +1650,7 @@ func TestFctSalesModelExecution(t *testing.T) {
 		t.Fatalf("Failed to read dim_customers.sql: %v", err)
 	}
 	dimCustomersSQL := string(dimCustomersContent)
-	lines := strings.Split(dimCustomersSQL, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	dimCustomersSQL = strings.Join(filteredLines, "\n")
+	dimCustomersSQL = removeConfigDirectives(dimCustomersSQL)
 	dimCustomersSQL = strings.ReplaceAll(dimCustomersSQL, `{{ ref "raw_sales" }}`, "raw_sales")
 	dimCustomersSQL = strings.TrimSpace(dimCustomersSQL)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_customers AS "+dimCustomersSQL)
@@ -1704,14 +1665,7 @@ func TestFctSalesModelExecution(t *testing.T) {
 		t.Fatalf("Failed to read dim_products.sql: %v", err)
 	}
 	dimProductsSQL := string(dimProductsContent)
-	lines = strings.Split(dimProductsSQL, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	dimProductsSQL = strings.Join(filteredLines, "\n")
+	dimProductsSQL = removeConfigDirectives(dimProductsSQL)
 	dimProductsSQL = strings.ReplaceAll(dimProductsSQL, `{{ ref "raw_sales" }}`, "raw_sales")
 	dimProductsSQL = strings.TrimSpace(dimProductsSQL)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_products AS "+dimProductsSQL)
@@ -1726,14 +1680,7 @@ func TestFctSalesModelExecution(t *testing.T) {
 		t.Fatalf("Failed to read dim_dates.sql: %v", err)
 	}
 	dimDatesSQL := string(dimDatesContent)
-	lines = strings.Split(dimDatesSQL, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	dimDatesSQL = strings.Join(filteredLines, "\n")
+	dimDatesSQL = removeConfigDirectives(dimDatesSQL)
 	dimDatesSQL = strings.ReplaceAll(dimDatesSQL, `{{ ref "raw_sales" }}`, "raw_sales")
 	dimDatesSQL = strings.TrimSpace(dimDatesSQL)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_dates AS "+dimDatesSQL)
@@ -1749,14 +1696,7 @@ func TestFctSalesModelExecution(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -1803,6 +1743,7 @@ func TestFctSalesColumns(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -1830,14 +1771,7 @@ func TestFctSalesColumns(t *testing.T) {
 	}
 
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -1921,6 +1855,7 @@ func TestFctSalesRowCount(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -1946,14 +1881,7 @@ func TestFctSalesRowCount(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -1998,6 +1926,7 @@ func TestFctSalesPointInTimeJoin(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2023,14 +1952,7 @@ func TestFctSalesPointInTimeJoin(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2088,6 +2010,7 @@ func TestFctSalesDataIntegrity(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2113,14 +2036,7 @@ func TestFctSalesDataIntegrity(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(content)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2215,8 +2131,8 @@ func TestRollupDailySalesModelContent(t *testing.T) {
 	contentStr := string(content)
 
 	// Test: Has config directive with materialized='table'
-	if !strings.Contains(contentStr, "{{ config(materialized='table') }}") {
-		t.Error("rollup_daily_sales.sql missing {{ config(materialized='table') }} directive")
+	if !strings.Contains(contentStr, "{{ config \"materialized\" \"table\" }}") {
+		t.Error("rollup_daily_sales.sql missing {{ config \"materialized\" \"table\" }} directive")
 	}
 
 	// Test: References fct_sales via {{ ref }}
@@ -2278,6 +2194,7 @@ func TestRollupDailySalesModelExecution(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2303,14 +2220,7 @@ func TestRollupDailySalesModelExecution(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2329,14 +2239,7 @@ func TestRollupDailySalesModelExecution(t *testing.T) {
 	}
 
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2381,6 +2284,7 @@ func TestRollupDailySalesColumns(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2431,14 +2335,7 @@ func TestRollupDailySalesColumns(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2512,6 +2409,7 @@ func TestRollupDailySalesGrain(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2562,14 +2460,7 @@ func TestRollupDailySalesGrain(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2620,6 +2511,7 @@ func TestRollupDailySalesRowCountReduction(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2677,14 +2569,7 @@ func TestRollupDailySalesRowCountReduction(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2746,6 +2631,7 @@ func TestRollupDailySalesAggregationAccuracy(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2806,14 +2692,7 @@ func TestRollupDailySalesAggregationAccuracy(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2873,6 +2752,7 @@ func TestRollupDailySalesDataIntegrity(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -2923,14 +2803,7 @@ func TestRollupDailySalesDataIntegrity(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2985,6 +2858,7 @@ func TestRollupDailySalesProductCategories(t *testing.T) {
 				t.Fatalf("Failed to read %s: %v", dim.path, err)
 			}
 			sqlContent := string(content)
+			sqlContent = removeConfigDirectives(sqlContent)
 			lines := strings.Split(sqlContent, "\n")
 			var filteredLines []string
 			for _, line := range lines {
@@ -3035,14 +2909,7 @@ func TestRollupDailySalesProductCategories(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(content)
-	lines = strings.Split(sqlContent, "\n")
-	filteredLines = []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -3110,7 +2977,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read raw_sales.sql: %v", err)
 	}
 	sqlContent := string(rawSalesContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE raw_sales AS "+sqlContent)
 	if err != nil {
@@ -3138,7 +3005,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read dim_products.sql: %v", err)
 	}
 	sqlContent = string(dimProductsContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_products AS "+sqlContent)
@@ -3163,7 +3030,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read dim_dates.sql: %v", err)
 	}
 	sqlContent = string(dimDatesContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_dates AS "+sqlContent)
@@ -3278,7 +3145,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent = string(fctSalesContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -3325,7 +3192,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read rollup_daily_sales.sql: %v", err)
 	}
 	sqlContent = string(rollupContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config(materialized='table') }}", "")
+	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "fct_sales" }}`, "fct_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_dates" }}`, "dim_dates")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")

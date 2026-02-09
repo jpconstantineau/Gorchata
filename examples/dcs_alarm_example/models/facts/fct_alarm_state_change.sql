@@ -1,4 +1,4 @@
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 -- Secondary Fact Table: Alarm State Changes
 -- Grain: One row per state transition

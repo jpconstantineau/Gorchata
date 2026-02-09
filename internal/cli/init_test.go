@@ -593,7 +593,7 @@ func TestGenerateModels_ContentCorrect(t *testing.T) {
 			name:     "stg_users.sql",
 			filename: "stg_users.sql",
 			expectedStrings: []string{
-				"{{ config(materialized='view') }}",
+				`{{ config "materialized" "view" }}`,
 				"SELECT",
 				"FROM raw_users",
 				"WHERE deleted_at IS NULL",
@@ -603,7 +603,7 @@ func TestGenerateModels_ContentCorrect(t *testing.T) {
 			name:     "stg_orders.sql",
 			filename: "stg_orders.sql",
 			expectedStrings: []string{
-				"{{ config(materialized='view') }}",
+				`{{ config "materialized" "view" }}`,
 				"SELECT",
 				"FROM raw_orders",
 				"WHERE status = 'completed'",
@@ -613,7 +613,7 @@ func TestGenerateModels_ContentCorrect(t *testing.T) {
 			name:     "fct_order_summary.sql",
 			filename: "fct_order_summary.sql",
 			expectedStrings: []string{
-				"{{ config(materialized='table') }}",
+				`{{ config "materialized" "table" }}`,
 				"SELECT",
 				"FROM",
 				"LEFT JOIN",

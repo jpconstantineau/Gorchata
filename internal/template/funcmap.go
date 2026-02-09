@@ -15,7 +15,7 @@ func BuildFuncMap(ctx *Context, tracker DependencyTracker) template.FuncMap {
 	return template.FuncMap{
 		"ref":            makeRefFunc(ctx, tracker),
 		"var":            makeVarFunc(ctx),
-		"config":         makeConfigFunc(ctx),
+		"config":         makeConfigFunc(ctx), // For accessing config values; materialization directives parsed separately
 		"source":         makeSourceFunc(ctx),
 		"env_var":        makeEnvVarFunc(),
 		"is_incremental": makeIsIncrementalFunc(ctx),

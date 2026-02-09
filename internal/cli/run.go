@@ -316,9 +316,25 @@ func loadModelsFromDirectory(dir string) ([]*executor.Model, error) {
 func extractModelConfig(content string) materialization.MaterializationConfig {
 	config := materialization.DefaultConfig()
 
-	// Look for {{ config(materialized='view') }} pattern (new format)
-	configRe := regexp.MustCompile(`{{\s*config\s*\(\s*materialized\s*=\s*['"](\w+)['"]\s*\)\s*}}`)
-	matches := configRe.FindStringSubmatch(content)
+	// Look for {{ config "materialized" "view" }} pattern (Go template syntax)
+	goTemplateRe := regexp.MustCompile(`{{\s*config\s+"materialized"\s+"(\w+)"\s*}}`)
+	matches := goTemplateRe.FindStringSubmatch(content)
+
+	if len(matches) > 1 {
+		switch matches[1] {
+		case "view":
+			config.Type = materialization.MaterializationView
+		case "table":
+			config.Type = materialization.MaterializationTable
+		case "incremental":
+			config.Type = materialization.MaterializationIncremental
+		}
+		return config
+	}
+
+	// Fall back to {{ config(materialized='view') }} pattern (legacy Jinja-style syntax)
+	legacyRe := regexp.MustCompile(`{{\s*config\s*\(\s*materialized\s*=\s*['"](\w+)['"]\s*\)\s*}}`)
+	matches = legacyRe.FindStringSubmatch(content)
 
 	if len(matches) > 1 {
 		switch matches[1] {
@@ -350,10 +366,15 @@ func extractModelConfig(content string) materialization.MaterializationConfig {
 	return config
 }
 
-// removeConfigCalls removes {{ config(...) }} from content
+// removeConfigCalls removes {{ config ... }} from content (both Go template and legacy syntax)
 func removeConfigCalls(content string) string {
-	configRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
-	return configRe.ReplaceAllString(content, "")
+	// Remove Go template syntax: {{ config "key" "value" }}
+	goTemplateRe := regexp.MustCompile(`{{\s*config\s+"[^"]+"\s+"[^"]+"\s*}}`)
+	content = goTemplateRe.ReplaceAllString(content, "")
+
+	// Remove legacy Jinja-style syntax: {{ config(key='value') }}
+	legacyRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
+	return legacyRe.ReplaceAllString(content, "")
 }
 
 // simpleDependencyTracker tracks template dependencies
