@@ -382,3 +382,208 @@ func countLines(s string) int {
 	}
 	return count
 }
+
+// ==================== Phase 3: Dimension Table Tests ====================
+
+// TestDimensionSQLFilesExist verifies all required dimension SQL files exist
+func TestDimensionSQLFilesExist(t *testing.T) {
+	requiredFiles := []string{
+		"models/dimensions/dim_resource.sql",
+		"models/dimensions/dim_work_order.sql",
+		"models/dimensions/dim_part.sql",
+		"models/dimensions/dim_date.sql",
+	}
+
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("Required dimension file %s does not exist", filePath)
+		}
+	}
+}
+
+// TestDimensionSQLStructure verifies dimension SQL files have correct Gorchata template syntax
+func TestDimensionSQLStructure(t *testing.T) {
+	testCases := []struct {
+		name        string
+		filePath    string
+		mustContain []string
+		description string
+	}{
+		{
+			name:     "dim_resource",
+			filePath: "models/dimensions/dim_resource.sql",
+			mustContain: []string{
+				"{{ config",
+				"resource_key",
+				"resource_id",
+				"resource_name",
+				"{{ seed \"raw_resources\" }}",
+			},
+			description: "Resource dimension must have surrogate key and reference raw_resources seed",
+		},
+		{
+			name:     "dim_work_order",
+			filePath: "models/dimensions/dim_work_order.sql",
+			mustContain: []string{
+				"{{ config",
+				"work_order_key",
+				"work_order_id",
+				"{{ seed \"raw_work_orders\" }}",
+			},
+			description: "Work order dimension must have surrogate key and reference raw_work_orders seed",
+		},
+		{
+			name:     "dim_part",
+			filePath: "models/dimensions/dim_part.sql",
+			mustContain: []string{
+				"{{ config",
+				"part_key",
+				"part_number",
+			},
+			description: "Part dimension must have surrogate key and natural key",
+		},
+		{
+			name:     "dim_date",
+			filePath: "models/dimensions/dim_date.sql",
+			mustContain: []string{
+				"{{ config",
+				"date_key",
+				"full_date",
+				"year",
+				"month",
+			},
+			description: "Date dimension must have date_key and temporal attributes",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join(tc.filePath))
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", tc.filePath, err)
+			}
+
+			contentStr := string(content)
+			for _, mustHave := range tc.mustContain {
+				if !containsSubstring(contentStr, mustHave) {
+					t.Errorf("%s: missing required element %q\nDescription: %s", tc.filePath, mustHave, tc.description)
+				}
+			}
+		})
+	}
+}
+
+// TestDimensionDataQuality verifies dimensions meet data quality requirements
+// Note: These tests assume Gorchata can build the dimensions. For now, we validate SQL structure.
+// Full data quality tests will be added once Gorchata build pipeline is integrated.
+func TestDimensionDataQuality(t *testing.T) {
+	t.Run("ResourceDimension", func(t *testing.T) {
+		// Verify SQL contains surrogate key uniqueness logic
+		content, err := os.ReadFile(filepath.Join("models/dimensions/dim_resource.sql"))
+		if err != nil {
+			t.Fatalf("Failed to read dim_resource.sql: %v", err)
+		}
+
+		contentStr := string(content)
+
+		// Verify ROW_NUMBER() is used for unique key generation
+		if !containsSubstring(contentStr, "ROW_NUMBER()") {
+			t.Error("dim_resource.sql should use ROW_NUMBER() for unique surrogate key generation")
+		}
+
+		// Verify calculated fields are present
+		if !containsSubstring(contentStr, "daily_capacity") {
+			t.Error("dim_resource.sql missing calculated field: daily_capacity")
+		}
+
+		if !containsSubstring(contentStr, "is_bottleneck_candidate") {
+			t.Error("dim_resource.sql missing calculated field: is_bottleneck_candidate")
+		}
+
+		// Verify SCD Type 2 metadata fields
+		if !containsSubstring(contentStr, "is_current") {
+			t.Error("dim_resource.sql missing SCD Type 2 field: is_current")
+		}
+	})
+
+	t.Run("WorkOrderDimension", func(t *testing.T) {
+		content, err := os.ReadFile(filepath.Join("models/dimensions/dim_work_order.sql"))
+		if err != nil {
+			t.Fatalf("Failed to read dim_work_order.sql: %v", err)
+		}
+
+		contentStr := string(content)
+
+		// Verify calculated date fields
+		requiredFields := []string{"release_date", "due_date", "lead_time_days"}
+		for _, field := range requiredFields {
+			if !containsSubstring(contentStr, field) {
+				t.Errorf("dim_work_order.sql missing calculated field: %s", field)
+			}
+		}
+
+		// Verify JULIANDAY is used for date calculations
+		if !containsSubstring(contentStr, "JULIANDAY") {
+			t.Error("dim_work_order.sql should use JULIANDAY for lead time calculations")
+		}
+	})
+
+	t.Run("PartDimension", func(t *testing.T) {
+		content, err := os.ReadFile(filepath.Join("models/dimensions/dim_part.sql"))
+		if err != nil {
+			t.Fatalf("Failed to read dim_part.sql: %v", err)
+		}
+
+		contentStr := string(content)
+
+		// Verify DISTINCT is used to extract unique parts
+		if !containsSubstring(contentStr, "DISTINCT") {
+			t.Error("dim_part.sql should use DISTINCT to extract unique part numbers")
+		}
+
+		// Verify classification fields
+		requiredFields := []string{"part_family", "routing_complexity"}
+		for _, field := range requiredFields {
+			if !containsSubstring(contentStr, field) {
+				t.Errorf("dim_part.sql missing classification field: %s", field)
+			}
+		}
+	})
+
+	t.Run("DateDimension", func(t *testing.T) {
+		content, err := os.ReadFile(filepath.Join("models/dimensions/dim_date.sql"))
+		if err != nil {
+			t.Fatalf("Failed to read dim_date.sql: %v", err)
+		}
+
+		contentStr := string(content)
+
+		// Verify recursive CTE is used for date series generation
+		if !containsSubstring(contentStr, "RECURSIVE") {
+			t.Error("dim_date.sql should use recursive CTE for date series generation")
+		}
+
+		// Verify date range covers analysis period
+		if !containsSubstring(contentStr, "2024-01-01") {
+			t.Error("dim_date.sql should start from 2024-01-01")
+		}
+
+		// Verify temporal attributes
+		requiredFields := []string{
+			"year", "month", "month_name", "quarter",
+			"day_of_month", "day_of_week", "day_name",
+			"week_of_year", "is_weekend",
+		}
+		for _, field := range requiredFields {
+			if !containsSubstring(contentStr, field) {
+				t.Errorf("dim_date.sql missing temporal attribute: %s", field)
+			}
+		}
+
+		// Verify date_key is in YYYYMMDD format
+		if !containsSubstring(contentStr, "STRFTIME('%Y%m%d'") {
+			t.Error("dim_date.sql date_key should be in YYYYMMDD format")
+		}
+	})
+}
