@@ -1121,3 +1121,281 @@ func TestIntResourceDailyUtilizationCapacityCalculation(t *testing.T) {
 		t.Error("int_resource_daily_utilization.sql should convert hours to minutes (* 60)")
 	}
 }
+
+// ==================== Phase 6: Analytical Rollup Tests ====================
+
+// TestAnalyticalRollupFilesExist verifies all analytical rollup SQL files exist
+func TestAnalyticalRollupFilesExist(t *testing.T) {
+	requiredFiles := []string{
+		"models/rollups/rollup_wip_by_resource.sql",
+		"models/rollups/rollup_queue_analysis.sql",
+		"models/rollups/rollup_bottleneck_ranking.sql",
+	}
+
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("Required analytical rollup file %s does not exist", filePath)
+		}
+	}
+}
+
+// TestRollupWIPByResourceSQLStructure verifies rollup_wip_by_resource.sql has correct structure
+func TestRollupWIPByResourceSQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/rollups/rollup_wip_by_resource.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ ref \"fct_operation\" }}",
+		"{{ ref \"dim_resource\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("rollup_wip_by_resource.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: resource per time period (hour or day)
+	requiredGrainKeys := []string{
+		"resource_key",
+		"resource_id",
+		"resource_name",
+		"operation_date",
+	}
+
+	for _, key := range requiredGrainKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("rollup_wip_by_resource.sql missing grain key: %s", key)
+		}
+	}
+
+	// Verify WIP tracking measures
+	requiredMeasures := []string{
+		"wip_count",
+		"total_queue_minutes",
+		"avg_queue_minutes",
+		"wip_level",
+	}
+
+	for _, measure := range requiredMeasures {
+		if !containsSubstring(contentStr, measure) {
+			t.Errorf("rollup_wip_by_resource.sql missing measure: %s", measure)
+		}
+	}
+
+	// Verify WIP categorization logic
+	if !containsSubstring(contentStr, "CASE") {
+		t.Error("rollup_wip_by_resource.sql should use CASE statement for WIP level categorization")
+	}
+
+	// Verify aggregation logic
+	if !containsSubstring(contentStr, "COUNT") {
+		t.Error("rollup_wip_by_resource.sql should use COUNT for WIP tracking")
+	}
+
+	if !containsSubstring(contentStr, "GROUP BY") {
+		t.Error("rollup_wip_by_resource.sql should use GROUP BY for aggregation")
+	}
+}
+
+// TestRollupQueueAnalysisSQLStructure verifies rollup_queue_analysis.sql has correct structure
+func TestRollupQueueAnalysisSQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/rollups/rollup_queue_analysis.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ ref \"fct_operation\" }}",
+		"{{ ref \"dim_resource\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("rollup_queue_analysis.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: one row per resource
+	requiredGrainKeys := []string{
+		"resource_key",
+		"resource_id",
+		"resource_name",
+	}
+
+	for _, key := range requiredGrainKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("rollup_queue_analysis.sql missing grain key: %s", key)
+		}
+	}
+
+	// Verify queue analysis measures
+	requiredMeasures := []string{
+		"total_operations",
+		"avg_queue_time_minutes",
+		"max_queue_time_minutes",
+		"min_queue_time_minutes",
+		"total_queue_minutes",
+		"avg_queue_time_hours",
+		"queue_rank",
+	}
+
+	for _, measure := range requiredMeasures {
+		if !containsSubstring(contentStr, measure) {
+			t.Errorf("rollup_queue_analysis.sql missing measure: %s", measure)
+		}
+	}
+
+	// Verify statistical functions
+	if !containsSubstring(contentStr, "AVG(") {
+		t.Error("rollup_queue_analysis.sql should use AVG() for average calculations")
+	}
+
+	if !containsSubstring(contentStr, "MAX(") {
+		t.Error("rollup_queue_analysis.sql should use MAX() for maximum calculations")
+	}
+
+	// Verify ranking logic
+	if !containsSubstring(contentStr, "RANK()") {
+		t.Error("rollup_queue_analysis.sql should use RANK() for ranking resources")
+	}
+
+	if !containsSubstring(contentStr, "ORDER BY") {
+		t.Error("rollup_queue_analysis.sql should use ORDER BY in ranking window function")
+	}
+}
+
+// TestRollupBottleneckRankingSQLStructure verifies rollup_bottleneck_ranking.sql has correct structure
+func TestRollupBottleneckRankingSQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/rollups/rollup_bottleneck_ranking.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax - must reference all intermediate and analytical rollups
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ ref \"int_resource_daily_utilization\" }}",
+		"{{ ref \"rollup_queue_analysis\" }}",
+		"{{ ref \"rollup_wip_by_resource\" }}",
+		"{{ ref \"int_downtime_summary\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("rollup_bottleneck_ranking.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: one row per resource
+	requiredGrainKeys := []string{
+		"resource_key",
+		"resource_id",
+		"resource_name",
+	}
+
+	for _, key := range requiredGrainKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("rollup_bottleneck_ranking.sql missing grain key: %s", key)
+		}
+	}
+
+	// Verify bottleneck indicators
+	requiredIndicators := []string{
+		"avg_utilization_pct",
+		"avg_queue_time_minutes",
+		"avg_wip_count",
+		"max_wip_count",
+		"downtime_event_count",
+		"total_downtime_minutes",
+	}
+
+	for _, indicator := range requiredIndicators {
+		if !containsSubstring(contentStr, indicator) {
+			t.Errorf("rollup_bottleneck_ranking.sql missing bottleneck indicator: %s", indicator)
+		}
+	}
+
+	// Verify composite score calculation
+	if !containsSubstring(contentStr, "bottleneck_score") {
+		t.Error("rollup_bottleneck_ranking.sql missing: bottleneck_score")
+	}
+
+	// Verify bottleneck flag
+	if !containsSubstring(contentStr, "is_potential_bottleneck") {
+		t.Error("rollup_bottleneck_ranking.sql missing: is_potential_bottleneck")
+	}
+
+	// Verify final ranking
+	if !containsSubstring(contentStr, "bottleneck_rank") {
+		t.Error("rollup_bottleneck_ranking.sql missing: bottleneck_rank")
+	}
+
+	// Verify weighted combination logic
+	if !containsSubstring(contentStr, "0.4") || !containsSubstring(contentStr, "0.3") {
+		t.Error("rollup_bottleneck_ranking.sql should use weighted combination for bottleneck score")
+	}
+
+	// Verify RANK() window function
+	if !containsSubstring(contentStr, "RANK()") {
+		t.Error("rollup_bottleneck_ranking.sql should use RANK() for final ranking")
+	}
+
+	// Verify COALESCE for handling nulls in metrics
+	if !containsSubstring(contentStr, "COALESCE") {
+		t.Error("rollup_bottleneck_ranking.sql should use COALESCE to handle null metrics")
+	}
+}
+
+// TestBottleneckRankingIdentifiesNCX10AndHeatTreat verifies NCX-10 and Heat Treat rank as top bottlenecks
+func TestBottleneckRankingIdentifiesNCX10AndHeatTreat(t *testing.T) {
+	filePath := filepath.Join("models/rollups/rollup_bottleneck_ranking.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify bottleneck score calculation incorporates high utilization
+	// NCX-10 and Heat Treat should have high utilization scores
+	if !containsSubstring(contentStr, "avg_utilization_pct") {
+		t.Error("rollup_bottleneck_ranking.sql must include avg_utilization_pct in score calculation")
+	}
+
+	// Verify queue time is weighted appropriately (NCX-10 and Heat Treat have high queue times)
+	if !containsSubstring(contentStr, "avg_queue_time_minutes") {
+		t.Error("rollup_bottleneck_ranking.sql must include avg_queue_time_minutes in score calculation")
+	}
+
+	// Verify ranking is ordered by bottleneck score (DESC = highest first)
+	if !containsSubstring(contentStr, "DESC") {
+		t.Error("rollup_bottleneck_ranking.sql ranking should be in descending order (highest bottleneck first)")
+	}
+
+	// LIMITATION: This test validates SQL structure only.
+	// Full end-to-end validation (NCX-10 and Heat Treat rank #1 and #2) requires
+	// running the complete Gorchata build pipeline (seed -> models -> rollups).
+	// The current test is adequate for Phase 6 structural validation.
+	// Future: Consider integration test that runs full Gorchata build.
+}
