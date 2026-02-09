@@ -1,0 +1,590 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Unit Train Analytics
+  # ===================================================================
+  
+  - name: dim_train
+    description: "Train dimension tracking unit train formation, completion, and car composition"
+    columns:
+      - name: train_id
+        description: "Unique identifier for train"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: train_name
+        description: "Human-readable train name/identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: num_cars
+        description: "Total number of cars in train (typically 75)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 100
+      
+      - name: formed_at
+        description: "Timestamp when train was formed at origin"
+        data_tests:
+          - not_null
+      
+      - name: completed_at
+        description: "Timestamp when train completed its journey (arrived at destination)"
+  
+  - name: dim_car
+    description: "Rail car dimension for unit train fleet"
+    columns:
+      - name: car_id
+        description: "Unique identifier for rail car"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: car_type
+        description: "Type of rail car (hopper, gondola, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: capacity_tons
+        description: "Cargo capacity in tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200
+  
+  - name: dim_location
+    description: "Location dimension including origins (2), destinations (3), and intermediate stations"
+    columns:
+      - name: location_id
+        description: "Unique identifier for location"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: location_name
+        description: "Human-readable location name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: location_type
+        description: "Type of location (ORIGIN, DESTINATION, STATION)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['ORIGIN', 'DESTINATION', 'STATION']
+      
+      - name: avg_queue_hours
+        description: "Average queue/loading/unloading wait time in hours (12-18 for origins, 8-12 for destinations)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+  
+  - name: dim_corridor
+    description: "Corridor dimension combining origin, destination, intermediate stations, and transit time class. 6 corridors = 2 origins × 3 destinations"
+    columns:
+      - name: corridor_id
+        description: "Unique identifier for corridor"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: origin_location_id
+        description: "Foreign key to dim_location (ORIGIN type)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: destination_location_id
+        description: "Foreign key to dim_location (DESTINATION type)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: transit_time_class
+        description: "Transit time classification (2-day, 3-day, 4-day)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['2-day', '3-day', '4-day']
+      
+      - name: intermediate_stations
+        description: "Comma-separated list of station location_ids along route"
+      
+      - name: expected_transit_hours
+        description: "Expected transit time in hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 24
+              max_value: 120
+  
+  - name: dim_date
+    description: "Date dimension for temporal analysis with week granularity for seasonal effects"
+    columns:
+      - name: date_key
+        description: "Date key in YYYYMMDD format"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: full_date
+        description: "Full date"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Year (4-digit)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 2020
+              max_value: 2030
+      
+      - name: quarter
+        description: "Quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+      
+      - name: month
+        description: "Month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: week
+        description: "Week of year (1-53) - important for seasonal analysis (week 5 slowdown, week 8 straggler spike)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: day_of_week
+        description: "Day of week (1=Monday, 7=Sunday)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      
+      - name: is_weekend
+        description: "Weekend flag (0=weekday, 1=weekend)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+  
+  # ===================================================================
+  # FACT TABLES - Unit Train Analytics
+  # ===================================================================
+  
+  - name: fact_car_location_event
+    description: "Primary fact table capturing CLM (Car Location Message) events from CSV input. Grain: one row per car location event"
+    columns:
+      - name: event_id
+        description: "Unique identifier for event (primary key)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: event_timestamp
+        description: "Timestamp of event occurrence"
+        data_tests:
+          - not_null
+      
+      - name: car_id
+        description: "Foreign key to dim_car"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_car
+              field: car_id
+      
+      - name: train_id
+        description: "Foreign key to dim_train (may be null if car not on train)"
+        data_tests:
+          - relationships:
+              to: dim_train
+              field: train_id
+              where: "train_id IS NOT NULL"
+      
+      - name: location_id
+        description: "Foreign key to dim_location"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: event_type
+        description: "Type of CLM event"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: 
+                - 'train_formed'
+                - 'departed_origin'
+                - 'arrived_station'
+                - 'departed_station'
+                - 'arrived_destination'
+                - 'car_set_out'
+                - 'car_picked_up'
+                - 'train_completed'
+      
+      - name: date_key
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+  
+  - name: fact_train_trip
+    description: "Aggregated fact table for train trips. Grain: one row per train trip (origin to destination)"
+    columns:
+      - name: trip_id
+        description: "Unique identifier for trip (primary key)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: train_id
+        description: "Foreign key to dim_train"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_train
+              field: train_id
+      
+      - name: corridor_id
+        description: "Foreign key to dim_corridor"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_corridor
+              field: corridor_id
+      
+      - name: departure_date_key
+        description: "Foreign key to dim_date (departure date)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: origin_queue_hours
+        description: "Hours spent in queue at origin (loading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: destination_queue_hours
+        description: "Hours spent in queue at destination (unloading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: transit_hours
+        description: "Hours in transit between origin and destination"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 240
+      
+      - name: total_trip_hours
+        description: "Total trip time (origin_queue + transit + destination_queue)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 360
+      
+      - name: num_stragglers
+        description: "Number of cars that became stragglers during this trip"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+  
+  - name: fact_straggler
+    description: "Fact table tracking cars that were set out from trains and traveled independently. Grain: one row per straggler occurrence"
+    columns:
+      - name: straggler_id
+        description: "Unique identifier for straggler occurrence (primary key)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: car_id
+        description: "Foreign key to dim_car"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_car
+              field: car_id
+      
+      - name: train_id
+        description: "Foreign key to dim_train (original train)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_train
+              field: train_id
+      
+      - name: set_out_location_id
+        description: "Foreign key to dim_location where car was set out"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: set_out_timestamp
+        description: "Timestamp when car was set out from train"
+        data_tests:
+          - not_null
+      
+      - name: picked_up_timestamp
+        description: "Timestamp when car started independent travel (may be null if still waiting)"
+      
+      - name: delay_hours
+        description: "Hours between set out and pickup (6 hours to 3 days typical)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 168  # 7 days max
+      
+      - name: delay_category
+        description: "Category of delay (short: <12h, medium: 12-24h, long: 1-3 days, extended: >3 days)"
+        data_tests:
+          - accepted_values:
+              values: ['short', 'medium', 'long', 'extended']
+      
+      - name: set_out_date_key
+        description: "Foreign key to dim_date (set out date)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+  
+  - name: fact_inferred_power_transfer
+    description: "Fact table tracking inferred locomotive power changes. Uses time gap heuristic: <1 hour = same locomotives, >1 hour = different locomotives. Grain: one row per potential power transfer"
+    columns:
+      - name: transfer_id
+        description: "Unique identifier for power transfer inference (primary key)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: train_id
+        description: "Foreign key to dim_train"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_train
+              field: train_id
+      
+      - name: location_id
+        description: "Foreign key to dim_location where transfer occurred"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: transfer_timestamp
+        description: "Timestamp marking the power transfer event (arrival time)"
+        data_tests:
+          - not_null
+      
+      - name: arrival_timestamp
+        description: "Timestamp of arrival at location"
+        data_tests:
+          - not_null
+      
+      - name: departure_timestamp
+        description: "Timestamp of departure from location"
+        data_tests:
+          - not_null
+      
+      - name: gap_hours
+        description: "Hours between arrival and departure"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: inferred_same_power
+        description: "Inferred flag: 1 if same locomotives (gap < 1 hour), 0 if different (gap > 1 hour)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: transfer_date_key
+        description: "Foreign key to dim_date (transfer date)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+    
+    # Table-level test: verify power inference logic is consistent
+    data_tests:
+      - at_least_one
+  
+  # ===================================================================
+  # AGGREGATED METRICS TABLES - For Performance
+  # ===================================================================
+  
+  - name: agg_corridor_weekly_metrics
+    description: "Weekly aggregated metrics by corridor for performance analysis. Supports seasonal analysis (week 5 slowdown, week 8 straggler spike)"
+    columns:
+      - name: corridor_id
+        description: "Foreign key to dim_corridor"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_corridor
+              field: corridor_id
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: total_trips
+        description: "Total number of trips"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: avg_transit_hours
+        description: "Average transit time in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 240
+      
+      - name: avg_origin_queue_hours
+        description: "Average origin queue time in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: avg_destination_queue_hours
+        description: "Average destination queue time in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: total_stragglers
+        description: "Total number of straggler occurrences"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: avg_straggler_delay_hours
+        description: "Average straggler delay in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 168
+    
+    # Composite key test
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['corridor_id', 'year', 'week']
+  
+  - name: agg_fleet_utilization_daily
+    description: "Daily fleet utilization metrics across all 250 cars"
+    columns:
+      - name: date_key
+        description: "Foreign key to dim_date (primary key)"
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: total_cars
+        description: "Total cars in fleet (should be 250)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [250]
+      
+      - name: cars_on_trains
+        description: "Number of cars actively on trains (3 trains × 75 cars = 225 typical)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 250
+      
+      - name: cars_as_stragglers
+        description: "Number of cars traveling as stragglers"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: cars_idle
+        description: "Number of idle cars (not on trains or as stragglers)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 250
+      
+      - name: utilization_pct
+        description: "Percentage of fleet actively utilized (on trains or as stragglers)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100

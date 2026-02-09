@@ -1,0 +1,10 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: "target/unit_train_analytics.db"
+    
+    prod:
+      type: sqlite
+      database: "production/unit_train_analytics.db"
