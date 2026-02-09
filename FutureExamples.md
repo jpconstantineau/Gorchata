@@ -9,11 +9,12 @@
 
 ### In Progress 🚧
 
+- [] Unit Train Analytics Data Warehouse
+
 ### Future Examples 🔮
 
 - [] Machine Event Data to OEE
 - [] Haul Truck Data Transformation and Analysis
-- [] Unit Train Analytics Data Warehouse
 - [] Oil Refinery Data Transformation and Warehousing
 
 ## Example Design Prompts
