@@ -50,38 +50,40 @@ Build a comprehensive data warehouse example modeling the UniCo plant from "The 
         - Higher downtime frequency at NCX-10 (bottleneck characteristic)
      7. Run tests to verify seed data structure and basic validity
 
-3. **Phase 3: Dimension Tables**
+3. **Phase 3: Dimension Tables** ✅ **COMPLETE**
    - **Objective:** Build dimension tables providing business context for resources, work orders, parts, and time hierarchies.
    - **Files/Functions to Modify/Create:**
-     - `examples/bottleneck_analysis/models/dimensions/dim_resource.sql`
-     - `examples/bottleneck_analysis/models/dimensions/dim_work_order.sql`
-     - `examples/bottleneck_analysis/models/dimensions/dim_part.sql`
-     - `examples/bottleneck_analysis/models/dimensions/dim_date.sql`
+     - `examples/bottleneck_analysis/models/dimensions/dim_resource.sql` ✅
+     - `examples/bottleneck_analysis/models/dimensions/dim_work_order.sql` ✅
+     - `examples/bottleneck_analysis/models/dimensions/dim_part.sql` ✅
+     - `examples/bottleneck_analysis/models/dimensions/dim_date.sql` ✅
    - **Tests to Write:**
-     - `test_dim_resource_uniqueness` (verify resource_key uniqueness)
-     - `test_dim_work_order_integrity` (verify work order attributes)
+     - `test_dim_resource_uniqueness` (verify resource_key uniqueness) ✅
+     - `test_dim_work_order_integrity` (verify work order attributes) ✅
    - **Steps:**
-     1. Write tests expecting dimension tables to exist with surrogate keys
-     2. Create `dim_resource.sql`:
-        - Surrogate key: resource_key (auto-increment)
+     1. Write tests expecting dimension tables to exist with surrogate keys ✅
+     2. Create `dim_resource.sql`: ✅
+        - Surrogate key: resource_key (ROW_NUMBER())
         - Natural key: resource_id
         - Attributes: resource_name, resource_type, capacity metrics, is_current flag
+        - Calculated fields: daily_capacity, is_bottleneck_candidate
         - Source from: `{{ seed "raw_resources" }}`
-     3. Create `dim_work_order.sql`:
+     3. Create `dim_work_order.sql`: ✅
         - Surrogate key: work_order_key
         - Natural key: work_order_id
         - Attributes: part_number, quantity, priority, release_date, due_date
+        - Calculated fields: lead_time_days, priority_rank
         - Source from: `{{ seed "raw_work_orders" }}`
-     4. Create `dim_part.sql`:
+     4. Create `dim_part.sql`: ✅
         - Surrogate key: part_key
         - Natural key: part_number
         - Attributes: part_description, part_family, routing_complexity
         - Derived from distinct parts in work orders
-     5. Create `dim_date.sql`:
-        - Date dimension with calendar hierarchy
-        - Attributes: date_key, full_date, day_of_week, week_number, month, quarter, year, is_weekend, is_holiday
-        - Generate dates covering the analysis period
-     6. Run tests to verify dimension table integrity
+     5. Create `dim_date.sql`: ✅
+        - Date dimension with calendar hierarchy using recursive CTE
+        - Attributes: date_key (YYYYMMDD), full_date, day_of_week, week_number, month, quarter, year, is_weekend, is_holiday
+        - Generate dates covering the analysis period (2024-01-01 to 2024-01-31)
+     6. Run tests to verify dimension table integrity ✅
 
 4. **Phase 4: Fact Table - Operation Events**
    - **Objective:** Create the core fact table capturing granular operation events with calculated metrics like queue time and cycle time.
