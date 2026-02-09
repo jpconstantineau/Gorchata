@@ -80,6 +80,12 @@ func RunCommand(args []string) error {
 		fmt.Printf("Found %d model(s)\n", len(allModels))
 	}
 
+	// Load seeds for template context
+	seedsMap, err := LoadSeedsForTemplateContext(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to load seeds: %w", err)
+	}
+
 	// Parse templates and extract config/dependencies
 	templateEngine := template.New()
 	tracker := newSimpleDependencyTracker()
@@ -117,7 +123,11 @@ func RunCommand(args []string) error {
 		}
 
 		// Render template
-		ctx := template.NewContext(template.WithCurrentModel(model.ID))
+		ctx := template.NewContext(
+			template.WithCurrentModel(model.ID),
+		)
+		ctx.Seeds = seedsMap
+
 		rendered, err := template.Render(tmpl, ctx, nil)
 		if err != nil {
 			return fmt.Errorf("failed to render template %s: %w", model.ID, err)

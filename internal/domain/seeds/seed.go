@@ -23,9 +23,10 @@ type SeedSchema struct {
 
 // Seed represents a data seed with its metadata and configuration
 type Seed struct {
-	ID     string                 // Unique identifier for the seed
-	Path   string                 // File path to the seed data
-	Type   SeedType               // Type of seed (CSV, SQL, etc.)
-	Schema *SeedSchema            // Optional schema definition
-	Config map[string]interface{} // Optional configuration for future use
+	ID                string                 // Unique identifier for the seed
+	Path              string                 // File path to the seed data
+	Type              SeedType               // Type of seed (CSV, SQL, etc.)
+	Schema            *SeedSchema            // Optional schema definition
+	Config            map[string]interface{} // Optional configuration for future use
+	ResolvedTableName string                 // Fully qualified table name (e.g., "schema.table_name")
 }

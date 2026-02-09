@@ -2,8 +2,9 @@ package schema
 
 // SchemaFile represents a DBT-compatible schema.yml file
 type SchemaFile struct {
-	Version int           `yaml:"version"`
-	Models  []ModelSchema `yaml:"models"`
+	Version        int           `yaml:"version"`
+	SeedConfigPath string        `yaml:"seed_config_path,omitempty"`
+	Models         []ModelSchema `yaml:"models"`
 }
 
 // ModelSchema represents a model configuration in a schema file
