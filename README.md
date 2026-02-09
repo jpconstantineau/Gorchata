@@ -19,6 +19,7 @@
 - 🗃️ **Multiple materializations** - Table, view, incremental
 - 📝 **Go text/template engine** - dbt-compatible functions: `{{ ref "..." }}`, `{{ source "..." "..." }}`, variables, conditionals
 - ✅ **Data quality testing** - 14 built-in tests + custom SQL tests
+- 🌱 **Seeds** - Load CSV/SQL data files with schema inference and overrides
 - 💾 **Pure Go SQLite** - No CGO dependencies, cross-platform
 - ⚙️ **Profile management** - Multiple environments (dev, prod)
 
@@ -63,7 +64,7 @@ my_project/
 │   ├── stg_users.sql      # Sample staging model
 │   ├── stg_orders.sql     # Sample staging model
 │   └── fct_order_summary.sql  # Sample fact table
-├── seeds/                  # CSV data files (planned feature)
+├── seeds/                  # CSV/SQL seed data files
 ├── tests/                  # Data quality tests
 └── macros/                 # Reusable SQL macros (planned feature)
 ```
@@ -241,7 +242,8 @@ Creates:
 - `profiles.yml` - Connection profiles with SQLite defaults
 - `models/` - Directory for SQL models (with samples unless --empty)
 - `tests/` - Directory for data quality tests (see "Testing Your Data" section)
-- `seeds/`, `macros/` - Empty directories for planned features
+- `seeds/` - Directory for CSV/SQL seed data files (see "Seeds" section)
+- `macros/` - Empty directory for planned macros feature
 
 **Flags:**
 - `--empty` - Skip creating sample models
@@ -510,6 +512,117 @@ Example JSON output:
   ]
 }
 ```
+
+## Seeds: Loading Static Data
+
+Seeds allow you to version-control and load CSV data files into your database. Perfect for reference data, lookup tables, and test fixtures.
+
+### Quick Start
+
+1. **Create a CSV file** in your `seeds/` directory:
+
+```csv
+# seeds/countries.csv
+iso_code,name,region
+US,United States,Americas
+CA,Canada,Americas
+UK,United Kingdom,Europe
+```
+
+2. **Load seeds** into your database:
+
+```bash
+gorchata seed                    # Load all seeds
+gorchata seed --show             # Show seed files without loading
+gorchata seed --select countries # Load specific seed(s)
+```
+
+3. **Reference seeds** in your models:
+
+```sql
+SELECT
+  o.order_id,
+  c.name AS country_name
+FROM {{ ref "orders" }} o
+JOIN {{ seed "countries" }} c ON o.country_code = c.iso_code
+```
+
+### Seed Configuration
+
+Configure seeds in `seeds/seed.yml`:
+
+```yaml
+version: 1
+
+naming:
+  strategy: filename  # Use filename as table name
+  prefix: ""          # Optional prefix (e.g., "seed_")
+
+import:
+  batch_size: 1000    # Rows per batch
+  scope: folder       # Discovery scope: file, folder, tree
+```
+
+### Schema Overrides
+
+Override inferred column types in your `models/schema.yml`:
+
+```yaml
+version: 2
+
+seeds:
+  - name: countries
+    config:
+      column_types:
+        iso_code: TEXT      # Force TEXT (prevents "01" becoming 1)
+        population: INTEGER
+        gdp: REAL
+```
+
+### SQL Seeds (Advanced)
+
+For complex setup, use SQL seed files with {{ var }} template support:
+
+```sql
+-- seeds/initialize.sql
+CREATE TABLE config AS
+SELECT
+  '{{ var "env" }}' AS environment,
+  '{{ var "region" }}' AS region;
+```
+
+Load with variables:
+
+```bash
+gorchata seed --vars '{"env":"prod","region":"us-west"}'
+```
+
+**Note**: SQL seeds support only `{{ var }}` - no `{{ ref }}`, `{{ source }}`, or `{{ seed }}`.
+
+### Seed Discovery
+
+Gorchata discovers seed files based on the `scope` setting:
+
+- **`file`**: Single specified file
+- **`folder`** (default): All CSV/SQL files in `seeds/` (non-recursive)
+- **`tree`**: All CSV/SQL files recursively
+
+### Seed Materialization
+
+Seeds are materialized as tables with full refresh on each run:
+
+1. Drop existing table (if exists)
+2. Infer schema from CSV headers and data
+3. Create table with inferred schema
+4. Load data in batches (configurable)
+
+### Best Practices
+
+- ✅ Keep seeds small (<1MB) - they're version-controlled
+- ✅ Use for reference data that changes infrequently
+- ✅ Commit seeds to version control
+- ✅ Use schema overrides for IDs with leading zeros
+- ❌ Don't use seeds for large datasets - use source tables instead
 
 ## Known Limitations
 
@@ -842,11 +955,11 @@ gorchata run
 - [x] Phase 6: Incremental materialization with `is_incremental` and `{{ this }}`
 - [x] Phase 7: `gorchata init` command with project scaffolding
 - [x] Phase 8: Data quality testing framework (14 generic tests + singular tests)
+- [x] Phase 9: Seeds system (CSV/SQL data loading with schema overrides)
 - [x] Complete working examples (Star Schema, DCS Alarm Analytics)
 
 ### In Progress 🚧
 
-- [ ] Phase 9: Seeds system (CSV/SQL data loading)
 - [ ] Phase 10: Macros system (reusable SQL snippets)
 - [ ] Phase 11: Documentation generation (`gorchata docs generate`)
 

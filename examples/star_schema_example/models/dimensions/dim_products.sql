@@ -5,5 +5,5 @@ SELECT DISTINCT
     product_name,
     product_category,
     product_price
-FROM {{ ref "raw_sales" }}
+FROM {{ seed "raw_sales" }}
 ORDER BY product_id

@@ -142,45 +142,76 @@ func loadSeedsFromPaths(seedPaths []string, seedConfig *config.SeedConfig) ([]*s
 
 		// Load each seed
 		for _, seedFile := range seedFiles {
-			// Parse CSV
-			rows, err := seeds.ParseCSV(seedFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse CSV %s: %w", seedFile, err)
+			// Detect file type
+			ext := strings.ToLower(filepath.Ext(seedFile))
+
+			if ext == ".csv" {
+				// Handle CSV seed
+				// Parse CSV
+				rows, err := seeds.ParseCSV(seedFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse CSV %s: %w", seedFile, err)
+				}
+
+				// Infer schema (use default sample size of 100, no overrides)
+				schema, err := seeds.InferSchema(rows, 100, nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to infer schema for %s: %w", seedFile, err)
+				}
+
+				// Resolve table name
+				tableName := seeds.ResolveTableName(seedFile, &seedConfig.Naming)
+
+				// Create seed info
+				// Note: rows[0] is headers (used by InferSchema), rows[1:] is data
+				dataRows := rows[1:]
+				info := &seedInfo{
+					Seed: &seeds.Seed{
+						ID:     tableName,
+						Path:   seedFile,
+						Type:   seeds.SeedTypeCSV,
+						Schema: schema,
+					},
+					Rows: dataRows,
+				}
+
+				allSeeds = append(allSeeds, info)
+
+			} else if ext == ".sql" {
+				// Handle SQL seed
+				// Read SQL content
+				sqlContent, err := os.ReadFile(seedFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read SQL file %s: %w", seedFile, err)
+				}
+
+				// Resolve table name (for identification purposes)
+				tableName := seeds.ResolveTableName(seedFile, &seedConfig.Naming)
+
+				// Create seed info (no schema needed for SQL seeds)
+				info := &seedInfo{
+					Seed: &seeds.Seed{
+						ID:     tableName,
+						Path:   seedFile,
+						Type:   seeds.SeedTypeSQL,
+						Schema: nil, // SQL seeds don't need schema
+					},
+					SQLContent: string(sqlContent),
+				}
+
+				allSeeds = append(allSeeds, info)
 			}
-
-			// Infer schema (use default sample size of 100)
-			schema, err := seeds.InferSchema(rows, 100)
-			if err != nil {
-				return nil, fmt.Errorf("failed to infer schema for %s: %w", seedFile, err)
-			}
-
-			// Resolve table name
-			tableName := seeds.ResolveTableName(seedFile, &seedConfig.Naming)
-
-			// Create seed info
-			// Note: rows[0] is headers (used by InferSchema), rows[1:] is data
-			dataRows := rows[1:]
-			info := &seedInfo{
-				Seed: &seeds.Seed{
-					ID:     tableName,
-					Path:   seedFile,
-					Type:   seeds.SeedTypeCSV,
-					Schema: schema,
-				},
-				Rows: dataRows,
-			}
-
-			allSeeds = append(allSeeds, info)
 		}
 	}
 
 	return allSeeds, nil
 }
 
-// seedInfo holds a seed and its parsed data rows
+// seedInfo holds a seed and its parsed data (rows for CSV, content for SQL)
 type seedInfo struct {
-	Seed *seeds.Seed
-	Rows [][]string
+	Seed       *seeds.Seed
+	Rows       [][]string // For CSV seeds
+	SQLContent string     // For SQL seeds
 }
 
 // filterSeeds filters seeds by name
@@ -212,27 +243,50 @@ func executeSeeds(ctx context.Context, adapter platform.DatabaseAdapter, seedsLi
 			fmt.Printf("Executing seed: %s (from %s)...\n", info.Seed.ID, filepath.Base(info.Seed.Path))
 		}
 
-		// Execute seed
-		result, err := seeds.ExecuteSeed(ctx, adapter, info.Seed, info.Rows, seedConfig)
-		if err != nil {
-			failureCount++
-			if verbose {
-				fmt.Printf("  ✗ Failed: %s\n", err)
-			}
-			return fmt.Errorf("seed %s failed: %w", info.Seed.ID, err)
-		}
+		var err error
 
-		if result.Status == seeds.StatusSuccess {
+		// Branch based on seed type
+		if info.Seed.Type == seeds.SeedTypeSQL {
+			// Execute SQL seed
+			// TODO: Support vars from config or flags
+			vars := make(map[string]interface{})
+			err = seeds.ExecuteSQLSeed(ctx, adapter, info.SQLContent, vars, nil)
+			if err != nil {
+				failureCount++
+				if verbose {
+					fmt.Printf("  ✗ Failed: %s\n", err)
+				}
+				return fmt.Errorf("SQL seed %s failed: %w", info.Seed.ID, err)
+			}
+
 			successCount++
 			if verbose {
-				fmt.Printf("  ✓ Success: loaded %d rows\n", result.RowsLoaded)
+				fmt.Printf("  ✓ Success: SQL seed executed\n")
 			}
+
 		} else {
-			failureCount++
-			if verbose {
-				fmt.Printf("  ✗ Failed: %s\n", result.Error)
+			// Execute CSV seed
+			result, err := seeds.ExecuteSeed(ctx, adapter, info.Seed, info.Rows, seedConfig)
+			if err != nil {
+				failureCount++
+				if verbose {
+					fmt.Printf("  ✗ Failed: %s\n", err)
+				}
+				return fmt.Errorf("seed %s failed: %w", info.Seed.ID, err)
 			}
-			return fmt.Errorf("seed %s failed: %s", info.Seed.ID, result.Error)
+
+			if result.Status == seeds.StatusSuccess {
+				successCount++
+				if verbose {
+					fmt.Printf("  ✓ Success: loaded %d rows\n", result.RowsLoaded)
+				}
+			} else {
+				failureCount++
+				if verbose {
+					fmt.Printf("  ✗ Failed: %s\n", result.Error)
+				}
+				return fmt.Errorf("seed %s failed: %s", info.Seed.ID, result.Error)
+			}
 		}
 	}
 

@@ -182,11 +182,24 @@ func TestDiscoverSeeds_FilterNonCSV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
-	if len(result) != 1 {
-		t.Fatalf("Expected 1 CSV file, got %d files", len(result))
+	// Should find CSV and SQL, but not TXT
+	if len(result) != 2 {
+		t.Fatalf("Expected 2 seed files (CSV + SQL), got %d files", len(result))
 	}
-	if result[0] != csvFile {
-		t.Errorf("Expected %s, got %s", csvFile, result[0])
+
+	// Check that result contains both seed files but not txt
+	found := make(map[string]bool)
+	for _, f := range result {
+		found[f] = true
+	}
+	if !found[csvFile] {
+		t.Errorf("Expected to find CSV file %s", csvFile)
+	}
+	if !found[sqlFile] {
+		t.Errorf("Expected to find SQL file %s", sqlFile)
+	}
+	if found[txtFile] {
+		t.Errorf("Should not find TXT file %s", txtFile)
 	}
 }
 
@@ -238,5 +251,123 @@ func TestDiscoverSeeds_InvalidScope(t *testing.T) {
 	}
 	if result != nil {
 		t.Errorf("Expected nil result for invalid scope, got %v", result)
+	}
+}
+
+// TestDiscoverSeeds_MixedTypes tests discovery of both CSV and SQL files
+func TestDiscoverSeeds_MixedTypes(t *testing.T) {
+	// Setup: Create temp directory with both CSV and SQL files
+	tmpDir := t.TempDir()
+
+	// Create CSV files
+	csv1 := filepath.Join(tmpDir, "customers.csv")
+	csv2 := filepath.Join(tmpDir, "orders.csv")
+	err := os.WriteFile(csv1, []byte("id,name\n1,Alice"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create CSV file: %v", err)
+	}
+	err = os.WriteFile(csv2, []byte("id,total\n1,100"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create CSV file: %v", err)
+	}
+
+	// Create SQL files
+	sql1 := filepath.Join(tmpDir, "init_data.sql")
+	sql2 := filepath.Join(tmpDir, "raw_events.sql")
+	err = os.WriteFile(sql1, []byte("CREATE TABLE test (id INTEGER);"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create SQL file: %v", err)
+	}
+	err = os.WriteFile(sql2, []byte("INSERT INTO events VALUES (1, 'test');"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create SQL file: %v", err)
+	}
+
+	// Create non-seed file (should be ignored)
+	txtFile := filepath.Join(tmpDir, "readme.txt")
+	err = os.WriteFile(txtFile, []byte("This is a readme"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create text file: %v", err)
+	}
+
+	// Act
+	result, err := DiscoverSeeds(tmpDir, ScopeFolder)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	// Should find 2 CSV files + 2 SQL files = 4 total
+	if len(result) != 4 {
+		t.Fatalf("Expected 4 seed files (2 CSV + 2 SQL), got %d", len(result))
+	}
+
+	// Check that result contains all seed files
+	found := make(map[string]bool)
+	for _, f := range result {
+		found[f] = true
+	}
+	if !found[csv1] {
+		t.Errorf("Expected to find %s", csv1)
+	}
+	if !found[csv2] {
+		t.Errorf("Expected to find %s", csv2)
+	}
+	if !found[sql1] {
+		t.Errorf("Expected to find %s", sql1)
+	}
+	if !found[sql2] {
+		t.Errorf("Expected to find %s", sql2)
+	}
+	if found[txtFile] {
+		t.Errorf("Should not find non-seed file %s", txtFile)
+	}
+}
+
+// TestDiscoverSeeds_SQLFile tests discovery of a single SQL file
+func TestDiscoverSeeds_SQLFile(t *testing.T) {
+	// Setup: Create temp directory with test SQL file
+	tmpDir := t.TempDir()
+	sqlFile := filepath.Join(tmpDir, "init.sql")
+	err := os.WriteFile(sqlFile, []byte("CREATE TABLE test (id INTEGER);"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Act
+	result, err := DiscoverSeeds(sqlFile, ScopeFile)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 file, got %d", len(result))
+	}
+	if result[0] != sqlFile {
+		t.Errorf("Expected %s, got %s", sqlFile, result[0])
+	}
+}
+
+// TestDiscoverSeeds_NonSeedFile tests rejection of non-seed files
+func TestDiscoverSeeds_NonSeedFile(t *testing.T) {
+	// Setup: Create temp directory with non-seed file
+	tmpDir := t.TempDir()
+	txtFile := filepath.Join(tmpDir, "readme.txt")
+	err := os.WriteFile(txtFile, []byte("This is not a seed file"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Act
+	result, err := DiscoverSeeds(txtFile, ScopeFile)
+
+	// Assert - should get an error
+	if err == nil {
+		t.Fatal("Expected error for non-seed file, got nil")
+	}
+	if result != nil {
+		t.Errorf("Expected nil result for non-seed file, got %v", result)
 	}
 }

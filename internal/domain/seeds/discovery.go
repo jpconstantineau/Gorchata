@@ -14,12 +14,18 @@ const (
 	ScopeTree   = "tree"   // All files recursively
 )
 
+// isSeedFile checks if a file is a valid seed file (CSV or SQL)
+func isSeedFile(path string) bool {
+	lowerPath := strings.ToLower(path)
+	return strings.HasSuffix(lowerPath, ".csv") || strings.HasSuffix(lowerPath, ".sql")
+}
+
 // DiscoverSeeds discovers seed files based on the specified path and scope.
 //
 // Scopes:
-//   - ScopeFile: Returns the single specified file if it exists and is a .csv
-//   - ScopeFolder: Returns all .csv files directly in the specified directory (non-recursive)
-//   - ScopeTree: Returns all .csv files in the directory tree (recursive)
+//   - ScopeFile: Returns the single specified file if it exists and is a .csv or .sql
+//   - ScopeFolder: Returns all .csv and .sql files directly in the specified directory (non-recursive)
+//   - ScopeTree: Returns all .csv and .sql files in the directory tree (recursive)
 //
 // Returns a list of absolute file paths to discovered seed files.
 func DiscoverSeeds(path string, scope string) ([]string, error) {
@@ -48,9 +54,9 @@ func discoverFile(path string) ([]string, error) {
 		return nil, fmt.Errorf("path is a directory, not a file: %s", path)
 	}
 
-	// Check if it's a CSV file
-	if !strings.HasSuffix(strings.ToLower(path), ".csv") {
-		return nil, fmt.Errorf("file is not a CSV: %s", path)
+	// Check if it's a seed file (CSV or SQL)
+	if !isSeedFile(path) {
+		return nil, fmt.Errorf("file is not a seed file (.csv or .sql): %s", path)
 	}
 
 	// Convert to absolute path
@@ -62,7 +68,7 @@ func discoverFile(path string) ([]string, error) {
 	return []string{absPath}, nil
 }
 
-// discoverFolder discovers all CSV files in a single directory (non-recursive)
+// discoverFolder discovers all seed files in a single directory (non-recursive)
 func discoverFolder(path string) ([]string, error) {
 	// Check if directory exists
 	info, err := os.Stat(path)
@@ -81,25 +87,25 @@ func discoverFolder(path string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	// Filter CSV files
-	var csvFiles []string
+	// Filter seed files (CSV and SQL)
+	var seedFiles []string
 	for _, entry := range entries {
 		// Skip directories
 		if entry.IsDir() {
 			continue
 		}
 
-		// Check if file is a CSV
-		if strings.HasSuffix(strings.ToLower(entry.Name()), ".csv") {
+		// Check if file is a seed file
+		if isSeedFile(entry.Name()) {
 			absPath := filepath.Join(path, entry.Name())
-			csvFiles = append(csvFiles, absPath)
+			seedFiles = append(seedFiles, absPath)
 		}
 	}
 
-	return csvFiles, nil
+	return seedFiles, nil
 }
 
-// discoverTree discovers all CSV files recursively in a directory tree
+// discoverTree discovers all seed files recursively in a directory tree
 func discoverTree(path string) ([]string, error) {
 	// Check if directory exists
 	info, err := os.Stat(path)
@@ -113,7 +119,7 @@ func discoverTree(path string) ([]string, error) {
 	}
 
 	// Walk the directory tree
-	var csvFiles []string
+	var seedFiles []string
 	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -124,9 +130,9 @@ func discoverTree(path string) ([]string, error) {
 			return nil
 		}
 
-		// Check if file is a CSV
-		if strings.HasSuffix(strings.ToLower(filePath), ".csv") {
-			csvFiles = append(csvFiles, filePath)
+		// Check if file is a seed file
+		if isSeedFile(filePath) {
+			seedFiles = append(seedFiles, filePath)
 		}
 
 		return nil
@@ -136,5 +142,5 @@ func discoverTree(path string) ([]string, error) {
 		return nil, fmt.Errorf("failed to walk directory tree: %w", err)
 	}
 
-	return csvFiles, nil
+	return seedFiles, nil
 }

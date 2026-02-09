@@ -18,7 +18,7 @@ WITH source_data AS (
     '9999-12-31' AS valid_to,
     1 AS is_current,
     ROW_NUMBER() OVER (ORDER BY tag_id) AS row_num
-  FROM {{ ref "raw_alarm_config" }}
+  FROM {{ seed "raw_alarm_config" }}
 )
 SELECT
   (row_num * 1000 + version_num) AS tag_key,

@@ -43,8 +43,8 @@ func LoadSeedsForTemplateContext(cfg *config.Config) (map[string]string, error) 
 				return nil, fmt.Errorf("failed to parse CSV %s: %w", seedFile, err)
 			}
 
-			// Infer schema (use default sample size of 100)
-			schema, err := seeds.InferSchema(rows, 100)
+			// Infer schema (use default sample size of 100, no overrides)
+			schema, err := seeds.InferSchema(rows, 100, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to infer schema for %s: %w", seedFile, err)
 			}
