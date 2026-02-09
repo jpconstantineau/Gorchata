@@ -1,0 +1,49 @@
+# seed.yml - Configuration for Gorchata seed data imports
+# This file controls how seed CSV files are loaded into the database
+
+version: 1
+
+# Naming configuration - controls how table names are resolved from seed files
+naming:
+  # Strategy determines how to resolve the table name:
+  #   - filename: use the CSV filename (without extension) as table name
+  #   - folder: use the parent folder name as table name
+  #   - static: use a fixed table name from static_name below
+  strategy: filename  # Options: filename, folder, static
+  
+  # Static table name (only used when strategy is "static")
+  static_name: ""
+  
+  # Optional prefix to prepend to resolved table names
+  # Example: prefix "seed_" with filename strategy on "customers.csv" → "seed_customers"
+  prefix: ""
+
+# Import configuration - controls how data is inserted
+import:
+  # Number of rows to insert in each batch
+  # Larger batch sizes are faster but use more memory
+  batch_size: 1000
+  
+  # Scope determines which seed files are processed:
+  #   - file: only the specific seed file
+  #   - folder: all seed files in the same folder
+  #   - tree: all seed files in the folder and subfolders (recursive)
+  scope: tree  # Options: file, folder, tree
+
+# Column type overrides - specify SQLite types for specific columns
+# If not specified, types are inferred from the CSV data
+column_types:
+  # Example overrides:
+  # customer_id: INTEGER
+  # name: TEXT
+  # email: TEXT
+  # created_at: TEXT
+  # balance: REAL
+  # is_active: INTEGER
+
+# Additional configuration options (for future use)
+config:
+  # Example options:
+  # quote_columns: true
+  # delimiter: ","
+  # encoding: "utf-8"
