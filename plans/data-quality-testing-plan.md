@@ -229,27 +229,18 @@ Implement a comprehensive data quality testing framework inspired by DBT's test 
      - [examples/dcs_alarm_example/README.md](examples/dcs_alarm_example/README.md) - Document test coverage
      - [examples/star_schema_example/README.md](examples/star_schema_example/README.md) - Document test coverage
    - **Tests to Write:**
-     - `TestDCSAlarmExample_AllTestsPass` - Verify all DCS alarm tes9+), here are planned future enhancements:
-
-### **Phase 9: Table-Level Monitors (Monte Carlo-Inspired)**
-- Freshness monitoring: Alert on stale data
-- Volume anomaly detection: Warn on unusual row count changes
-- Schema drift detection: Track schema evolution
-- Metadata-based (no expensive queries)
-
-### **Phase 10: Statistical Profiling & Baseline Generation**
-- Automatic metric collection: null%, cardinality, min/max, mean, stdev
-- Store baselines in test history tables
-- Detect distribution drift over time
-- Percentile-based alerting
-
-### **Phase 11: Anomaly Detection & ML-Based Testing**
-- Time-series anomaly detection on test metrics
-- Seasonal pattern recognition
-- Predictive thresholds (95th percentile from history)
-- Integration with test result storage for trend analysis
-
-### **Phase 12 comprehensive schema.yml for star schema example:
+     - `TestDCSAlarmExample_AllTestsPass` - Verify all DCS alarm tests execute successfully
+     - `TestStarSchemaExample_AllTestsPass` - Verify all star schema tests execute successfully
+     - `TestExamples_TestDiscovery` - Verify test files are discovered correctly
+   - **Steps:**
+     1. Write integration tests for example test execution
+     2. Run tests and confirm failures
+     3. Create schema.yml for DCS alarm example with 20+ generic tests
+     4. Create 3 singular test SQL files for alarm analytics (lifecycle, standing alarms, chattering)
+     5. Create custom generic test template for timestamp validation
+     6. Create schema.yml for star schema example with 25+ generic tests
+     7. Create singular test for fact table integrity
+     8. Create comprehensive schema.yml for star schema example:
         - Dimension uniqueness tests
         - Fact table FK integrity tests
         - Not null on key columns
@@ -266,30 +257,58 @@ Implement a comprehensive data quality testing framework inspired by DBT's test 
 
 ## Future Phases (Statistical Testing & Observability)
 
-Given the decision to defer statistical testing (Q7: Defer to Phase 8+), here are planned future enhancements:
+Given the decision to defer statistical testing (Q7: Defer to Phase 9+), here are planned future enhancements:
 
-### **Phase 8: Table-Level Monitors (Monte Carlo-Inspired)**
-- Freshness monitoring: Alert on stale data
-- Volume anomaly detection: Warn on unusual row count changes
-- Schema drift detection: Track schema evolution
-- Metadata-based (no expensive queries)
+### **Phase 9: Table-Level Monitors (Monte Carlo-Inspired)**
+   - **Objective:** Implement table-level monitoring for freshness, volume anomalies, and schema drift
+   - **Key Features:**
+     - Freshness monitoring: Alert on stale data based on timestamp columns
+     - Volume anomaly detection: Warn on unusual row count changes (configurable thresholds)
+     - Schema drift detection: Track schema evolution and breaking changes
+     - Metadata-based checks (no expensive full-table queries)
+   - **Implementation:**
+     - Monitor tables at metadata layer (row counts, last modified times)
+     - Store baselines and track deviations
+     - Alert on significant changes (>20% volume deviation, >24hr stale data)
 
-### **Phase 9: Statistical Profiling & Baseline Generation**
-- Automatic metric collection: null%, cardinality, min/max, mean, stdev
-- Store baselines in test history tables
-- Detect distribution drift over time
-- Percentile-based alerting
+### **Phase 10: Statistical Profiling & Baseline Generation**
+   - **Objective:** Automatic metric collection and baseline generation for distribution testing
+   - **Key Features:**
+     - Automatic metric collection: null%, cardinality, min/max, mean, stdev
+     - Store baselines in test history tables
+     - Detect distribution drift over time
+     - Percentile-based alerting (P50, P95, P99)
+   - **Implementation:**
+     - Profile tables on each test run
+     - Store metrics with timestamps
+     - Compare current metrics against historical baselines
+     - Alert when metrics deviate beyond thresholds
 
-### **Phase 10: Anomaly Detection & ML-Based Testing**
-- Time-series anomaly detection on test metrics
-- Seasonal pattern recognition
-- Predictive thresholds (95th percentile from history)
-- Integration with test result storage for trend analysis
+### **Phase 11: Anomaly Detection & ML-Based Testing**
+   - **Objective:** ML-based anomaly detection using historical test result patterns
+   - **Key Features:**
+     - Time-series anomaly detection on test metrics
+     - Seasonal pattern recognition (day-of-week, monthly cycles)
+     - Predictive thresholds (95th percentile from history)
+     - Integration with test result storage for trend analysis
+   - **Implementation:**
+     - Analyze test result history for patterns
+     - Use simple statistical methods (Z-score, IQR) initially
+     - Detect unexpected spikes/drops in failure rates
+     - Adapt thresholds based on historical variance
 
-### **Phase 11: Segmented Testing**
-- Test metrics by dimensions (area_code, priority_code, etc.)
-- Detect subgroup anomalies masked by aggregates
-- Relative distribution testing (segment % changes)
+### **Phase 12: Segmented Testing**
+   - **Objective:** Test metrics within dimensional segments to detect subgroup issues
+   - **Key Features:**
+     - Test metrics by dimensions (area_code, priority_code, equipment_type, etc.)
+     - Detect subgroup anomalies masked by aggregates
+     - Relative distribution testing (segment % changes)
+     - Dimensional drill-down on test failures
+   - **Implementation:**
+     - Extend tests to group by dimensional attributes
+     - Track per-segment metrics over time
+     - Alert when segment distribution shifts significantly
+     - Provide drill-down capabilities in test results
 
 ---
 
