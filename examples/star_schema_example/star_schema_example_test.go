@@ -69,6 +69,30 @@ func removeConfigDirectives(sql string) string {
 	return legacyRe.ReplaceAllString(sql, "")
 }
 
+// removeAllTemplateDirectives removes all template directives from SQL for raw execution
+func removeAllTemplateDirectives(sql string) string {
+	// First remove config directives
+	sql = removeConfigDirectives(sql)
+
+	// Remove {{ if ... }} directives (even in comments)
+	ifRe := regexp.MustCompile(`--\s*\{\{\s*if\s+[^}]+\}\}`)
+	sql = ifRe.ReplaceAllString(sql, "")
+
+	// Remove {{ end }} directives (even in comments)
+	endRe := regexp.MustCompile(`--\s*\{\{\s*end\s*\}\}`)
+	sql = endRe.ReplaceAllString(sql, "")
+
+	// Remove {{ this }} references (even in comments)
+	thisRe := regexp.MustCompile(`\{\{\s*this\s*\}\}`)
+	sql = thisRe.ReplaceAllString(sql, "this")
+
+	// Remove any remaining commented template directives
+	commentTemplateRe := regexp.MustCompile(`--[^\n]*\{\{[^}]*\}\}`)
+	sql = commentTemplateRe.ReplaceAllString(sql, "")
+
+	return sql
+}
+
 // TestStarSchemaProjectConfig tests that the star_schema_example project config can be loaded
 func TestStarSchemaProjectConfig(t *testing.T) {
 	projectPath := filepath.Join("gorchata_project.yml")
@@ -2285,14 +2309,6 @@ func TestRollupDailySalesColumns(t *testing.T) {
 			}
 			sqlContent := string(content)
 			sqlContent = removeConfigDirectives(sqlContent)
-			lines := strings.Split(sqlContent, "\n")
-			var filteredLines []string
-			for _, line := range lines {
-				if !strings.Contains(line, "{{ config(") {
-					filteredLines = append(filteredLines, line)
-				}
-			}
-			sqlContent = strings.Join(filteredLines, "\n")
 			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 			sqlContent = strings.TrimSpace(sqlContent)
 			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
@@ -2310,14 +2326,7 @@ func TestRollupDailySalesColumns(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2435,14 +2444,7 @@ func TestRollupDailySalesGrain(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2537,14 +2539,7 @@ func TestRollupDailySalesRowCountReduction(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2657,14 +2652,7 @@ func TestRollupDailySalesAggregationAccuracy(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2729,7 +2717,7 @@ func TestRollupDailySalesAggregationAccuracy(t *testing.T) {
 	}
 }
 
-// TestRollupDailySalesDataIntegrity verifies no NULLs in required fields
+// TestRollupDailySales DataIntegrity verifies no NULLs in required fields
 func TestRollupDailySalesDataIntegrity(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -2753,14 +2741,6 @@ func TestRollupDailySalesDataIntegrity(t *testing.T) {
 			}
 			sqlContent := string(content)
 			sqlContent = removeConfigDirectives(sqlContent)
-			lines := strings.Split(sqlContent, "\n")
-			var filteredLines []string
-			for _, line := range lines {
-				if !strings.Contains(line, "{{ config(") {
-					filteredLines = append(filteredLines, line)
-				}
-			}
-			sqlContent = strings.Join(filteredLines, "\n")
 			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 			sqlContent = strings.TrimSpace(sqlContent)
 			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
@@ -2778,14 +2758,7 @@ func TestRollupDailySalesDataIntegrity(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -2859,14 +2832,6 @@ func TestRollupDailySalesProductCategories(t *testing.T) {
 			}
 			sqlContent := string(content)
 			sqlContent = removeConfigDirectives(sqlContent)
-			lines := strings.Split(sqlContent, "\n")
-			var filteredLines []string
-			for _, line := range lines {
-				if !strings.Contains(line, "{{ config(") {
-					filteredLines = append(filteredLines, line)
-				}
-			}
-			sqlContent = strings.Join(filteredLines, "\n")
 			sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 			sqlContent = strings.TrimSpace(sqlContent)
 			_, err = db.ExecContext(context.Background(), "CREATE TABLE "+dim.tableName+" AS "+sqlContent)
@@ -2884,14 +2849,7 @@ func TestRollupDailySalesProductCategories(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent := string(fctSalesContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
@@ -3005,7 +2963,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read dim_products.sql: %v", err)
 	}
 	sqlContent = string(dimProductsContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_products AS "+sqlContent)
@@ -3030,7 +2988,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read dim_dates.sql: %v", err)
 	}
 	sqlContent = string(dimDatesContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_dates AS "+sqlContent)
@@ -3055,14 +3013,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read dim_customers.sql: %v", err)
 	}
 	sqlContent = string(dimCustomersContent)
-	lines := strings.Split(sqlContent, "\n")
-	var filteredLines []string
-	for _, line := range lines {
-		if !strings.Contains(line, "{{ config(") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	sqlContent = strings.Join(filteredLines, "\n")
+	sqlContent = removeConfigDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.TrimSpace(sqlContent)
 	_, err = db.ExecContext(context.Background(), "CREATE TABLE dim_customers AS "+sqlContent)
@@ -3145,7 +3096,7 @@ func TestEndToEndIntegration(t *testing.T) {
 		t.Fatalf("Failed to read fct_sales.sql: %v", err)
 	}
 	sqlContent = string(fctSalesContent)
-	sqlContent = strings.ReplaceAll(sqlContent, "{{ config \"materialized\" \"table\" }}", "")
+	sqlContent = removeAllTemplateDirectives(sqlContent)
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "raw_sales" }}`, "raw_sales")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_customers" }}`, "dim_customers")
 	sqlContent = strings.ReplaceAll(sqlContent, `{{ ref "dim_products" }}`, "dim_products")
