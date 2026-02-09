@@ -36,6 +36,8 @@ func Run(args []string) error {
 		return InitCommand(commandArgs)
 	case "run":
 		return RunCommand(commandArgs)
+	case "seed":
+		return SeedCommand(commandArgs)
 	case "compile":
 		return CompileCommand(commandArgs)
 	case "test":
@@ -59,6 +61,7 @@ func printUsage() {
 	fmt.Println("Available Commands:")
 	fmt.Println("  init      Initialize a new Gorchata project")
 	fmt.Println("  run       Execute SQL transformations against the database")
+	fmt.Println("  seed      Load seed data into the database")
 	fmt.Println("  compile   Compile SQL templates without executing them")
 	fmt.Println("  test      Run data quality tests")
 	fmt.Println("  build     Run models and tests (full build workflow)")
