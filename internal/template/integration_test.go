@@ -66,10 +66,10 @@ LIMIT {{ var "limit" }}`
 		expectedSubstitutions := map[string]string{
 			"raw_data.customers": "source customers table",
 			"analytics.orders":   "ref orders table",
-			"2024-01-01":        "start_date variable",
-			"US":                "target_region config",
-			"5000":              "min_lifetime_value variable",
-			"100":               "limit variable",
+			"2024-01-01":         "start_date variable",
+			"US":                 "target_region config",
+			"5000":               "min_lifetime_value variable",
+			"100":                "limit variable",
 		}
 
 		for expected, description := range expectedSubstitutions {
@@ -223,13 +223,13 @@ func TestIntegrationErrorHandling(t *testing.T) {
 				expectError: "missing",
 			},
 			{
-				name:     "missing config",
-				template: `{{ config "missing" }}`,
-				ctx:      NewContext(),
+				name:        "missing config",
+				template:    `{{ config "missing" }}`,
+				ctx:         NewContext(),
 				expectError: "missing",
 			},
 			{
-				name: "missing source table",
+				name:     "missing source table",
 				template: `{{ source "raw" "missing_table" }}`,
 				ctx: NewContext(
 					WithSources(map[string]map[string]string{
@@ -359,6 +359,110 @@ WHERE co.order_count > 0
 					t.Errorf("expected dependency %s -> %s", from, to)
 				}
 			}
+		}
+	})
+}
+
+func TestIntegration_ModelReferencesSeed(t *testing.T) {
+	t.Run("model template uses seed() function", func(t *testing.T) {
+		// Create engine
+		engine := New()
+
+		// Define SQL template that references seeds
+		sqlTemplate := `-- Customer analysis using seed data
+SELECT 
+    c.customer_id,
+    c.name,
+    COUNT(*) as order_count
+FROM {{ seed "customers" }} c
+LEFT JOIN {{ ref "orders" }} o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.name`
+
+		// Parse the template
+		tmpl, err := engine.Parse("customer_analysis.sql", sqlTemplate)
+		if err != nil {
+			t.Fatalf("failed to parse template: %v", err)
+		}
+
+		// Create context with Seeds map
+		ctx := NewContext(
+			WithSchema("analytics"),
+			WithCurrentModel("customer_analysis"),
+		)
+		ctx.Seeds = map[string]string{
+			"customers": "customers",
+			"products":  "staging.products",
+		}
+
+		// Render the template
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("failed to render template: %v", err)
+		}
+
+		// Verify seed reference was replaced
+		if !strings.Contains(result, "customers c") {
+			t.Error("expected seed reference to be replaced with table name")
+		}
+
+		// Verify ref() still works
+		if !strings.Contains(result, "analytics.orders") {
+			t.Error("expected ref to be qualified with schema")
+		}
+
+		// Ensure template markers are gone
+		if strings.Contains(result, "{{") || strings.Contains(result, "}}") {
+			t.Error("template should be fully rendered")
+		}
+	})
+
+	t.Run("model uses seed with schema prefix", func(t *testing.T) {
+		engine := New()
+
+		sqlTemplate := `SELECT * FROM {{ seed "products" }}`
+
+		tmpl, err := engine.Parse("product_analysis.sql", sqlTemplate)
+		if err != nil {
+			t.Fatalf("failed to parse template: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.Seeds = map[string]string{
+			"products": "staging.products",
+		}
+
+		result, err := Render(tmpl, ctx, nil)
+		if err != nil {
+			t.Fatalf("failed to render template: %v", err)
+		}
+
+		if !strings.Contains(result, "staging.products") {
+			t.Errorf("expected 'staging.products', got: %s", result)
+		}
+	})
+
+	t.Run("seed() error for nonexistent seed", func(t *testing.T) {
+		engine := New()
+
+		sqlTemplate := `SELECT * FROM {{ seed "nonexistent" }}`
+
+		tmpl, err := engine.Parse("test.sql", sqlTemplate)
+		if err != nil {
+			t.Fatalf("failed to parse template: %v", err)
+		}
+
+		ctx := NewContext()
+		ctx.Seeds = map[string]string{
+			"customers": "customers",
+		}
+
+		_, err = Render(tmpl, ctx, nil)
+		if err == nil {
+			t.Fatal("expected error for nonexistent seed")
+		}
+
+		if !strings.Contains(err.Error(), "seed \"nonexistent\" not found") {
+			t.Errorf("expected error about nonexistent seed, got: %v", err)
 		}
 	})
 }

@@ -244,3 +244,23 @@ func executeSeeds(ctx context.Context, adapter platform.DatabaseAdapter, seedsLi
 
 	return nil
 }
+
+// buildSeedsMapForTemplate builds a Seeds map for template context from loaded seeds
+// Maps seedName -> qualified table name (with schema prefix if configured)
+func buildSeedsMapForTemplate(seedsList []*seedInfo, schema string) map[string]string {
+	seedsMap := make(map[string]string)
+	for _, info := range seedsList {
+		// Build qualified table name
+		tableName := info.Seed.ID
+		if schema != "" {
+			tableName = schema + "." + info.Seed.ID
+		}
+
+		// Store in ResolvedTableName for future use
+		info.Seed.ResolvedTableName = tableName
+
+		// Add to map
+		seedsMap[info.Seed.ID] = tableName
+	}
+	return seedsMap
+}

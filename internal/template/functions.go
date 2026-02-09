@@ -100,6 +100,23 @@ func makeSourceFunc(ctx *Context) func(string, string) (string, error) {
 	}
 }
 
+// makeSeedFunc creates a seed() function for template use.
+// Returns qualified table name for the specified seed.
+func makeSeedFunc(ctx *Context) func(string) (string, error) {
+	return func(seedName string) (string, error) {
+		if seedName == "" {
+			return "", fmt.Errorf("seed name cannot be empty")
+		}
+
+		tableName, ok := ctx.Seeds[seedName]
+		if !ok {
+			return "", fmt.Errorf("seed %q not found", seedName)
+		}
+
+		return tableName, nil
+	}
+}
+
 // makeEnvVarFunc creates an env_var() function for template use.
 // Gets environment variable with optional default value.
 func makeEnvVarFunc() func(string, ...string) (string, error) {

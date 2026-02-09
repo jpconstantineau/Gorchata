@@ -211,3 +211,73 @@ func TestContextWithCurrentModelTable(t *testing.T) {
 		}
 	})
 }
+
+func TestContext_SeedsMap(t *testing.T) {
+	t.Run("initializes Seeds map", func(t *testing.T) {
+		ctx := NewContext()
+
+		if ctx.Seeds == nil {
+			t.Fatal("expected Seeds map to be initialized")
+		}
+		if len(ctx.Seeds) != 0 {
+			t.Errorf("expected Seeds map to be empty, got %d entries", len(ctx.Seeds))
+		}
+	})
+
+	t.Run("populates Seeds map", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.Seeds = map[string]string{
+			"customers": "customers",
+			"orders":    "orders",
+		}
+
+		if len(ctx.Seeds) != 2 {
+			t.Errorf("expected 2 seeds, got %d", len(ctx.Seeds))
+		}
+		if ctx.Seeds["customers"] != "customers" {
+			t.Errorf("expected customers seed to be 'customers', got %s", ctx.Seeds["customers"])
+		}
+		if ctx.Seeds["orders"] != "orders" {
+			t.Errorf("expected orders seed to be 'orders', got %s", ctx.Seeds["orders"])
+		}
+	})
+}
+
+func TestContext_SeedsWithQualifiedNames(t *testing.T) {
+	t.Run("stores qualified seed names with schema", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.Seeds = map[string]string{
+			"customers": "staging.customers",
+			"orders":    "staging.orders",
+			"products":  "production.products",
+		}
+
+		if len(ctx.Seeds) != 3 {
+			t.Errorf("expected 3 seeds, got %d", len(ctx.Seeds))
+		}
+		if ctx.Seeds["customers"] != "staging.customers" {
+			t.Errorf("expected customers seed to be 'staging.customers', got %s", ctx.Seeds["customers"])
+		}
+		if ctx.Seeds["orders"] != "staging.orders" {
+			t.Errorf("expected orders seed to be 'staging.orders', got %s", ctx.Seeds["orders"])
+		}
+		if ctx.Seeds["products"] != "production.products" {
+			t.Errorf("expected products seed to be 'production.products', got %s", ctx.Seeds["products"])
+		}
+	})
+
+	t.Run("handles seeds without schema prefix", func(t *testing.T) {
+		ctx := NewContext()
+		ctx.Seeds = map[string]string{
+			"customers": "customers",
+			"orders":    "orders",
+		}
+
+		if ctx.Seeds["customers"] != "customers" {
+			t.Errorf("expected customers seed to be 'customers', got %s", ctx.Seeds["customers"])
+		}
+		if ctx.Seeds["orders"] != "orders" {
+			t.Errorf("expected orders seed to be 'orders', got %s", ctx.Seeds["orders"])
+		}
+	})
+}

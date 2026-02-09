@@ -208,6 +208,43 @@ func TestLoadSchemaFiles_NonexistentDirectory(t *testing.T) {
 	}
 }
 
+func TestParseSchemaFile_SeedConfigRef(t *testing.T) {
+	// Create a temporary schema file with seed_config_path
+	tmpDir := t.TempDir()
+	schemaFile := filepath.Join(tmpDir, "schema.yml")
+
+	schemaContent := `version: 2
+seed_config_path: seeds/seed.yml
+models:
+  - name: customer_analysis
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+`
+
+	err := os.WriteFile(schemaFile, []byte(schemaContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test schema file: %v", err)
+	}
+
+	schema, err := ParseSchemaFile(schemaFile)
+	if err != nil {
+		t.Fatalf("Failed to parse schema file with seed_config_path: %v", err)
+	}
+
+	if schema.SeedConfigPath != "seeds/seed.yml" {
+		t.Errorf("Expected SeedConfigPath to be 'seeds/seed.yml', got %q", schema.SeedConfigPath)
+	}
+
+	if len(schema.Models) != 1 {
+		t.Errorf("Expected 1 model, got %d", len(schema.Models))
+	}
+
+	if schema.Models[0].Name != "customer_analysis" {
+		t.Errorf("Expected model name 'customer_analysis', got %q", schema.Models[0].Name)
+	}
+}
+
 // Helper function to find a column by name
 func findColumn(columns []ColumnSchema, name string) *ColumnSchema {
 	for i := range columns {

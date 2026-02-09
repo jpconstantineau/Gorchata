@@ -60,6 +60,12 @@ func CompileCommand(args []string) error {
 		sorted = filterModels(sorted, strings.Split(common.Models, ","))
 	}
 
+	// Load seeds for template context
+	seedsMap, err := LoadSeedsForTemplateContext(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to load seeds: %w", err)
+	}
+
 	// Create template engine
 	engine := template.New()
 
@@ -77,6 +83,8 @@ func CompileCommand(args []string) error {
 
 		// Parse and render template
 		ctx := template.NewContext()
+		ctx.Seeds = seedsMap
+
 		tmpl, err := engine.Parse(node.Name, content)
 		if err != nil {
 			return fmt.Errorf("failed to parse template for model %s: %w", node.Name, err)

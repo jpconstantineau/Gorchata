@@ -24,6 +24,10 @@ type Context struct {
 	// Sources maps source names to their table definitions
 	// Structure: Sources[sourceName][tableName] = qualifiedName
 	Sources map[string]map[string]string
+
+	// Seeds maps seed names to their qualified table names
+	// Structure: Seeds[seedName] = qualifiedTableName
+	Seeds map[string]string
 }
 
 // ContextOption configures a Context.
@@ -35,6 +39,7 @@ func NewContext(opts ...ContextOption) *Context {
 		Vars:    make(map[string]interface{}),
 		Config:  make(map[string]interface{}),
 		Sources: make(map[string]map[string]string),
+		Seeds:   make(map[string]string),
 	}
 
 	for _, opt := range opts {
