@@ -587,3 +587,221 @@ func TestDimensionDataQuality(t *testing.T) {
 		}
 	})
 }
+
+// ==================== Phase 4: Fact Table Tests ====================
+
+// TestFactTableSQLFilesExist verifies the fact table SQL file exists
+func TestFactTableSQLFilesExist(t *testing.T) {
+	requiredFiles := []string{
+		"models/facts/fct_operation.sql",
+	}
+
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("Required fact table file %s does not exist", filePath)
+		}
+	}
+}
+
+// TestFactOperationSQLStructure verifies fct_operation.sql has correct structure
+func TestFactOperationSQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/facts/fct_operation.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ seed \"raw_operations\" }}",
+		"{{ seed \"raw_work_orders\" }}",
+		"{{ ref \"dim_resource\" }}",
+		"{{ ref \"dim_work_order\" }}",
+		"{{ ref \"dim_part\" }}",
+		"{{ ref \"dim_date\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("fct_operation.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: natural keys for operation-level detail
+	requiredNaturalKeys := []string{
+		"operation_id",
+		"work_order_id",
+		"operation_seq",
+	}
+
+	for _, key := range requiredNaturalKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("fct_operation.sql missing grain key: %s", key)
+		}
+	}
+}
+
+// TestFactOperationForeignKeys verifies all foreign key references are present
+func TestFactOperationForeignKeys(t *testing.T) {
+	filePath := filepath.Join("models/facts/fct_operation.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify all required foreign keys (surrogate keys from dimensions)
+	requiredForeignKeys := []string{
+		"resource_key",
+		"work_order_key",
+		"part_key",
+		"start_date_key",
+		"end_date_key",
+	}
+
+	for _, fk := range requiredForeignKeys {
+		if !containsSubstring(contentStr, fk) {
+			t.Errorf("fct_operation.sql missing foreign key: %s", fk)
+		}
+	}
+
+	// Verify joins to dimension tables
+	requiredJoins := []string{
+		"dim_resource",
+		"dim_work_order",
+		"dim_part",
+		"dim_date",
+	}
+
+	for _, table := range requiredJoins {
+		if !containsSubstring(contentStr, table) {
+			t.Errorf("fct_operation.sql missing join to dimension: %s", table)
+		}
+	}
+}
+
+// TestFactOperationQueueTimeCalculation verifies queue time calculation logic
+func TestFactOperationQueueTimeCalculation(t *testing.T) {
+	filePath := filepath.Join("models/facts/fct_operation.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify LAG window function for previous operation end time
+	if !containsSubstring(contentStr, "LAG(") {
+		t.Error("fct_operation.sql should use LAG() window function for queue time calculation")
+	}
+
+	// Verify PARTITION BY work_order_id
+	if !containsSubstring(contentStr, "PARTITION BY") {
+		t.Error("fct_operation.sql should use PARTITION BY for window function")
+	}
+
+	// Verify queue_time_minutes calculation
+	if !containsSubstring(contentStr, "queue_time_minutes") {
+		t.Error("fct_operation.sql missing calculated measure: queue_time_minutes")
+	}
+
+	// Verify JULIANDAY for time arithmetic (SQLite pattern)
+	if !containsSubstring(contentStr, "JULIANDAY") {
+		t.Error("fct_operation.sql should use JULIANDAY for timestamp arithmetic")
+	}
+
+	// Verify COALESCE for handling first operation (no previous operation)
+	if !containsSubstring(contentStr, "COALESCE") {
+		t.Error("fct_operation.sql should use COALESCE to handle first operation queue time")
+	}
+
+	// Verify reference to work order release timestamp for first operation
+	if !containsSubstring(contentStr, "release_timestamp") {
+		t.Error("fct_operation.sql should use work order release_timestamp for first operation arrival time")
+	}
+}
+
+// TestFactOperationCycleTimeCalculation verifies cycle time calculation logic
+func TestFactOperationCycleTimeCalculation(t *testing.T) {
+	filePath := filepath.Join("models/facts/fct_operation.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify cycle_time_minutes calculation
+	if !containsSubstring(contentStr, "cycle_time_minutes") {
+		t.Error("fct_operation.sql missing calculated measure: cycle_time_minutes")
+	}
+
+	// Verify calculation: (end_timestamp - start_timestamp) * 24 * 60
+	if !containsSubstring(contentStr, "* 24 * 60") {
+		t.Error("fct_operation.sql cycle time should convert days to minutes (* 24 * 60)")
+	}
+
+	// Verify CAST to INTEGER for minute values
+	if !containsSubstring(contentStr, "CAST(") || !containsSubstring(contentStr, "AS INTEGER)") {
+		t.Error("fct_operation.sql should CAST time calculations to INTEGER")
+	}
+}
+
+// TestFactOperationMeasures verifies all required measures are present
+func TestFactOperationMeasures(t *testing.T) {
+	filePath := filepath.Join("models/facts/fct_operation.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify base measures from raw_operations
+	requiredMeasures := []string{
+		"quantity_completed",
+		"quantity_scrapped",
+		"cycle_time_minutes",
+		"queue_time_minutes",
+	}
+
+	for _, measure := range requiredMeasures {
+		if !containsSubstring(contentStr, measure) {
+			t.Errorf("fct_operation.sql missing measure: %s", measure)
+		}
+	}
+
+	// Verify timestamps are included
+	requiredTimestamps := []string{
+		"start_timestamp",
+		"end_timestamp",
+	}
+
+	for _, ts := range requiredTimestamps {
+		if !containsSubstring(contentStr, ts) {
+			t.Errorf("fct_operation.sql missing timestamp: %s", ts)
+		}
+	}
+
+	// Verify operation attributes
+	requiredAttributes := []string{
+		"resource_id",
+		"operation_type",
+	}
+
+	for _, attr := range requiredAttributes {
+		if !containsSubstring(contentStr, attr) {
+			t.Errorf("fct_operation.sql missing attribute: %s", attr)
+		}
+	}
+}
