@@ -13,11 +13,15 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// stripTemplateConfig removes Jinja-style config directives from SQL
+// stripTemplateConfig removes config directives from SQL (both Go template and legacy Jinja syntax)
 func stripTemplateConfig(sql string) string {
-	//Remove {{ config(materialized='table') }} and similar patterns
-	re := regexp.MustCompile(`\{\{\s*config\([^)]+\)\s*\}\}`)
-	return re.ReplaceAllString(sql, "")
+	// Remove Go template syntax: {{ config "materialized" "table" }}
+	goTemplateRe := regexp.MustCompile(`\{\{\s*config\s+"[^"]+"\s+"[^"]+"\s*\}\}`)
+	sql = goTemplateRe.ReplaceAllString(sql, "")
+
+	// Remove legacy Jinja-style syntax: {{ config(materialized='table') }}
+	legacyRe := regexp.MustCompile(`\{\{\s*config\s*\([^)]+\)\s*\}\}`)
+	return legacyRe.ReplaceAllString(sql, "")
 }
 
 // setupTestDB creates a temporary database for testing.
@@ -300,9 +304,9 @@ func TestRawAlarmEventsParse(t *testing.T) {
 		t.Error("File does not contain config directive {{ config ... }}")
 	}
 
-	// Verify it's using Jinja-style materialized config
-	if !strings.Contains(contentStr, `config(materialized='table')`) {
-		t.Error("File should contain Jinja-style syntax: {{ config(materialized='table') }}")
+	// Verify it's using Go template syntax for materialized config
+	if !strings.Contains(contentStr, `{{ config "materialized" "table" }}`) {
+		t.Error("File should contain Go template syntax: {{ config \"materialized\" \"table\" }}")
 	}
 
 	// Verify SQL keywords

@@ -17,7 +17,7 @@
 - 🔄 **Dependency resolution** - Automatic DAG-based execution order
 - 🎯 **Incremental models** - Efficient updates for large datasets
 - 🗃️ **Multiple materializations** - Table, view, incremental
-- 📝 **Jinja templating** - `{{ ref() }}`, `{{ source() }}`, variables, macros
+- 📝 **Go text/template engine** - dbt-compatible functions: `{{ ref "..." }}`, `{{ source "..." "..." }}`, variables, conditionals
 - ✅ **Data quality testing** - 14 built-in tests + custom SQL tests
 - 💾 **Pure Go SQLite** - No CGO dependencies, cross-platform
 - ⚙️ **Profile management** - Multiple environments (dev, prod)
@@ -135,7 +135,7 @@ Models are SQL files with optional configuration and template functions.
 **models/staging/stg_users.sql**:
 ```sql
 -- Staging model for users
-{{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT
     id,
@@ -149,7 +149,7 @@ WHERE deleted_at IS NULL
 **models/marts/fct_orders.sql**:
 ```sql
 -- Fact table combining users and orders
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 SELECT
     u.id as user_id,
@@ -161,9 +161,11 @@ LEFT JOIN {{ ref "stg_orders" }} o ON u.id = o.user_id
 GROUP BY u.id, u.name
 ```
 
-**Key Template Functions:**
-- `{{ config(materialized='view') }}` - Set materialization strategy (view, table, incremental)
+**Template Syntax:**
+- `{{ config "materialized" "view" }}` - Set materialization strategy (view, table, incremental)
 - `{{ ref "model_name" }}` - Reference another model (creates dependency)
+- `{{ source "source_name" "table_name" }}` - Reference a source table
+- `{{ if condition }}...{{ end }}` - Conditional logic
 
 ### 4. Run Your Models
 
@@ -522,13 +524,6 @@ The data quality testing framework is fully functional with some documented limi
 - **Status**: 24 of 27 integration tests passing (89% success rate)
 - **Impact**: 3 tests affected by schema discovery limitation (ExecuteTestsEndToEnd, SingularTest, TestSelection)
 
-**Template Engine in Tests**
-- Singular tests cannot use full template syntax (e.g., `{{ ref "model" }}`)
-- **Workaround**: Use direct table names instead: `FROM model_name` rather than `FROM {{ ref "model" }}`
-- **Reason**: Test executor doesn't currently integrate the template engine (Phase 5 design decision)
-- **Impact**: Tests must reference physical table names directly
-- **Future**: Template engine integration planned for future release
-
 **Performance**
 - Adaptive sampling automatically activates for tables ≥1 million rows (100,000 row sample)
 - Can be overridden per-test with `sample_size: null` to scan all rows
@@ -547,6 +542,34 @@ All critical functionality is fully operational:
 
 These limitations are documented as known issues and will be addressed in future releases.
 
+## Template Engine
+
+Gorchata uses Go's `text/template` engine with dbt-compatible template functions. This provides a familiar experience for dbt users while leveraging Go's robust templating system.
+
+### Template Syntax
+
+**Go text/template** uses space-separated arguments for functions:
+```sql
+{{ ref "model_name" }}                    -- Reference a model
+{{ source "raw_data" "users" }}           -- Reference a source
+{{ config "materialized" "view" }}        -- Set materialization
+{{ if is_incremental }}...{{ end }}       -- Conditional logic
+```
+
+All template functions use consistent Go template syntax with space-separated string arguments.
+
+### Available Functions
+
+| Function | Syntax | Description |
+|----------|--------|-------------|
+| `ref` | `{{ ref "model" }}` | Reference another model, creates dependency |
+| `source` | `{{ source "src" "table" }}` | Reference a source table |
+| `this` | `{{ this }}` | Current model's table name (for incremental models) |
+| `is_incremental` | `{{ if is_incremental }}` | Check if running in incremental mode |
+| `var` | `{{ var "name" }}` | Access variable from context |
+| `env_var` | `{{ env_var "VAR" "default" }}` | Get environment variable |
+| `config` | `{{ config "key" }}` | Access configuration value |
+
 ## Materialization Strategies
 
 Gorchata supports three materialization strategies:
@@ -555,7 +578,7 @@ Gorchata supports three materialization strategies:
 Creates a SQL view. Fast to build, always reflects current data.
 
 ```sql
-{{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT * FROM source_table
 ```
@@ -564,7 +587,7 @@ SELECT * FROM source_table
 Creates a physical table using `CREATE TABLE AS SELECT`. Full refresh on each run.
 
 ```sql
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 SELECT * FROM source_table
 ```
@@ -573,7 +596,7 @@ SELECT * FROM source_table
 Appends new records to existing table based on unique key. Use the `is_incremental` template function to add filtering logic that only applies during incremental runs.
 
 ```sql
-{{ config(materialization="incremental", unique_key="id") }}
+{{ config "materialized" "incremental" }}
 
 SELECT 
   id,
@@ -586,8 +609,9 @@ WHERE created_at > (SELECT MAX(created_at) FROM {{ this }})
 ```
 
 **Template Functions:**
-- `{{ if is_incremental }}` - Conditional logic for incremental runs
-- `{{ this }}` - References the current model's table name
+- `{{ if is_incremental }}...{{ end }}` - Conditional logic for incremental runs
+- `{{ this }}` - Returns the current model's table name (use in FROM clause)
+- Functions use Go text/template syntax with space-separated arguments
 
 **Full Refresh:**
 Force a full refresh (rebuild from scratch) using the `--full-refresh` flag:
@@ -661,9 +685,11 @@ gorchata run
 - Ensure `default` profile exists in `profiles.yml`
 
 **Error: "template execution failed"**
-- Check template syntax: use `{{ ref "model" }}` not `{{ ref('model') }}`
+- Check template syntax: use `{{ ref "model" }}` with space-separated arguments (Go text/template style)
+- NOT Jinja style: `{{ ref('model') }}` won't work
 - Ensure all referenced models exist
 - Validate SQL syntax
+- Check conditionals use `{{ if condition }}...{{ end }}` format
 
 ### Execution Order
 

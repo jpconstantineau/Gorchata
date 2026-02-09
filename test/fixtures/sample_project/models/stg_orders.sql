@@ -1,5 +1,5 @@
 -- Stage clean orders data
--- {{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT 
     id,

@@ -1,4 +1,4 @@
-{{ config(materialized='incremental', unique_key=['customer_sk']) }}
+{{ config "materialized" "incremental" }}
 
 -- SCD Type 2 Customer Dimension
 -- Tracks historical changes to customer attributes (city, state, email)

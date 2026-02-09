@@ -42,7 +42,7 @@ prod:
 
 // stgUsersTemplate is the template for stg_users.sql
 const stgUsersTemplate = `-- Stage clean users data
--- {{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT 
     id,
@@ -55,7 +55,7 @@ WHERE deleted_at IS NULL
 
 // stgOrdersTemplate is the template for stg_orders.sql
 const stgOrdersTemplate = `-- Stage clean orders data
--- {{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT 
     id,
@@ -68,7 +68,7 @@ WHERE status = 'completed'
 
 // fctOrderSummaryTemplate is the template for fct_order_summary.sql
 const fctOrderSummaryTemplate = `-- Create order summary fact table
--- {{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 SELECT 
     u.id as user_id,

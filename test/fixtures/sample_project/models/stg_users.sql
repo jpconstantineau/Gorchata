@@ -1,5 +1,5 @@
 -- Stage clean users data
--- {{ config(materialized='view') }}
+{{ config "materialized" "view" }}
 
 SELECT 
     id,

@@ -1,4 +1,4 @@
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 -- Alternative: Use incremental materialization for efficient processing
 -- To enable incremental mode, uncomment the following line and comment out the config above:

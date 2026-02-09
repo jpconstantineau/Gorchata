@@ -1,5 +1,5 @@
 -- Create order summary fact table
--- {{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 SELECT 
     u.id as user_id,

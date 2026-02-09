@@ -1,4 +1,4 @@
-{{ config(materialized='table') }}
+{{ config "materialized" "table" }}
 
 -- Equipment Dimension
 -- Process equipment hierarchy for alarm root cause analysis

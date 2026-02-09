@@ -272,13 +272,29 @@ func loadModels(dir string) ([]*executor.Model, error) {
 }
 
 // extractConfig extracts materialization config from SQL comments
-// Looks for {{ config(materialized='view') }} or similar
+// Looks for {{ config "materialized" "view" }} (Go template) or {{ config(materialized='view') }} (legacy)
 func extractConfig(content string) materialization.MaterializationConfig {
 	config := materialization.DefaultConfig()
 
-	// Look for config() function in comments or template tags
-	configRe := regexp.MustCompile(`{{\s*config\s*\(\s*materialized\s*=\s*['"](\w+)['"]\s*\)\s*}}`)
-	matches := configRe.FindStringSubmatch(content)
+	// Look for Go template syntax: {{ config "materialized" "view" }}
+	goTemplateRe := regexp.MustCompile(`{{\s*config\s+"materialized"\s+"(\w+)"\s*}}`)
+	matches := goTemplateRe.FindStringSubmatch(content)
+
+	if len(matches) > 1 {
+		switch matches[1] {
+		case "view":
+			config.Type = materialization.MaterializationView
+		case "table":
+			config.Type = materialization.MaterializationTable
+		case "incremental":
+			config.Type = materialization.MaterializationIncremental
+		}
+		return config
+	}
+
+	// Fall back to legacy Jinja-style syntax: {{ config(materialized='view') }}
+	legacyRe := regexp.MustCompile(`{{\s*config\s*\(\s*materialized\s*=\s*['"](\w+)['"]\s*\)\s*}}`)
+	matches = legacyRe.FindStringSubmatch(content)
 
 	if len(matches) > 1 {
 		switch matches[1] {
@@ -294,11 +310,16 @@ func extractConfig(content string) materialization.MaterializationConfig {
 	return config
 }
 
-// removeConfigCalls removes {{ config(...) }} calls from content
+// removeConfigCalls removes {{ config ... }} calls from content (both Go template and legacy syntax)
 // so they don't interfere with template parsing
 func removeConfigCalls(content string) string {
-	configRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
-	return configRe.ReplaceAllString(content, "")
+	// Remove Go template syntax: {{ config "key" "value" }}
+	goTemplateRe := regexp.MustCompile(`{{\s*config\s+"[^"]+"\s+"[^"]+"\s*}}`)
+	content = goTemplateRe.ReplaceAllString(content, "")
+
+	// Remove legacy Jinja-style syntax: {{ config(key='value') }}
+	legacyRe := regexp.MustCompile(`{{\s*config\s*\([^}]+\)\s*}}`)
+	return legacyRe.ReplaceAllString(content, "")
 }
 
 // TestIntegration_IncrementalModel tests end-to-end incremental model execution
