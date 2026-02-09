@@ -8,11 +8,11 @@
 
 ### In Progress 🚧
 
+- [] Manufacturing Data for Bottleneck Analysis
 
 ### Future Examples 🔮
 
 - [] Machine Event Data to OEE
-- [] Manufacturing Data for Bottleneck Analysis
 - [] Haul Truck Data Transformation and Analysis
 - [] Unit Train Analytics Data Warehouse
 - [] Oil Refinery Data Transformation and Warehousing
