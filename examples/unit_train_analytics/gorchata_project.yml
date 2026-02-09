@@ -1,0 +1,15 @@
+name: "unit_train_analytics"
+version: "1.0"
+profile: "dev"
+
+model-paths:
+  - "models"
+
+seed-paths:
+  - "seeds"
+
+test-paths:
+  - "tests"
+
+# Database configuration
+target-path: "target"
