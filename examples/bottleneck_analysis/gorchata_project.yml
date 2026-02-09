@@ -16,9 +16,9 @@ test-paths:
   - tests
 
 vars:
-  # Analysis time period
-  analysis_start_date: '2026-01-01'
-  analysis_end_date: '2026-03-31'
+  # Analysis time period (2 weeks of operations data)
+  analysis_start_date: '2024-01-01'
+  analysis_end_date: '2024-01-14'
   
   # Shift configuration (8-hour shifts)
   shift_hours: 8

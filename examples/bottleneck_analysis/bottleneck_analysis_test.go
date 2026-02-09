@@ -805,3 +805,319 @@ func TestFactOperationMeasures(t *testing.T) {
 		}
 	}
 }
+
+// ==================== Phase 5: Intermediate Rollup Tests ====================
+
+// TestIntermediateRollupFilesExist verifies all intermediate rollup SQL files exist
+func TestIntermediateRollupFilesExist(t *testing.T) {
+	requiredFiles := []string{
+		"models/rollups/int_downtime_summary.sql",
+		"models/rollups/int_resource_daily_utilization.sql",
+	}
+
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("Required intermediate rollup file %s does not exist", filePath)
+		}
+	}
+}
+
+// TestIntDowntimeSummarySQLStructure verifies int_downtime_summary.sql has correct structure
+func TestIntDowntimeSummarySQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_downtime_summary.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ seed \"raw_downtime\" }}",
+		"{{ ref \"dim_resource\" }}",
+		"{{ ref \"dim_date\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("int_downtime_summary.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: one row per downtime event
+	requiredNaturalKeys := []string{
+		"downtime_id",
+	}
+
+	for _, key := range requiredNaturalKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("int_downtime_summary.sql missing grain key: %s", key)
+		}
+	}
+
+	// Verify foreign keys
+	requiredForeignKeys := []string{
+		"resource_key",
+		"date_key",
+	}
+
+	for _, fk := range requiredForeignKeys {
+		if !containsSubstring(contentStr, fk) {
+			t.Errorf("int_downtime_summary.sql missing foreign key: %s", fk)
+		}
+	}
+}
+
+// TestIntDowntimeSummaryDurationCalculation verifies downtime duration calculation logic
+func TestIntDowntimeSummaryDurationCalculation(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_downtime_summary.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify downtime_minutes calculation
+	if !containsSubstring(contentStr, "downtime_minutes") {
+		t.Error("int_downtime_summary.sql missing calculated measure: downtime_minutes")
+	}
+
+	// Verify JULIANDAY for time arithmetic (SQLite pattern)
+	if !containsSubstring(contentStr, "JULIANDAY") {
+		t.Error("int_downtime_summary.sql should use JULIANDAY for timestamp arithmetic")
+	}
+
+	// Verify calculation: (downtime_end - downtime_start) * 24 * 60
+	if !containsSubstring(contentStr, "* 24 * 60") {
+		t.Error("int_downtime_summary.sql should convert days to minutes (* 24 * 60)")
+	}
+
+	// Verify CAST to INTEGER for minute values
+	if !containsSubstring(contentStr, "CAST(") || !containsSubstring(contentStr, "AS INTEGER)") {
+		t.Error("int_downtime_summary.sql should CAST time calculations to INTEGER")
+	}
+
+	// Verify downtime timestamps
+	requiredTimestamps := []string{
+		"downtime_start",
+		"downtime_end",
+	}
+
+	for _, ts := range requiredTimestamps {
+		if !containsSubstring(contentStr, ts) {
+			t.Errorf("int_downtime_summary.sql missing timestamp: %s", ts)
+		}
+	}
+}
+
+// TestIntDowntimeSummaryCategorization verifies downtime type categorization
+func TestIntDowntimeSummaryCategorization(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_downtime_summary.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify downtime_type field
+	if !containsSubstring(contentStr, "downtime_type") {
+		t.Error("int_downtime_summary.sql missing: downtime_type")
+	}
+
+	// Verify reason_code field
+	if !containsSubstring(contentStr, "reason_code") {
+		t.Error("int_downtime_summary.sql missing: reason_code")
+	}
+
+	// Verify is_scheduled flag
+	if !containsSubstring(contentStr, "is_scheduled") {
+		t.Error("int_downtime_summary.sql missing calculated flag: is_scheduled")
+	}
+
+	// Verify is_unscheduled flag
+	if !containsSubstring(contentStr, "is_unscheduled") {
+		t.Error("int_downtime_summary.sql missing calculated flag: is_unscheduled")
+	}
+
+	// Verify CASE statement for categorization
+	if !containsSubstring(contentStr, "CASE") {
+		t.Error("int_downtime_summary.sql should use CASE statement for categorization")
+	}
+}
+
+// TestIntResourceDailyUtilizationSQLStructure verifies int_resource_daily_utilization.sql has correct structure
+func TestIntResourceDailyUtilizationSQLStructure(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_resource_daily_utilization.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify Gorchata template syntax
+	requiredTemplates := []string{
+		"{{ config",
+		"{{ ref \"fct_operation\" }}",
+		"{{ ref \"dim_resource\" }}",
+		"{{ ref \"dim_date\" }}",
+		"{{ ref \"int_downtime_summary\" }}",
+	}
+
+	for _, template := range requiredTemplates {
+		if !containsSubstring(contentStr, template) {
+			t.Errorf("int_resource_daily_utilization.sql missing required template syntax: %s", template)
+		}
+	}
+
+	// Verify grain: one row per resource per day
+	requiredGrainKeys := []string{
+		"resource_key",
+		"date_key",
+	}
+
+	for _, key := range requiredGrainKeys {
+		if !containsSubstring(contentStr, key) {
+			t.Errorf("int_resource_daily_utilization.sql missing grain key: %s", key)
+		}
+	}
+}
+
+// TestIntResourceDailyUtilizationCalculations verifies utilization calculation logic
+func TestIntResourceDailyUtilizationCalculations(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_resource_daily_utilization.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify required calculated measures
+	requiredMeasures := []string{
+		"total_processing_minutes",
+		"available_minutes_per_day",
+		"total_downtime_minutes",
+		"effective_available_minutes",
+		"utilization_pct",
+		"adjusted_utilization_pct",
+	}
+
+	for _, measure := range requiredMeasures {
+		if !containsSubstring(contentStr, measure) {
+			t.Errorf("int_resource_daily_utilization.sql missing calculated measure: %s", measure)
+		}
+	}
+
+	// Verify SUM aggregation for processing time
+	if !containsSubstring(contentStr, "SUM(") {
+		t.Error("int_resource_daily_utilization.sql should use SUM() for aggregation")
+	}
+
+	// Verify GROUP BY for resource and date grain
+	if !containsSubstring(contentStr, "GROUP BY") {
+		t.Error("int_resource_daily_utilization.sql should use GROUP BY for aggregation")
+	}
+
+	// Verify COALESCE for handling nulls
+	if !containsSubstring(contentStr, "COALESCE") {
+		t.Error("int_resource_daily_utilization.sql should use COALESCE to handle null values")
+	}
+
+	// Verify NULLIF to prevent division by zero
+	if !containsSubstring(contentStr, "NULLIF") {
+		t.Error("int_resource_daily_utilization.sql should use NULLIF to prevent division by zero")
+	}
+}
+
+// TestIntResourceDailyUtilizationPercentageBounds verifies utilization percentage calculation
+func TestIntResourceDailyUtilizationPercentageBounds(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_resource_daily_utilization.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify percentage calculation: * 100.0
+	if !containsSubstring(contentStr, "* 100") {
+		t.Error("int_resource_daily_utilization.sql should multiply by 100 for percentage")
+	}
+
+	// Verify ROUND for percentage precision
+	if !containsSubstring(contentStr, "ROUND") {
+		t.Error("int_resource_daily_utilization.sql should use ROUND for percentage precision")
+	}
+}
+
+// TestIntResourceDailyUtilizationOperationFiltering verifies operation type filtering
+func TestIntResourceDailyUtilizationOperationFiltering(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_resource_daily_utilization.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify WHERE clause filters operation types
+	if !containsSubstring(contentStr, "WHERE") {
+		t.Error("int_resource_daily_utilization.sql should use WHERE clause to filter operations")
+	}
+
+	// Verify operation_type IN filtering for PROCESSING and SETUP only
+	if !containsSubstring(contentStr, "operation_type") {
+		t.Error("int_resource_daily_utilization.sql should filter by operation_type")
+	}
+
+	// Verify PROCESSING and SETUP are included
+	if !containsSubstring(contentStr, "PROCESSING") {
+		t.Error("int_resource_daily_utilization.sql should include PROCESSING operations")
+	}
+
+	if !containsSubstring(contentStr, "SETUP") {
+		t.Error("int_resource_daily_utilization.sql should include SETUP operations")
+	}
+}
+
+// TestIntResourceDailyUtilizationCapacityCalculation verifies capacity calculation from dim_resource
+func TestIntResourceDailyUtilizationCapacityCalculation(t *testing.T) {
+	filePath := filepath.Join("models/rollups/int_resource_daily_utilization.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify capacity calculation components from dim_resource
+	requiredComponents := []string{
+		"available_hours_per_shift",
+		"shifts_per_day",
+	}
+
+	for _, component := range requiredComponents {
+		if !containsSubstring(contentStr, component) {
+			t.Errorf("int_resource_daily_utilization.sql missing capacity component: %s", component)
+		}
+	}
+
+	// Verify multiplication: hours * shifts * 60 (minutes)
+	if !containsSubstring(contentStr, "* 60") {
+		t.Error("int_resource_daily_utilization.sql should convert hours to minutes (* 60)")
+	}
+}
