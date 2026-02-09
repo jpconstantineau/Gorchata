@@ -1,0 +1,379 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Data Quality Tests
+  # ===================================================================
+  
+  - name: dim_resource
+    description: "Resource dimension with capacity and bottleneck flags"
+    columns:
+      - name: resource_key
+        description: "Surrogate key for resource"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: resource_id
+        description: "Natural key for resource"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: resource_name
+        description: "Human-readable resource name"
+        data_tests:
+          - not_null
+      
+      - name: resource_type
+        description: "Type of resource (MACHINING, PROCESSING, ASSEMBLY)"
+        data_tests:
+          - not_null
+      
+      - name: available_hours_per_shift
+        description: "Hours available per shift"
+        data_tests:
+          - not_null
+      
+      - name: shifts_per_day
+        description: "Number of shifts per day"
+        data_tests:
+          - not_null
+      
+      - name: theoretical_capacity_per_hour
+        description: "Theoretical units that can be processed per hour"
+        data_tests:
+          - not_null
+      
+      - name: daily_capacity
+        description: "Calculated daily capacity based on available hours and shifts"
+        data_tests:
+          - not_null
+      
+      - name: is_bottleneck_candidate
+        description: "Flag indicating if resource is identified as a bottleneck candidate"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: is_current
+        description: "SCD Type 2 current flag"
+        data_tests:
+          - not_null
+      
+      - name: valid_from
+        description: "SCD Type 2 valid from timestamp"
+        data_tests:
+          - not_null
+      
+      - name: valid_to
+        description: "SCD Type 2 valid to date"
+        data_tests:
+          - not_null
+  
+  - name: dim_work_order
+    description: "Work order dimension with scheduling and routing information"
+    columns:
+      - name: work_order_key
+        description: "Surrogate key for work order"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: work_order_id
+        description: "Natural key for work order"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: part_number
+        description: "Part number being manufactured"
+        data_tests:
+          - not_null
+      
+      - name: quantity
+        description: "Order quantity"
+        data_tests:
+          - not_null
+      
+      - name: release_timestamp
+        description: "Timestamp when work order was released"
+        data_tests:
+          - not_null
+      
+      - name: due_timestamp
+        description: "Timestamp when work order is due"
+        data_tests:
+          - not_null
+      
+      - name: priority
+        description: "Work order priority (HIGH, MEDIUM, LOW)"
+        data_tests:
+          - not_null
+      
+      - name: status
+        description: "Work order status"
+        data_tests:
+          - not_null
+      
+      - name: release_date
+        description: "Date work order was released to shop floor"
+        data_tests:
+          - not_null
+      
+      - name: due_date
+        description: "Date work order is due"
+        data_tests:
+          - not_null
+      
+      - name: lead_time_days
+        description: "Calculated lead time from release to due date"
+        data_tests:
+          - not_null
+      
+      - name: priority_rank
+        description: "Numeric priority rank (1=HIGH, 2=MEDIUM, 3=LOW)"
+        data_tests:
+          - not_null
+  
+  # ===================================================================
+  # FACT TABLES - Data Quality Tests
+  # ===================================================================
+  
+  - name: fct_operation
+    description: "Operation-level fact table capturing cycle time, queue time, and resource utilization"
+    columns:
+      - name: operation_id
+        description: "Primary key for operation"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: work_order_id
+        description: "Natural key for work order"
+        data_tests:
+          - not_null
+      
+      - name: resource_id
+        description: "Natural key for resource"
+        data_tests:
+          - not_null
+      
+      - name: operation_seq
+        description: "Sequence number of operation within work order routing"
+        data_tests:
+          - not_null
+      
+      - name: operation_type
+        description: "Type of operation (PROCESSING, SETUP, etc.)"
+        data_tests:
+          - not_null
+      
+      - name: start_timestamp
+        description: "Operation start time"
+        data_tests:
+          - not_null
+      
+      - name: end_timestamp
+        description: "Operation end time"
+        data_tests:
+          - not_null
+      
+      - name: quantity_completed
+        description: "Quantity completed in this operation"
+        data_tests:
+          - not_null
+      
+      - name: quantity_scrapped
+        description: "Quantity scrapped in this operation"
+        data_tests:
+          - not_null
+      
+      - name: cycle_time_minutes
+        description: "Actual time resource was processing (end - start)"
+        data_tests:
+          - not_null
+      
+      - name: queue_time_minutes
+        description: "Time work order waited before processing started"
+        data_tests:
+          - not_null
+      
+      - name: resource_key
+        description: "Foreign key to dim_resource"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_resource
+              field: resource_key
+      
+      - name: work_order_key
+        description: "Foreign key to dim_work_order"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_work_order
+              field: work_order_key
+      
+      - name: part_key
+        description: "Foreign key to dim_part"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_part
+              field: part_key
+      
+      - name: start_date_key
+        description: "Foreign key to dim_date for operation start date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: end_date_key
+        description: "Foreign key to dim_date for operation end date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+  
+  # ===================================================================
+  # INTERMEDIATE ROLLUPS - Data Quality Tests
+  # ===================================================================
+  
+  - name: int_resource_daily_utilization
+    description: "Daily resource utilization metrics with capacity and actual hours"
+    columns:
+      - name: resource_key
+        description: "Foreign key to dim_resource"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_resource
+              field: resource_key
+      
+      - name: resource_id
+        description: "Natural key for resource (denormalized)"
+        data_tests:
+          - not_null
+      
+      - name: resource_name
+        description: "Resource name (denormalized)"
+        data_tests:
+          - not_null
+      
+      - name: date_key
+        description: "Date of utilization measurement"
+        data_tests:
+          - not_null
+      
+      - name: total_processing_minutes
+        description: "Total minutes actually used for production"
+        data_tests:
+          - not_null
+      
+      - name: available_minutes_per_day
+        description: "Total minutes available for production on this date"
+        data_tests:
+          - not_null
+      
+      - name: total_downtime_minutes
+        description: "Total minutes lost to downtime"
+        data_tests:
+          - not_null
+      
+      - name: effective_available_minutes
+        description: "Available minutes minus downtime"
+        data_tests:
+          - not_null
+      
+      - name: utilization_pct
+        description: "Utilization percentage (should be between 0-100)"
+        data_tests:
+          - not_null
+      
+      - name: adjusted_utilization_pct
+        description: "Utilization adjusted for downtime"
+        data_tests:
+          - not_null
+      
+      - name: operation_count
+        description: "Number of operations performed on this date"
+        data_tests:
+          - not_null
+  
+  # ===================================================================
+  # ANALYTICAL ROLLUPS - Data Quality Tests
+  # ===================================================================
+  
+  - name: rollup_bottleneck_ranking
+    description: "Bottleneck identification with composite scoring based on utilization, queue time, WIP, and downtime"
+    columns:
+      - name: resource_key
+        description: "Foreign key to dim_resource"
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: dim_resource
+              field: resource_key
+      
+      - name: resource_id
+        description: "Natural key for resource (denormalized for reporting)"
+        data_tests:
+          - not_null
+      
+      - name: resource_name
+        description: "Resource name (denormalized for reporting)"
+        data_tests:
+          - not_null
+      
+      - name: avg_utilization_pct
+        description: "Average utilization percentage across analysis period"
+        data_tests:
+          - not_null
+      
+      - name: avg_queue_time_minutes
+        description: "Average queue time in minutes"
+        data_tests:
+          - not_null
+      
+      - name: avg_wip_count
+        description: "Average work-in-process count"
+        data_tests:
+          - not_null
+      
+      - name: max_wip_count
+        description: "Maximum work-in-process count"
+        data_tests:
+          - not_null
+      
+      - name: downtime_event_count
+        description: "Number of downtime events"
+        data_tests:
+          - not_null
+      
+      - name: total_downtime_minutes
+        description: "Total downtime in minutes"
+        data_tests:
+          - not_null
+      
+      - name: bottleneck_score
+        description: "Composite score for bottleneck identification (weighted combination of normalized metrics)"
+        data_tests:
+          - not_null
+      
+      - name: is_potential_bottleneck
+        description: "Flag indicating if resource is a potential bottleneck (high utilization or queue time)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: bottleneck_rank
+        description: "Ranking of resources by bottleneck score (1 = highest bottleneck)"
+        data_tests:
+          - not_null

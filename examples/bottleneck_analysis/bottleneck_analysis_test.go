@@ -1399,3 +1399,244 @@ func TestBottleneckRankingIdentifiesNCX10AndHeatTreat(t *testing.T) {
 	// The current test is adequate for Phase 6 structural validation.
 	// Future: Consider integration test that runs full Gorchata build.
 }
+
+// ==================== Phase 7: Data Quality Tests ====================
+
+// TestSchemaYMLExists verifies schema.yml exists in models directory
+func TestSchemaYMLExists(t *testing.T) {
+	schemaPath := filepath.Join("models", "schema.yml")
+
+	// Verify file exists
+	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
+		t.Fatalf("schema.yml does not exist at %s", schemaPath)
+	}
+
+	// Verify file has content
+	content, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to read schema.yml: %v", err)
+	}
+
+	if len(content) == 0 {
+		t.Error("schema.yml is empty, want non-empty")
+	}
+
+	contentStr := string(content)
+
+	// Verify it's valid YAML structure
+	if !containsSubstring(contentStr, "version:") {
+		t.Error("schema.yml missing 'version:' key")
+	}
+
+	if !containsSubstring(contentStr, "models:") {
+		t.Error("schema.yml missing 'models:' key")
+	}
+}
+
+// TestSchemaYMLDefinesAllKeyTables verifies schema.yml includes all key tables
+func TestSchemaYMLDefinesAllKeyTables(t *testing.T) {
+	schemaPath := filepath.Join("models", "schema.yml")
+
+	content, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to read schema.yml: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify all key tables are defined
+	requiredTables := []string{
+		"dim_resource",
+		"dim_work_order",
+		"fct_operation",
+		"int_resource_daily_utilization",
+		"rollup_bottleneck_ranking",
+	}
+
+	for _, table := range requiredTables {
+		if !containsSubstring(contentStr, "- name: "+table) {
+			t.Errorf("schema.yml missing table definition for %s", table)
+		}
+	}
+}
+
+// TestSchemaYMLDefinesDataQualityTests verifies schema.yml includes data quality tests
+func TestSchemaYMLDefinesDataQualityTests(t *testing.T) {
+	schemaPath := filepath.Join("models", "schema.yml")
+
+	content, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to read schema.yml: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify data_tests keyword is used
+	if !containsSubstring(contentStr, "data_tests:") {
+		t.Error("schema.yml should define data_tests for columns")
+	}
+
+	// Verify common test types are present
+	requiredTests := []string{
+		"unique",
+		"not_null",
+		"relationships:",
+	}
+
+	for _, testType := range requiredTests {
+		if !containsSubstring(contentStr, testType) {
+			t.Errorf("schema.yml missing test type: %s", testType)
+		}
+	}
+
+	// Verify relationship tests reference correct tables
+	if !containsSubstring(contentStr, "to: dim_resource") {
+		t.Error("schema.yml should define relationship to dim_resource")
+	}
+
+	if !containsSubstring(contentStr, "to: dim_work_order") {
+		t.Error("schema.yml should define relationship to dim_work_order")
+	}
+}
+
+// TestCustomSQLTestFilesExist verifies all custom SQL test files exist
+func TestCustomSQLTestFilesExist(t *testing.T) {
+	requiredTests := []string{
+		"tests/test_operation_lifecycle.sql",
+		"tests/test_valid_timestamps.sql",
+		"tests/test_utilization_bounds.sql",
+	}
+
+	for _, testFile := range requiredTests {
+		testPath := filepath.Join(testFile)
+		if _, err := os.Stat(testPath); os.IsNotExist(err) {
+			t.Errorf("Required test file %s does not exist", testPath)
+		}
+	}
+}
+
+// TestOperationLifecycleTestStructure verifies test_operation_lifecycle.sql validates business rules
+func TestOperationLifecycleTestStructure(t *testing.T) {
+	filePath := filepath.Join("tests", "test_operation_lifecycle.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify test header/purpose is documented
+	if !containsSubstring(contentStr, "Operation Lifecycle") {
+		t.Error("test_operation_lifecycle.sql should document its purpose")
+	}
+
+	// Verify sequential operation check
+	if !containsSubstring(contentStr, "operation_seq") {
+		t.Error("test_operation_lifecycle.sql should validate operation sequences")
+	}
+
+	// Verify timestamp validation (end > start)
+	if !containsSubstring(contentStr, "end_timestamp") && !containsSubstring(contentStr, "start_timestamp") {
+		t.Error("test_operation_lifecycle.sql should validate timestamp ordering")
+	}
+
+	// Verify quantity constraint check
+	if !containsSubstring(contentStr, "quantity") {
+		t.Error("test_operation_lifecycle.sql should validate quantity constraints")
+	}
+
+	// Verify cycle time validation
+	if !containsSubstring(contentStr, "cycle_time_minutes") {
+		t.Error("test_operation_lifecycle.sql should validate cycle time is positive")
+	}
+
+	// Verify use of ref() template function
+	if !containsSubstring(contentStr, "{{ ref(") || !containsSubstring(contentStr, "fct_operation") {
+		t.Error("test_operation_lifecycle.sql should use {{ ref('fct_operation') }}")
+	}
+}
+
+// TestValidTimestampsTestStructure verifies test_valid_timestamps.sql checks timestamp integrity
+func TestValidTimestampsTestStructure(t *testing.T) {
+	filePath := filepath.Join("tests", "test_valid_timestamps.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify test header/purpose
+	if !containsSubstring(contentStr, "Valid Timestamp") || !containsSubstring(contentStr, "Validation") {
+		t.Error("test_valid_timestamps.sql should document its purpose")
+	}
+
+	// Verify checks for null timestamps
+	if !containsSubstring(contentStr, "IS NULL") {
+		t.Error("test_valid_timestamps.sql should check for null timestamps")
+	}
+
+	// Verify checks for future timestamps
+	if !containsSubstring(contentStr, "analysis_end_date") {
+		t.Error("test_valid_timestamps.sql should check timestamps against analysis_end_date")
+	}
+
+	// Verify checks for past timestamps
+	if !containsSubstring(contentStr, "analysis_start_date") {
+		t.Error("test_valid_timestamps.sql should check timestamps against analysis_start_date")
+	}
+
+	// Verify use of var() template function
+	if !containsSubstring(contentStr, "{{ var(") {
+		t.Error("test_valid_timestamps.sql should use {{ var('...') }} for date variables")
+	}
+
+	// Verify use of ref() for table references
+	if !containsSubstring(contentStr, "{{ ref(") {
+		t.Error("test_valid_timestamps.sql should use {{ ref('...') }} for table references")
+	}
+}
+
+// TestUtilizationBoundsTestStructure verifies test_utilization_bounds.sql validates percentage ranges
+func TestUtilizationBoundsTestStructure(t *testing.T) {
+	filePath := filepath.Join("tests", "test_utilization_bounds.sql")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Failed to read %s: %v", filePath, err)
+	}
+
+	contentStr := string(content)
+
+	// Verify test header/purpose
+	if !containsSubstring(contentStr, "Utilization") || !containsSubstring(contentStr, "Bounds") {
+		t.Error("test_utilization_bounds.sql should document its purpose")
+	}
+
+	// Verify checks for utilization > 100%
+	if !containsSubstring(contentStr, "> 100") {
+		t.Error("test_utilization_bounds.sql should check for utilization > 100%")
+	}
+
+	// Verify checks for utilization < 0%
+	if !containsSubstring(contentStr, "< 0") {
+		t.Error("test_utilization_bounds.sql should check for utilization < 0%")
+	}
+
+	// Verify checks utilization_pct column
+	if !containsSubstring(contentStr, "utilization_pct") {
+		t.Error("test_utilization_bounds.sql should check utilization_pct column")
+	}
+
+	// Verify checks adjusted_utilization_pct column
+	if !containsSubstring(contentStr, "adjusted_utilization_pct") {
+		t.Error("test_utilization_bounds.sql should check adjusted_utilization_pct column")
+	}
+
+	// Verify use of ref() for table references
+	if !containsSubstring(contentStr, "{{ ref(") || !containsSubstring(contentStr, "int_resource_daily_utilization") {
+		t.Error("test_utilization_bounds.sql should use {{ ref('int_resource_daily_utilization') }}")
+	}
+}
