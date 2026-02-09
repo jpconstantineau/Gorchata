@@ -383,6 +383,17 @@ func countLines(s string) int {
 	return count
 }
 
+func countSubstring(s, substr string) int {
+	count := 0
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			count++
+			i += len(substr) - 1 // Skip past this match
+		}
+	}
+	return count
+}
+
 // ==================== Phase 3: Dimension Table Tests ====================
 
 // TestDimensionSQLFilesExist verifies all required dimension SQL files exist
@@ -1638,5 +1649,171 @@ func TestUtilizationBoundsTestStructure(t *testing.T) {
 	// Verify use of ref() for table references
 	if !containsSubstring(contentStr, "{{ ref(") || !containsSubstring(contentStr, "int_resource_daily_utilization") {
 		t.Error("test_utilization_bounds.sql should use {{ ref('int_resource_daily_utilization') }}")
+	}
+}
+
+// ==================== Phase 8: Comprehensive Documentation Tests ====================
+
+// TestREADMEComprehensive verifies README.md is comprehensive (>3000 bytes)
+func TestREADMEComprehensive(t *testing.T) {
+	readmePath := filepath.Join("README.md")
+
+	// Verify file exists
+	info, err := os.Stat(readmePath)
+	if os.IsNotExist(err) {
+		t.Fatalf("README.md does not exist at %s", readmePath)
+	}
+	if err != nil {
+		t.Fatalf("Failed to stat README.md: %v", err)
+	}
+
+	// Verify file size is comprehensive (>3000 bytes)
+	if info.Size() < 3000 {
+		t.Errorf("README.md size = %d bytes, want at least 3000 bytes for comprehensive documentation", info.Size())
+	}
+
+	// Read content to verify key sections
+	content, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("Failed to read README.md: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify key sections exist
+	requiredSections := []string{
+		"Theory of Constraints",
+		"UniCo",
+		"NCX-10",
+		"Heat Treat",
+		"How to Run",
+		"Configuration",
+		"Project Structure",
+		"Expected Outputs",
+		"References",
+		"The Goal",
+	}
+
+	for _, section := range requiredSections {
+		if !containsSubstring(contentStr, section) {
+			t.Errorf("README.md missing section or reference: %q", section)
+		}
+	}
+
+	// Verify no placeholder text remains
+	placeholders := []string{
+		"To be implemented",
+		"TODO",
+		"FIXME",
+	}
+
+	for _, placeholder := range placeholders {
+		if containsSubstring(contentStr, placeholder) {
+			t.Errorf("README.md contains placeholder text: %q (should be complete)", placeholder)
+		}
+	}
+}
+
+// TestSchemaDiagramExists verifies docs/schema_diagram.md exists with ERD
+func TestSchemaDiagramExists(t *testing.T) {
+	diagramPath := filepath.Join("docs", "schema_diagram.md")
+
+	// Verify file exists
+	if _, err := os.Stat(diagramPath); os.IsNotExist(err) {
+		t.Fatalf("docs/schema_diagram.md does not exist at %s", diagramPath)
+	}
+
+	// Read content to verify it has meaningful content
+	content, err := os.ReadFile(diagramPath)
+	if err != nil {
+		t.Fatalf("Failed to read docs/schema_diagram.md: %v", err)
+	}
+
+	contentStr := string(content)
+
+	if len(contentStr) < 500 {
+		t.Errorf("docs/schema_diagram.md size = %d bytes, want at least 500 bytes", len(contentStr))
+	}
+
+	// Verify key sections exist
+	requiredSections := []string{
+		"ERD",
+		"Data Flow",
+		"dim_",
+		"fact_",
+		"int_",
+		"bottleneck",
+		"utilization",
+	}
+
+	for _, section := range requiredSections {
+		if !containsSubstring(contentStr, section) {
+			t.Errorf("docs/schema_diagram.md missing content: %q", section)
+		}
+	}
+
+	// Verify ASCII art diagram elements (typical diagram characters)
+	diagramChars := []string{"|", "+", "-"}
+	foundDiagramChars := 0
+	for _, char := range diagramChars {
+		if containsSubstring(contentStr, char) {
+			foundDiagramChars++
+		}
+	}
+
+	if foundDiagramChars < 2 {
+		t.Error("docs/schema_diagram.md should contain ASCII art diagram elements")
+	}
+}
+
+// TestVerificationSQLExists verifies verify_bottleneck_analysis.sql exists with queries
+func TestVerificationSQLExists(t *testing.T) {
+	verifyPath := filepath.Join("verify_bottleneck_analysis.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(verifyPath); os.IsNotExist(err) {
+		t.Fatalf("verify_bottleneck_analysis.sql does not exist at %s", verifyPath)
+	}
+
+	// Read content to verify it has queries
+	content, err := os.ReadFile(verifyPath)
+	if err != nil {
+		t.Fatalf("Failed to read verify_bottleneck_analysis.sql: %v", err)
+	}
+
+	contentStr := string(content)
+
+	if len(contentStr) < 1000 {
+		t.Errorf("verify_bottleneck_analysis.sql size = %d bytes, want at least 1000 bytes for comprehensive queries", len(contentStr))
+	}
+
+	// Verify multiple queries (at least 5)
+	selectCount := countSubstring(contentStr, "SELECT")
+	if selectCount < 5 {
+		t.Errorf("verify_bottleneck_analysis.sql has %d SELECT statements, want at least 5 verification queries", selectCount)
+	}
+
+	// Verify uses Gorchata template syntax
+	if !containsSubstring(contentStr, "{{ ref(") {
+		t.Error("verify_bottleneck_analysis.sql should use {{ ref('...') }} template syntax")
+	}
+
+	// Verify targets key tables
+	keyTables := []string{
+		"bottleneck",
+		"utilization",
+		"NCX-10",
+		"Heat Treat",
+	}
+
+	for _, table := range keyTables {
+		if !containsSubstring(contentStr, table) {
+			t.Errorf("verify_bottleneck_analysis.sql should query/mention %q", table)
+		}
+	}
+
+	// Verify has comments explaining queries
+	if !containsSubstring(contentStr, "--") && !containsSubstring(contentStr, "/*") {
+		t.Error("verify_bottleneck_analysis.sql should have comments explaining queries")
 	}
 }

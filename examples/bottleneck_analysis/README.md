@@ -75,23 +75,37 @@ bottleneck_analysis/
 
 ### Initial Setup
 
-*(To be implemented in Phase 2)*
-
 1. Review and customize configuration in `gorchata_project.yml`
-2. Set database location if needed: `$env:BOTTLENECK_ANALYSIS_DB="path\to\db.db"`
-3. Load seed data: `gorchata seed`
+2. Set database location if needed:
+   ```powershell
+   $env:BOTTLENECK_ANALYSIS_DB="path\to\db.db"
+   ```
+3. Load seed data:
+   ```powershell
+   gorchata seed
+   ```
+
+This will create the database and load the raw manufacturing data from CSV files in the `seeds/` directory.
 
 ### Build Models
 
-*(To be implemented in later phases)*
-
 ```powershell
-# Build all models
+# Build all models (sources → dimensions → facts → rollups)
 gorchata run
 
 # Build specific model
 gorchata run --models bottleneck_hourly_utilization
+
+# Build with full lineage
+gorchata run --models +bottleneck_ranking
 ```
+
+The build process follows this order:
+1. **Sources**: Import seed data into staging tables
+2. **Dimensions**: Build dimension tables (resources, work orders, parts, dates)
+3. **Facts**: Create fact tables for operations and downtime
+4. **Intermediate**: Calculate daily utilization metrics
+5. **Rollups**: Generate bottleneck rankings and analytics
 
 ### Run Tests
 
@@ -101,6 +115,19 @@ gorchata test
 
 # Run Go integration tests
 go test ./examples/bottleneck_analysis/...
+```
+
+### Verify Results
+
+Use the verification SQL script to manually inspect results:
+
+```powershell
+# Run all verification queries
+sqlite3 bottleneck_analysis.db < verify_bottleneck_analysis.sql
+
+# Or run interactively
+sqlite3 bottleneck_analysis.db
+.read verify_bottleneck_analysis.sql
 ```
 
 ## Configuration
@@ -126,14 +153,39 @@ $env:BOTTLENECK_ANALYSIS_DB="path\to\custom.db"
 
 ## Expected Outputs
 
-*(To be detailed in later phases)*
+### Bottleneck Identification
 
-Key analytical outputs:
-- Hourly machine utilization rates
-- Bottleneck identification by time period
-- Throughput analysis and trends
-- Downtime root cause analysis
-- Shift-over-shift performance comparison
+The `anl_bottleneck_ranking` rollup produces a ranked list of resources by bottleneck severity. You should see:
+
+**Top Bottlenecks (Highest Scores):**
+1. **NCX-10** - Primary constraint with high utilization (>85%) and significant queue time
+2. **Heat Treat** - Secondary bottleneck with capacity constraints and WIP accumulation
+
+**Non-Bottlenecks (Lower Scores):**
+- Milling, Assembly, Grinding - Lower utilization and minimal queuing
+
+### Key Metrics
+
+- **Utilization Rate**: NCX-10 typically shows 85-95% utilization, Heat Treat 75-85%
+- **Queue Time**: NCX-10 averages 2-4 hours of queue time per operation
+- **WIP Accumulation**: Visible buildup before NCX-10 and Heat Treat
+- **Downtime Impact**: Unplanned downtime on NCX-10 creates cascading delays
+
+### Daily Utilization Trends
+
+The `int_resource_daily_utilization` intermediate table shows:
+- Day-over-day utilization patterns
+- Downtime-adjusted utilization rates
+- Shift performance variations
+- Capacity constraint identification
+
+### Actionable Insights
+
+According to Theory of Constraints, focus improvements on:
+1. **Exploit the constraint**: Maximize NCX-10 uptime, eliminate idle time
+2. **Subordinate operations**: Ensure upstream processes feed NCX-10 continuously
+3. **Elevate capacity**: Consider additional NCX-10 capacity if exploitation maxed out
+4. **Monitor Heat Treat**: Watch for constraint shifting downstream
 
 ## Development
 
