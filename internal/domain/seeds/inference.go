@@ -74,8 +74,9 @@ func inferColumnType(values []string) string {
 // The first row is expected to be headers, and subsequent rows are data.
 // If sampleSize > 0, only the first sampleSize data rows are analyzed.
 // If sampleSize = 0, all data rows are analyzed.
-// Returns a SeedSchema with inferred column types or an error.
-func InferSchema(rows [][]string, sampleSize int) (*SeedSchema, error) {
+// columnTypeOverrides allows manual specification of column types to override inference.
+// Returns a SeedSchema with inferred (or overridden) column types or an error.
+func InferSchema(rows [][]string, sampleSize int, columnTypeOverrides map[string]string) (*SeedSchema, error) {
 	// Validate input
 	if len(rows) < 2 {
 		return nil, fmt.Errorf("insufficient data: need at least headers + 1 data row")
@@ -98,19 +99,30 @@ func InferSchema(rows [][]string, sampleSize int) (*SeedSchema, error) {
 	// Build schema by inferring type for each column
 	columns := make([]SeedColumn, len(headers))
 	for colIdx, header := range headers {
-		// Collect all values for this column
-		colValues := make([]string, 0, len(dataRows))
-		for _, row := range dataRows {
-			// Handle rows with different lengths
-			if colIdx < len(row) {
-				colValues = append(colValues, row[colIdx])
-			} else {
-				colValues = append(colValues, "")
+		// Check if there's a manual override for this column
+		var colType string
+		if columnTypeOverrides != nil {
+			if overrideType, exists := columnTypeOverrides[header]; exists {
+				colType = overrideType
 			}
 		}
 
-		// Infer the type for this column
-		colType := inferColumnType(colValues)
+		// If no override, infer the type from data
+		if colType == "" {
+			// Collect all values for this column
+			colValues := make([]string, 0, len(dataRows))
+			for _, row := range dataRows {
+				// Handle rows with different lengths
+				if colIdx < len(row) {
+					colValues = append(colValues, row[colIdx])
+				} else {
+					colValues = append(colValues, "")
+				}
+			}
+
+			// Infer the type for this column
+			colType = inferColumnType(colValues)
+		}
 
 		columns[colIdx] = SeedColumn{
 			Name: header,

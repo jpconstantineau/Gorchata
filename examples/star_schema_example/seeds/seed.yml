@@ -1,0 +1,8 @@
+version: 1
+
+naming:
+  strategy: filename
+
+import:
+  batch_size: 1000
+  scope: folder

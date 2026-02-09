@@ -13,7 +13,7 @@ WITH active_events AS (
     alarm_value,
     setpoint_value,
     area_code
-  FROM {{ ref "raw_alarm_events" }}
+  FROM {{ seed "raw_alarm_events" }}
   WHERE event_type = 'ACTIVE'
 ),
 
@@ -23,7 +23,7 @@ acknowledged_events AS (
     event_timestamp AS acknowledged_timestamp,
     operator_id,
     ROW_NUMBER() OVER (PARTITION BY tag_id ORDER BY event_timestamp) AS ack_seq
-  FROM {{ ref "raw_alarm_events" }}
+  FROM {{ seed "raw_alarm_events" }}
   WHERE event_type = 'ACKNOWLEDGED'
 ),
 
@@ -32,7 +32,7 @@ inactive_events AS (
     tag_id,
     event_timestamp AS inactive_timestamp,
     ROW_NUMBER() OVER (PARTITION BY tag_id ORDER BY event_timestamp) AS inactive_seq
-  FROM {{ ref "raw_alarm_events" }}
+  FROM {{ seed "raw_alarm_events" }}
   WHERE event_type = 'INACTIVE'
 ),
 

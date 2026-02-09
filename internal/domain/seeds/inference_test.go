@@ -153,7 +153,7 @@ func TestInferSchema_BasicCSV(t *testing.T) {
 		{"3", "Charlie", "92.3"},
 	}
 
-	schema, err := InferSchema(rows, 0)
+	schema, err := InferSchema(rows, 0, nil)
 	if err != nil {
 		t.Fatalf("InferSchema() error = %v", err)
 	}
@@ -195,7 +195,7 @@ func TestInferSchema_MixedTypes(t *testing.T) {
 		{"3", "Charlie", "28", "3200.75", "true"},
 	}
 
-	schema, err := InferSchema(rows, 0)
+	schema, err := InferSchema(rows, 0, nil)
 	if err != nil {
 		t.Fatalf("InferSchema() error = %v", err)
 	}
@@ -233,7 +233,7 @@ func TestInferSchema_WithHeaders(t *testing.T) {
 		{"4", "5", "6"},       // Data row 2
 	}
 
-	schema, err := InferSchema(rows, 0)
+	schema, err := InferSchema(rows, 0, nil)
 	if err != nil {
 		t.Fatalf("InferSchema() error = %v", err)
 	}
@@ -261,7 +261,7 @@ func TestInferSchema_SampleSize(t *testing.T) {
 	}
 
 	// Sample only first 3 data rows (integers)
-	schema, err := InferSchema(rows, 3)
+	schema, err := InferSchema(rows, 3, nil)
 	if err != nil {
 		t.Fatalf("InferSchema() error = %v", err)
 	}
@@ -271,7 +271,7 @@ func TestInferSchema_SampleSize(t *testing.T) {
 	}
 
 	// Sample all rows (includes "hello")
-	schema, err = InferSchema(rows, 0)
+	schema, err = InferSchema(rows, 0, nil)
 	if err != nil {
 		t.Fatalf("InferSchema() error = %v", err)
 	}
@@ -287,7 +287,7 @@ func TestInferSchema_EmptyData(t *testing.T) {
 		{"id", "name", "score"},
 	}
 
-	_, err := InferSchema(rows, 0)
+	_, err := InferSchema(rows, 0, nil)
 	if err == nil {
 		t.Error("expected error for empty data, got nil")
 	}
@@ -300,8 +300,93 @@ func TestInferSchema_NoHeaders(t *testing.T) {
 		{"1", "2", "3"},
 	}
 
-	_, err := InferSchema(rows, 0)
+	_, err := InferSchema(rows, 0, nil)
 	if err == nil {
 		t.Error("expected error for no headers, got nil")
+	}
+}
+
+// TestInferSchema_WithOverrides tests applying manual column type overrides
+func TestInferSchema_WithOverrides(t *testing.T) {
+	rows := [][]string{
+		{"id", "code", "amount", "name"},
+		{"1", "ABC123", "100.50", "Alice"},
+		{"2", "DEF456", "250.75", "Bob"},
+	}
+
+	// Without overrides, 'code' would be TEXT (correct), 'id' and 'amount' would be inferred
+	// Let's force 'id' to be TEXT and keep amount as REAL
+	overrides := map[string]string{
+		"id":   "TEXT", // Force ID to be TEXT even though it looks like INTEGER
+		"code": "TEXT", // Explicitly set (would be inferred anyway)
+	}
+
+	schema, err := InferSchema(rows, 0, overrides)
+	if err != nil {
+		t.Fatalf("InferSchema failed: %v", err)
+	}
+
+	if len(schema.Columns) != 4 {
+		t.Fatalf("expected 4 columns, got %d", len(schema.Columns))
+	}
+
+	// Check id - should be TEXT due to override
+	if schema.Columns[0].Name != "id" {
+		t.Errorf("column 0: expected name 'id', got '%s'", schema.Columns[0].Name)
+	}
+	if schema.Columns[0].Type != "TEXT" {
+		t.Errorf("column 0: expected type 'TEXT' (overridden), got '%s'", schema.Columns[0].Type)
+	}
+
+	// Check code - should be TEXT
+	if schema.Columns[1].Name != "code" {
+		t.Errorf("column 1: expected name 'code', got '%s'", schema.Columns[1].Name)
+	}
+	if schema.Columns[1].Type != "TEXT" {
+		t.Errorf("column 1: expected type 'TEXT', got '%s'", schema.Columns[1].Type)
+	}
+
+	// Check amount - should be REAL (inferred, no override)
+	if schema.Columns[2].Name != "amount" {
+		t.Errorf("column 2: expected name 'amount', got '%s'", schema.Columns[2].Name)
+	}
+	if schema.Columns[2].Type != "REAL" {
+		t.Errorf("column 2: expected type 'REAL' (inferred), got '%s'", schema.Columns[2].Type)
+	}
+
+	// Check name - should be TEXT (inferred, no override)
+	if schema.Columns[3].Name != "name" {
+		t.Errorf("column 3: expected name 'name', got '%s'", schema.Columns[3].Name)
+	}
+	if schema.Columns[3].Type != "TEXT" {
+		t.Errorf("column 3: expected type 'TEXT' (inferred), got '%s'", schema.Columns[3].Type)
+	}
+}
+
+// TestInferSchema_OverrideAll tests applying overrides to all columns
+func TestInferSchema_OverrideAll(t *testing.T) {
+	rows := [][]string{
+		{"col1", "col2"},
+		{"1", "2.5"},
+		{"3", "4.5"},
+	}
+
+	// Override everything
+	overrides := map[string]string{
+		"col1": "TEXT",
+		"col2": "TEXT",
+	}
+
+	schema, err := InferSchema(rows, 0, overrides)
+	if err != nil {
+		t.Fatalf("InferSchema failed: %v", err)
+	}
+
+	// Both columns should be TEXT due to overrides
+	if schema.Columns[0].Type != "TEXT" {
+		t.Errorf("col1: expected TEXT, got %s", schema.Columns[0].Type)
+	}
+	if schema.Columns[1].Type != "TEXT" {
+		t.Errorf("col2: expected TEXT, got %s", schema.Columns[1].Type)
 	}
 }

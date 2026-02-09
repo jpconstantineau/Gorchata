@@ -8,5 +8,5 @@ SELECT DISTINCT
     CAST(strftime('%d', sale_date) AS INTEGER) AS day,
     strftime('%w', sale_date) AS day_of_week,
     CASE WHEN strftime('%w', sale_date) IN ('0', '6') THEN 1 ELSE 0 END AS is_weekend
-FROM {{ ref "raw_sales" }}
+FROM {{ seed "raw_sales" }}
 ORDER BY sale_date

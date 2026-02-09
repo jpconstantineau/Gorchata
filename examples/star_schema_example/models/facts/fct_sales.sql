@@ -11,7 +11,7 @@ SELECT
     rs.sale_date,
     rs.sale_amount,
     rs.quantity
-FROM {{ ref "raw_sales" }} rs
+FROM {{ seed "raw_sales" }} rs
 INNER JOIN {{ ref "dim_customers" }} dc 
     ON rs.customer_id = dc.customer_id 
     AND rs.sale_date >= dc.valid_from 

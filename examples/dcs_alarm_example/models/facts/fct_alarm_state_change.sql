@@ -13,7 +13,7 @@ WITH all_events AS (
     LAG(event_type) OVER (PARTITION BY tag_id ORDER BY event_timestamp) AS from_state,
     LAG(event_timestamp) OVER (PARTITION BY tag_id ORDER BY event_timestamp) AS prev_timestamp,
     ROW_NUMBER() OVER (PARTITION BY tag_id ORDER BY event_timestamp) AS sequence_number
-  FROM {{ ref "raw_alarm_events" }}
+  FROM {{ seed "raw_alarm_events" }}
 ),
 
 state_changes AS (

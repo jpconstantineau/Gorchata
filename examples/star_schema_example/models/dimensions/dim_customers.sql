@@ -12,7 +12,7 @@ WITH customer_changes AS (
     customer_city,
     customer_state,
     sale_date
-  FROM {{ ref "raw_sales" }}
+  FROM {{ seed "raw_sales" }}
 ),
 
 customer_versions AS (
