@@ -1,0 +1,156 @@
+# Unit Train Analytics - CLM Generation Configuration
+# This configuration defines parameters for generating realistic Car Location Messages (CLM)
+# simulating 3 parallel unit trains with 75 cars each across 6 corridors over 90 days
+
+version: 1
+
+# Fleet Configuration
+fleet:
+  total_cars: 250        # 225 operational (3 trains × 75 cars) + 25 buffer
+  car_type: "COAL_HOPPER"
+  commodity: "COAL"
+  capacity_tons: 110
+
+# Location Configuration
+locations:
+  # 2 Origins with loading queue (1 train at a time, 12-18 hours loading)
+  origins:
+    - id: "COAL_MINE_A"
+      name: "Coal Mine Alpha"
+      loading_hours_min: 12.0
+      loading_hours_max: 18.0
+      queue_capacity: 1
+    
+    - id: "COAL_MINE_B"
+      name: "Coal Mine Beta"
+      loading_hours_min: 12.0
+      loading_hours_max: 18.0
+      queue_capacity: 1
+  
+  # 3 Destinations with unloading queue (1 train at a time, 8-12 hours unloading)
+  destinations:
+    - id: "POWER_PLANT_1"
+      name: "Power Plant One"
+      unloading_hours_min: 8.0
+      unloading_hours_max: 12.0
+      queue_capacity: 1
+    
+    - id: "POWER_PLANT_2"
+      name: "Power Plant Two"
+      unloading_hours_min: 8.0
+      unloading_hours_max: 12.0
+      queue_capacity: 1
+    
+    - id: "PORT_TERMINAL"
+      name: "Export Port Terminal"
+      unloading_hours_min: 8.0
+      unloading_hours_max: 12.0
+      queue_capacity: 1
+
+# Corridor Configuration (2 origins × 3 destinations = 6 corridors)
+corridors:
+  - id: "CORR_A1"
+    origin_id: "COAL_MINE_A"
+    destination_id: "POWER_PLANT_1"
+    transit_days_min: 2
+    transit_days_max: 3
+    station_count: 6
+    distance_miles: 450
+    empty_return_factor: 0.7  # Empty trains travel 30% faster
+  
+  - id: "CORR_A2"
+    origin_id: "COAL_MINE_A"
+    destination_id: "POWER_PLANT_2"
+    transit_days_min: 3
+    transit_days_max: 4
+    station_count: 8
+    distance_miles: 620
+    empty_return_factor: 0.7
+  
+  - id: "CORR_A3"
+    origin_id: "COAL_MINE_A"
+    destination_id: "PORT_TERMINAL"
+    transit_days_min: 2
+    transit_days_max: 3
+    station_count: 5
+    distance_miles: 380
+    empty_return_factor: 0.7
+  
+  - id: "CORR_B1"
+    origin_id: "COAL_MINE_B"
+    destination_id: "POWER_PLANT_1"
+    transit_days_min: 3
+    transit_days_max: 4
+    station_count: 9
+    distance_miles: 710
+    empty_return_factor: 0.7
+  
+  - id: "CORR_B2"
+    origin_id: "COAL_MINE_B"
+    destination_id: "POWER_PLANT_2"
+    transit_days_min: 2
+    transit_days_max: 3
+    station_count: 7
+    distance_miles: 520
+    empty_return_factor: 0.7
+  
+  - id: "CORR_B3"
+    origin_id: "COAL_MINE_B"
+    destination_id: "PORT_TERMINAL"
+    transit_days_min: 3
+    transit_days_max: 4
+    station_count: 10
+    distance_miles: 780
+    empty_return_factor: 0.7
+
+# Train Configuration
+trains:
+  cars_per_train: 75       # Unit trains with exactly 75 cars
+  parallel_trains: 3       # 3 trains operating simultaneously
+
+# Operations Configuration
+operations:
+  # Origin queue: only 1 train can load at a time
+  origin_queue:
+    max_concurrent: 1
+  
+  # Destination queue: only 1 train can unload at a time
+  destination_queue:
+    max_concurrent: 1
+
+# Straggler Configuration
+stragglers:
+  rate_per_train_per_day: 1.0    # 1 car per train per day in transit (both directions)
+  delay_hours_min: 6.0           # Minimum delay: 6 hours
+  delay_hours_max: 72.0          # Maximum delay: 3 days (72 hours)
+
+# Seasonal Effects Configuration
+seasonal:
+  # Week 5: One corridor becomes 20% slower
+  slow_corridor_week: 5
+  slow_corridor_id: "CORR_A2"     # COAL_MINE_A to POWER_PLANT_2 gets slower
+  slowdown_factor: 1.2            # 20% slower (multiply transit time by 1.2)
+  
+  # Week 8: Straggler rate doubles across all corridors
+  high_straggler_week: 8
+  straggler_multiplier: 2.0       # 2x straggler rate
+
+# Time Window Configuration
+time_window:
+  start_date: "2024-01-01"        # Analysis starts January 1, 2024
+  duration_days: 90               # 90 days of operations (approximately 13 weeks)
+
+# Output Configuration
+output:
+  format: "csv"
+  filename: "raw_clm_events.csv"
+  headers:
+    - "event_id"
+    - "event_timestamp"
+    - "car_id"
+    - "train_id"
+    - "location_id"
+    - "event_type"
+    - "loaded_flag"
+    - "commodity"
+    - "weight_tons"

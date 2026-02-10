@@ -107,11 +107,26 @@ The schema includes comprehensive data quality tests:
 - Delay categories classify correctly (short/medium/long/extended)
 - Power inference logic is consistent (gap < 1 hour vs > 1 hour)
 
+## Seed Data Configuration
+
+The `seeds/` directory contains configuration for generating realistic CLM data. See [seeds/README.md](seeds/README.md) for details.
+
+Key features of the seed configuration:
+- 250-car fleet with 3 parallel 75-car unit trains
+- 6 corridors (2 origins × 3 destinations)
+- Queue bottlenecks at origins (loading) and destinations (unloading)
+- Straggler simulation with 6-hour to 3-day delays
+- Seasonal effects (week 5 slowdown, week 8 straggler spike)
+- 90 days of operational data
+
 ## Running Tests
 
 ```bash
 # Run all schema validation tests
 go test -v ./test -run TestUnitTrain
+
+# Run seed configuration validation tests
+go test -v ./test -run "UnitTrainSeed|CarFleet|TrainFormation|OriginDestination|Queue|Transit|Straggler|ParallelTrain|Seasonal|CSV"
 
 # Discover data quality tests from schema
 cd examples/unit_train_analytics
@@ -120,7 +135,7 @@ gorchata test
 
 ## Test Coverage
 
-The following tests validate the schema design:
+### Schema Design Tests
 
 1. **TestUnitTrainSchemaValidation** - Validates YAML structure
 2. **TestUnitTrainSchemaParsing** - Ensures schema parses correctly
@@ -128,6 +143,22 @@ The following tests validate the schema design:
 4. **TestUnitTrainFactTables** - Verifies fact table structure including power inference
 5. **TestUnitTrainCorridorLogic** - Validates corridor combination logic
 6. **TestUnitTrainTestDiscovery** - Confirms data quality tests can be discovered
+
+### Seed Configuration Tests
+
+7. **TestUnitTrainSeedConfiguration** - Validates seed YAML parses
+8. **TestCarFleetAllocation** - Ensures 225+ cars available (3 trains × 75 cars with buffer)
+9. **TestTrainFormationLogic** - Validates 75 cars per train constraint
+10. **TestOriginDestinationPairs** - Verifies 2 origins × 3 destinations = 6 corridors
+11. **TestOriginQueueLogic** - Ensures only 1 train loading at origin at a time (12-18 hours)
+12. **TestDestinationQueueLogic** - Ensures only 1 train unloading at destination at a time (8-12 hours)
+13. **TestTransitTimeDistribution** - Ensures 2-4 day variation with 5-10 stations
+14. **TestStragglerDelayRange** - Validates straggler delay between 6 hours and 3 days
+15. **TestStragglerIndependentTravel** - Validates stragglers travel independently then rejoin
+16. **TestStragglerGeneration** - Validates 1 car per train per day in transit, doubles during week 8
+17. **TestParallelTrainOperations** - Confirms 3 trains can operate simultaneously
+18. **TestSeasonalSlowdown** - Validates 1 corridor slower for 1 week
+19. **TestCSVFormatOutput** - Ensures CLM messages output as valid CSV
 
 ## Key Design Decisions
 
@@ -143,12 +174,11 @@ The following tests validate the schema design:
 
 6. **Queue Time Tracking**: Both origin and destination queue times are captured separately to identify bottlenecks.
 
-## Next Steps (Future Phases)
+## Project Status
 
-- Phase 2: Seed data generation
-- Phase 3: Source model implementation (CLM CSV ingestion)
-- Phase 4: Dimension model implementation with SCD Type 2 for changes
-- Phase 5: Fact table transformation logic
-- Phase 6: Aggregation models for performance optimization
-- Phase 7: Business metrics and KPI calculations
-- Phase 8: Integration tests with full data pipeline
+- ✅ Phase 1 Complete: Schema design with 5 dimensions, 4 facts, 2 aggregations
+- ✅ Phase 2 Complete: Seed configuration for CLM message generation
+- 🔲 Phase 3: CLM event generation logic
+- 🔲 Phase 4: Staging and dimension loading transformations
+- 🔲 Phase 5: Fact table transformations
+- 🔲 Phase 6: Analytical metrics and aggregations
