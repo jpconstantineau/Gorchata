@@ -30,7 +30,7 @@ Successfully created star schema structure for unit train analytics enabling ana
 
 *Dimension Tables (5):*
 - dim_train - train lifecycle tracking
-- dim_car - rail car fleet (250 cars)
+- dim_car - rail car fleet (228 cars)
 - dim_location - origins (2), destinations (3), stations
 - dim_corridor - 6 origin-destination combinations
 - dim_date - time dimension with week granularity

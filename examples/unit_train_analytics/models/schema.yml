@@ -124,9 +124,6 @@ models:
           - accepted_values:
               values: ['2-day', '3-day', '4-day']
       
-      - name: intermediate_stations
-        description: "Comma-separated list of station location_ids along route"
-      
       - name: expected_transit_hours
         description: "Expected transit time in hours"
         data_tests:
@@ -134,6 +131,25 @@ models:
           - accepted_range:
               min_value: 24
               max_value: 120
+      
+      - name: distance_miles
+        description: "Estimated distance in miles (calculated from transit time)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 100
+              max_value: 3000
+      
+      - name: station_count
+        description: "Number of intermediate stations along route"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 20
+      
+      - name: intermediate_stations
+        description: "Comma-separated list of station location_ids along route"
   
   - name: dim_date
     description: "Date dimension for temporal analysis with week granularity for seasonal effects"

@@ -114,7 +114,7 @@ Building a comprehensive railroad operations data warehouse that transforms raw 
   - `test/transform_dimensions_test.go`
 - **Tests to Write:**
   - `TestStagingTableLoad` - validates raw CLM CSV data loads correctly
-  - `TestDimCarGeneration` - ensures all 250 cars in dimension with single car type
+  - `TestDimCarGeneration` - ensures all 228 cars in dimension with single car type
   - `TestDimTrainGeneration` - validates train records created from CLM events with trip-specific IDs
   - `TestDimLocationHierarchy` - ensures origin/station/destination hierarchy
   - `TestDimCorridorCreation` - validates 6 corridor records with proper attributes
@@ -241,7 +241,7 @@ Building a comprehensive railroad operations data warehouse that transforms raw 
   - `examples/unit_train_analytics/validation/straggler_validation.sql`
   - `test/validation_test.go`
 - **Tests to Write:**
-  - `TestCarAccountingBalance` - ensures all 250 cars accounted for at all times
+  - `TestCarAccountingBalance` - ensures all 228 cars accounted for at all times
   - `TestCarExclusivityValidation` - validates no car on multiple trains simultaneously
   - `TestTrainSizeValidation` - ensures trains form with exactly 75 cars (except stragglers)
   - `TestQueueConstraintValidation` - validates only 1 train loading/unloading at origin/destination at a time

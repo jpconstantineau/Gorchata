@@ -7,7 +7,7 @@ This directory contains seed configuration for generating realistic Car Location
 ### clm_generation_config.yml
 Configuration file that defines parameters for generating CLM messages simulating railroad operations:
 
-- **Fleet Configuration**: 250 rail cars (225 operational + 25 buffer)
+- **Fleet Configuration**: 228 rail cars (225 operational + 3 buffer)
   - Car type: COAL_HOPPER
   - Commodity: COAL
   - Capacity: 110 tons per car

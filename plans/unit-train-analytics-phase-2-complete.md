@@ -42,7 +42,7 @@ Successfully created comprehensive seed configuration defining parameters for ge
 
 **Configuration Structure:**
 
-*Fleet:* 250 cars total (225 operational + 25 buffer), single car type (COAL_HOPPER), single commodity (COAL)
+*Fleet:* 228 cars total (225 operational + 3 buffer), single car type (COAL_HOPPER), single commodity (COAL)
 
 *Locations:*
 - 2 origins (COAL_MINE_A, COAL_MINE_B) with single train loading queues (12-18 hours)
