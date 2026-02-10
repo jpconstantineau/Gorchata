@@ -6,10 +6,11 @@
 - [x] Star Schema
 - [x] DCS Alarm Analytics
 - [x] Manufacturing Data for Bottleneck Analysis
+- [x] [Unit Train Analytics Data Warehouse](examples/unit_train_analytics/README.md)
 
 ### In Progress 🚧
 
-- [] Unit Train Analytics Data Warehouse
+- [] None currently
 
 ### Future Examples 🔮
 
