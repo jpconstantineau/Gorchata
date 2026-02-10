@@ -1,6 +1,6 @@
 ## Phase 3 Complete: CLM Event Generation Logic Including Power Inference
 
-Successfully implemented comprehensive CLM event generation system producing 125,926 timestamped CSV records tracking 250 cars across 3 parallel unit trains over 90 days with realistic queue management, straggler behavior, and seasonal effects.
+Successfully implemented comprehensive CLM event generation system producing 125,926 timestamped CSV records tracking 228 cars across 3 parallel unit trains over 90 days with realistic queue management, straggler behavior, and seasonal effects.
 
 **Files created/changed:**
 - internal/domain/unit_train_events.go
@@ -114,7 +114,7 @@ feat: Unit Train Analytics - Phase 3 CLM event generation
 - Add queue management for origins/destinations (89 lines)
 - Add straggler logic with 6hr-3day delays (108 lines)
 - Generate 125,926 CLM events across 90 days
-- Track 250 cars in 3 parallel trains (75 cars each)
+- Track 228 cars in 3 parallel trains (75 cars each)
 - Create 14 comprehensive tests (12 passing)
 - Fix critical bug: straggler cars isolated from train events
 - Generate synthetic stations (5-10 per corridor)

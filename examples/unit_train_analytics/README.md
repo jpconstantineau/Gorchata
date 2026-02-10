@@ -6,8 +6,8 @@ This example demonstrates a comprehensive data warehouse design for unit train o
 
 This data warehouse models a unit train operation with the following characteristics:
 
-- **Fleet**: 250 rail cars total
-- **Operations**: 3 parallel trains, 75 cars each
+- **Fleet**: 228 rail cars total (based on generated seed data)
+- **Operations**: 3 parallel trains, 75 cars each (225 operational + 3 buffer)
 - **Origins**: 2 loading facilities (single queue, 12-18 hour loading time)
 - **Destinations**: 3 unloading facilities (single queue, 8-12 hour unloading time)
 - **Corridors**: 6 routes (2 origins × 3 destinations)
@@ -69,7 +69,7 @@ This data warehouse models a unit train operation with the following characteris
    - Metrics: total_trips, avg_transit_hours, avg_queue_hours, total_stragglers
 
 2. **agg_fleet_utilization_daily** - Daily fleet status
-   - Total 250 cars: cars_on_trains, cars_as_stragglers, cars_idle, utilization_pct
+   - Total 228 cars: cars_on_trains, cars_as_stragglers, cars_idle, utilization_pct
 
 ## Input Data Format
 
@@ -103,7 +103,7 @@ The schema includes comprehensive data quality tests:
 - Transit time classes are valid (2-day/3-day/4-day)
 - Queue times are reasonable (0-72 hours)
 - Transit times are reasonable (24-120 hours)
-- Fleet size is constant (250 cars)
+- Fleet size is constant (228 cars)
 - Delay categories classify correctly (short/medium/long/extended)
 - Power inference logic is consistent (gap < 1 hour vs > 1 hour)
 
@@ -112,7 +112,7 @@ The schema includes comprehensive data quality tests:
 The `seeds/` directory contains configuration for generating realistic CLM data. See [seeds/README.md](seeds/README.md) for details.
 
 Key features of the seed configuration:
-- 250-car fleet with 3 parallel 75-car unit trains
+- 228-car fleet with 3 parallel 75-car unit trains (225 operational + 3 buffer)
 - 6 corridors (2 origins × 3 destinations)
 - Queue bottlenecks at origins (loading) and destinations (unloading)
 - Straggler simulation with 6-hour to 3-day delays
@@ -147,7 +147,7 @@ gorchata test
 ### Seed Configuration Tests
 
 7. **TestUnitTrainSeedConfiguration** - Validates seed YAML parses
-8. **TestCarFleetAllocation** - Ensures 225+ cars available (3 trains × 75 cars with buffer)
+8. **TestCarFleetAllocation** - Ensures 228 cars available (3 trains × 75 cars = 225 operational + 3 buffer)
 9. **TestTrainFormationLogic** - Validates 75 cars per train constraint
 10. **TestOriginDestinationPairs** - Verifies 2 origins × 3 destinations = 6 corridors
 11. **TestOriginQueueLogic** - Ensures only 1 train loading at origin at a time (12-18 hours)
