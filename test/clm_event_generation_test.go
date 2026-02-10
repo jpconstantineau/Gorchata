@@ -266,8 +266,7 @@ func TestStragglerEventSequence(t *testing.T) {
 // TestCarExclusivity ensures cars only on one train at a time (except stragglers between set_out and rejoin)
 // Note: This test has known limitations due to event generation vs simulation timing
 func TestCarExclusivity(t *testing.T) {
-	t.Skip("Known limitation: car allocation timing between event generation and simulation order")
-
+	// Un-skipped to verify straggler bug fix
 	config := loadCLMConfig(t)
 
 	events, err := generateCLMEvents(config)
@@ -301,10 +300,16 @@ func TestCarExclusivity(t *testing.T) {
 				if currentTrain != "" && currentTrain != assignment.TrainID && !isStragglerIndependent {
 					// Debug: print sequence for this car
 					if failCount < 2 { // Only print first 2 failures
-						t.Logf("Car %s event sequence:", carID)
-						for j := 0; j < len(assignments) && j < 20; j++ {
-							t.Logf("  %d: %s - Train: %s - %v", j, assignments[j].EventType,
-								assignments[j].TrainID, assignments[j].Timestamp.Format("01-02 15:04"))
+						t.Logf("Car %s event sequence (showing %d events around failure at index %d):", carID, min(len(assignments), 20), i)
+						start := max(0, i-10)
+						end := min(len(assignments), i+10)
+						for j := start; j < end; j++ {
+							marker := ""
+							if j == i {
+								marker = " <- FAILURE HERE"
+							}
+							t.Logf("  %d: %s - Train: %s - %v%s", j, assignments[j].EventType,
+								assignments[j].TrainID, assignments[j].Timestamp.Format("01-02 15:04"), marker)
 						}
 						failCount++
 					}
@@ -317,6 +322,13 @@ func TestCarExclusivity(t *testing.T) {
 				// Car becomes independent (straggler)
 				isStragglerIndependent = true
 				currentTrain = ""
+
+			case "ARRIVE_DESTINATION":
+				// Independent straggler arrival (no train ID) - reset independent flag
+				if assignment.TrainID == "" && isStragglerIndependent {
+					isStragglerIndependent = false
+					currentTrain = ""
+				}
 
 			case "JOIN_TRAIN":
 				// Car rejoins a train

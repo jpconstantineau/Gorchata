@@ -356,23 +356,23 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				transitDuration = time.Duration(float64(transitDuration) * g.Config.Seasonal.SlowdownFactor)
 			}
 
-			// Generate station events
-			stationEvents := g.generateStationEvents(nextTrain, corridor, currentTime, transitDuration, true, &eventIDCounter)
-			events = append(events, stationEvents...)
-
-			// Check for stragglers
+			// Check for stragglers FIRST (before generating station events)
 			stragglerEvents := g.StragglerEngine.GenerateStragglerEvents(
 				nextTrain, corridor, currentTime, transitDuration, true, &eventIDCounter, g.isHighStragglerWeek(currentTime),
 			)
 			if len(stragglerEvents) > 0 {
 				events = append(events, stragglerEvents...)
-				// Remove stragglers from train
+				// Remove stragglers from train BEFORE generating station events
 				for _, se := range stragglerEvents {
 					if se.EventType == "SET_OUT" {
 						nextTrain.CarIDs = removeCarFromList(nextTrain.CarIDs, se.CarIDs[0])
 					}
 				}
 			}
+
+			// Generate station events AFTER straggler removal
+			stationEvents := g.generateStationEvents(nextTrain, corridor, currentTime, transitDuration, true, &eventIDCounter)
+			events = append(events, stationEvents...)
 
 			// Arrive at destination
 			arrivalTime := currentTime.Add(transitDuration)
@@ -479,23 +479,23 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 			}
 			transitDuration := time.Duration(float64(transitDays)*24*corridor.EmptyReturnFactor) * time.Hour
 
-			// Generate station events (empty return)
-			stationEvents := g.generateStationEvents(nextTrain, corridor, currentTime, transitDuration, false, &eventIDCounter)
-			events = append(events, stationEvents...)
-
-			// Check for stragglers on empty return
+			// Check for stragglers on empty return FIRST (before generating station events)
 			stragglerEvents := g.StragglerEngine.GenerateStragglerEvents(
 				nextTrain, corridor, currentTime, transitDuration, false, &eventIDCounter, g.isHighStragglerWeek(currentTime),
 			)
 			if len(stragglerEvents) > 0 {
 				events = append(events, stragglerEvents...)
-				// Remove stragglers from train
+				// Remove stragglers from train BEFORE generating station events
 				for _, se := range stragglerEvents {
 					if se.EventType == "SET_OUT" {
 						nextTrain.CarIDs = removeCarFromList(nextTrain.CarIDs, se.CarIDs[0])
 					}
 				}
 			}
+
+			// Generate station events AFTER straggler removal (empty return)
+			stationEvents := g.generateStationEvents(nextTrain, corridor, currentTime, transitDuration, false, &eventIDCounter)
+			events = append(events, stationEvents...)
 
 			// Arrive at origin (empty)
 			arrivalTime := currentTime.Add(transitDuration)
