@@ -16,7 +16,7 @@ WITH train_arrivals AS (
   FROM {{ ref "fact_car_location_event" }} f
   INNER JOIN {{ ref "dim_location" }} l ON f.location_id = l.location_id
   WHERE f.train_id IS NOT NULL
-    AND f.event_type IN ('ARRIVE_DESTINATION', 'ARRIVE_ORIGIN')
+    AND f.event_type IN ('arrived_destination', 'arrived_origin')
 ),
 
 train_departures AS (
@@ -28,7 +28,7 @@ train_departures AS (
     f.event_type
   FROM {{ ref "fact_car_location_event" }} f
   WHERE f.train_id IS NOT NULL
-    AND f.event_type IN ('DEPART_ORIGIN', 'DEPART_DESTINATION')
+    AND f.event_type IN ('departed_origin', 'departed_destination')
 ),
 
 -- Match arrivals with subsequent departures at same location

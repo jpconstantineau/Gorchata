@@ -65,11 +65,33 @@ This data warehouse models a unit train operation with the following characteris
 #### Aggregated Metrics Tables (Performance Optimization)
 
 1. **agg_corridor_weekly_metrics** - Weekly KPIs by corridor
+   - Grain: One row per corridor per week
    - Supports seasonal analysis (week 5 slowdown, week 8 straggler spike)
-   - Metrics: total_trips, avg_transit_hours, avg_queue_hours, total_stragglers
+   - Metrics: total_trips, avg_transit_hours, avg_origin_queue_hours, avg_destination_queue_hours, total_stragglers, avg_straggler_delay_hours, avg_cycle_hours, straggler_rate
 
 2. **agg_fleet_utilization_daily** - Daily fleet status
+   - Grain: One row per day
    - Total 228 cars: cars_on_trains, cars_as_stragglers, cars_idle, utilization_pct
+
+3. **agg_origin_turnaround** - Origin turnaround time analysis
+   - Grain: One row per origin location per week
+   - Metrics: avg_turnaround_hours, min_turnaround_hours, max_turnaround_hours, stddev_turnaround_hours
+
+4. **agg_destination_turnaround** - Destination turnaround time analysis
+   - Grain: One row per destination location per week
+   - Metrics: avg_turnaround_hours, min_turnaround_hours, max_turnaround_hours, stddev_turnaround_hours
+
+5. **agg_straggler_impact** - Straggler impact analysis with delay distribution
+   - Grain: One row per corridor per week
+   - Metrics: straggler_count, cars_affected, avg_delay_hours, median_delay_hours, delay histogram (0-6h, 6-12h, 12-24h, 24+h), rejoined_count
+
+6. **agg_queue_analysis** - Queue bottleneck identification
+   - Grain: One row per location per week (covers both origins and destinations)
+   - Metrics: queue_frequency, avg_queue_hours, max_queue_hours, p75_queue_hours, p95_queue_hours
+
+7. **agg_power_efficiency** - Locomotive power transfer patterns
+   - Grain: One row per corridor per week
+   - Metrics: power_transfer_count, same_power_trips, repower_trips, repower_frequency_pct, power_efficiency_score
 
 ## Input Data Format
 
@@ -181,4 +203,4 @@ gorchata test
 - 🔲 Phase 3: CLM event generation logic
 - 🔲 Phase 4: Staging and dimension loading transformations
 - 🔲 Phase 5: Fact table transformations
-- 🔲 Phase 6: Analytical metrics and aggregations
+- ✅ Phase 6 Complete: Analytical metrics and aggregations (7 metric tables, 11 tests)

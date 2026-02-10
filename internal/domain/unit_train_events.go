@@ -252,14 +252,14 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 			nextTrain.CorridorID = corridor.ID
 			nextTrain.FormationTime = currentTime
 
-			// Generate FORM_TRAIN event
+			// Generate train_formed event
 			events = append(events, CLMEvent{
 				EventID:    fmt.Sprintf("EVT_%08d", eventIDCounter),
 				Timestamp:  currentTime,
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: origin.ID,
-				EventType:  "FORM_TRAIN",
+				EventType:  "train_formed",
 				LoadedFlag: false,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: 0,
@@ -289,7 +289,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 					CarIDs:     nextTrain.CarIDs,
 					TrainID:    nextTrain.TrainID,
 					LocationID: nextTrain.CurrentLocation,
-					EventType:  "LOAD_START",
+					EventType:  "load_start",
 					LoadedFlag: false,
 					Commodity:  g.Config.Fleet.Commodity,
 					WeightTons: 0,
@@ -313,7 +313,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: nextTrain.CurrentLocation,
-				EventType:  "LOAD_COMPLETE",
+				EventType:  "load_complete",
 				LoadedFlag: true,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: g.Config.Fleet.CapacityTons * len(nextTrain.CarIDs),
@@ -329,7 +329,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: nextTrain.CurrentLocation,
-				EventType:  "DEPART_ORIGIN",
+				EventType:  "departed_origin",
 				LoadedFlag: true,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: g.Config.Fleet.CapacityTons * len(nextTrain.CarIDs),
@@ -364,7 +364,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				events = append(events, stragglerEvents...)
 				// Remove stragglers from train BEFORE generating station events
 				for _, se := range stragglerEvents {
-					if se.EventType == "SET_OUT" {
+					if se.EventType == "car_set_out" {
 						nextTrain.CarIDs = removeCarFromList(nextTrain.CarIDs, se.CarIDs[0])
 					}
 				}
@@ -384,7 +384,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: destination.ID,
-				EventType:  "ARRIVE_DESTINATION",
+				EventType:  "arrived_destination",
 				LoadedFlag: true,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: g.Config.Fleet.CapacityTons * len(nextTrain.CarIDs),
@@ -414,7 +414,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 					CarIDs:     nextTrain.CarIDs,
 					TrainID:    nextTrain.TrainID,
 					LocationID: nextTrain.CurrentLocation,
-					EventType:  "UNLOAD_START",
+					EventType:  "unload_start",
 					LoadedFlag: true,
 					Commodity:  g.Config.Fleet.Commodity,
 					WeightTons: g.Config.Fleet.CapacityTons * len(nextTrain.CarIDs),
@@ -438,7 +438,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: nextTrain.CurrentLocation,
-				EventType:  "UNLOAD_COMPLETE",
+				EventType:  "unload_complete",
 				LoadedFlag: false,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: 0,
@@ -454,7 +454,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: nextTrain.CurrentLocation,
-				EventType:  "DEPART_DESTINATION",
+				EventType:  "departed_destination",
 				LoadedFlag: false,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: 0,
@@ -487,7 +487,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				events = append(events, stragglerEvents...)
 				// Remove stragglers from train BEFORE generating station events
 				for _, se := range stragglerEvents {
-					if se.EventType == "SET_OUT" {
+					if se.EventType == "car_set_out" {
 						nextTrain.CarIDs = removeCarFromList(nextTrain.CarIDs, se.CarIDs[0])
 					}
 				}
@@ -507,7 +507,7 @@ func (g *UnitTrainEventGenerator) GenerateEvents() ([]CLMEvent, error) {
 				CarIDs:     nextTrain.CarIDs,
 				TrainID:    nextTrain.TrainID,
 				LocationID: origin.ID,
-				EventType:  "ARRIVE_ORIGIN",
+				EventType:  "arrived_origin",
 				LoadedFlag: false,
 				Commodity:  g.Config.Fleet.Commodity,
 				WeightTons: 0,
@@ -628,7 +628,7 @@ func (g *UnitTrainEventGenerator) generateStationEvents(
 			CarIDs:     train.CarIDs,
 			TrainID:    train.TrainID,
 			LocationID: stationID,
-			EventType:  "ARRIVE_STATION",
+			EventType:  "arrived_station",
 			LoadedFlag: loaded,
 			Commodity:  g.Config.Fleet.Commodity,
 			WeightTons: func() int {
@@ -651,7 +651,7 @@ func (g *UnitTrainEventGenerator) generateStationEvents(
 			CarIDs:     train.CarIDs,
 			TrainID:    train.TrainID,
 			LocationID: stationID,
-			EventType:  "DEPART_STATION",
+			EventType:  "departed_station",
 			LoadedFlag: loaded,
 			Commodity:  g.Config.Fleet.Commodity,
 			WeightTons: func() int {

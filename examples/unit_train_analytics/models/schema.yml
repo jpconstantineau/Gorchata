@@ -261,10 +261,16 @@ models:
           - accepted_values:
               values: 
                 - 'train_formed'
+                - 'load_start'
+                - 'load_complete'
                 - 'departed_origin'
                 - 'arrived_station'
                 - 'departed_station'
                 - 'arrived_destination'
+                - 'unload_start'
+                - 'unload_complete'
+                - 'departed_destination'
+                - 'arrived_origin'
                 - 'car_set_out'
                 - 'car_picked_up'
                 - 'train_completed'
@@ -548,6 +554,22 @@ models:
           - accepted_range:
               min_value: 0
               max_value: 168
+      
+      - name: avg_cycle_hours
+        description: "Average complete round trip cycle time in hours (transit + origin queue + destination queue + turnaround)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 300
+      
+      - name: straggler_rate
+        description: "Straggler rate per trip (total_stragglers / total_trips)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10
     
     # Composite key test
     data_tests:
@@ -555,7 +577,7 @@ models:
           columns: ['corridor_id', 'year', 'week']
   
   - name: agg_fleet_utilization_daily
-    description: "Daily fleet utilization metrics across all 250 cars"
+    description: "Daily fleet utilization metrics across all 228 cars"
     columns:
       - name: date_key
         description: "Foreign key to dim_date (primary key)"
@@ -567,11 +589,11 @@ models:
               field: date_key
       
       - name: total_cars
-        description: "Total cars in fleet (should be 250)"
+        description: "Total cars in fleet (should be 228)"
         data_tests:
           - not_null
           - accepted_values:
-              values: [250]
+              values: [228]
       
       - name: cars_on_trains
         description: "Number of cars actively on trains (3 trains × 75 cars = 225 typical)"
@@ -579,7 +601,7 @@ models:
           - not_null
           - accepted_range:
               min_value: 0
-              max_value: 250
+              max_value: 228
       
       - name: cars_as_stragglers
         description: "Number of cars traveling as stragglers"
@@ -595,7 +617,7 @@ models:
           - not_null
           - accepted_range:
               min_value: 0
-              max_value: 250
+              max_value: 228
       
       - name: utilization_pct
         description: "Percentage of fleet actively utilized (on trains or as stragglers)"
@@ -604,3 +626,429 @@ models:
           - accepted_range:
               min_value: 0
               max_value: 100
+  
+  - name: agg_origin_turnaround
+    description: "Turnaround time analysis at origin locations. Tracks loading queue wait times by origin and week."
+    columns:
+      - name: location_id
+        description: "Foreign key to dim_location (origin location)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: trip_count
+        description: "Number of trips at this origin during the week"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: avg_turnaround_hours
+        description: "Average turnaround time at origin in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: min_turnaround_hours
+        description: "Minimum turnaround time (fastest loading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: max_turnaround_hours
+        description: "Maximum turnaround time (slowest loading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: stddev_turnaround_hours
+        description: "Standard deviation of turnaround times (variability measure)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+    
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['location_id', 'year', 'week']
+  
+  - name: agg_destination_turnaround
+    description: "Turnaround time analysis at destination locations. Tracks unloading queue wait times by destination and week."
+    columns:
+      - name: location_id
+        description: "Foreign key to dim_location (destination location)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: trip_count
+        description: "Number of trips to this destination during the week"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: avg_turnaround_hours
+        description: "Average turnaround time at destination in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: min_turnaround_hours
+        description: "Minimum turnaround time (fastest unloading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: max_turnaround_hours
+        description: "Maximum turnaround time (slowest unloading)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: stddev_turnaround_hours
+        description: "Standard deviation of turnaround times (variability measure)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+    
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['location_id', 'year', 'week']
+  
+  - name: agg_straggler_impact
+    description: "Straggler pattern analysis with delay distribution histogram. Tracks straggler occurrences, delays, and impact by corridor and week."
+    columns:
+      - name: corridor_id
+        description: "Foreign key to dim_corridor (or UNKNOWN for unmatched stragglers)"
+        data_tests:
+          - not_null
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: straggler_count
+        description: "Total number of straggler occurrences"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: cars_affected
+        description: "Number of unique cars that became stragglers"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 228
+      
+      - name: avg_delay_hours
+        description: "Average straggler delay in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 168
+      
+      - name: median_delay_hours
+        description: "Median straggler delay in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 168
+      
+      - name: max_delay_hours
+        description: "Maximum straggler delay in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 168
+      
+      - name: delay_0_6_hours
+        description: "Count of stragglers with delay 0-6 hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: delay_6_12_hours
+        description: "Count of stragglers with delay 6-12 hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: delay_12_24_hours
+        description: "Count of stragglers with delay 12-24 hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: delay_24_plus_hours
+        description: "Count of stragglers with delay 24+ hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: rejoined_count
+        description: "Number of stragglers that were picked up"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: still_straggling_count
+        description: "Number of stragglers not yet picked up"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: straggler_rate
+        description: "Straggler rate (stragglers per trip or opportunity)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+    
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['corridor_id', 'year', 'week']
+  
+  - name: agg_queue_analysis
+    description: "Queue wait time analysis at origins and destinations. Identifies bottlenecks by location and week."
+    columns:
+      - name: location_id
+        description: "Foreign key to dim_location"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: location_type
+        description: "Type of location (ORIGIN or DESTINATION)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['ORIGIN', 'DESTINATION']
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: queue_frequency
+        description: "Number of queue events (trips) at this location"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: avg_queue_hours
+        description: "Average queue wait time in hours"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: min_queue_hours
+        description: "Minimum queue wait time"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: max_queue_hours
+        description: "Maximum queue wait time (bottleneck indicator)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: stddev_queue_hours
+        description: "Standard deviation of queue wait times"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: p75_queue_hours
+        description: "75th percentile queue wait time"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: p95_queue_hours
+        description: "95th percentile queue wait time (extreme bottleneck)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+    
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['location_id', 'year', 'week']
+  
+  - name: agg_power_efficiency
+    description: "Locomotive power transfer efficiency analysis. Tracks same-power vs repower patterns by corridor and week."
+    columns:
+      - name: corridor_id
+        description: "Foreign key to dim_corridor (or UNKNOWN for unmatched transfers)"
+        data_tests:
+          - not_null
+      
+      - name: year
+        description: "Year"
+        data_tests:
+          - not_null
+      
+      - name: week
+        description: "Week of year"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: power_transfer_count
+        description: "Total number of potential power transfer events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: same_power_trips
+        description: "Number of consecutive trips with same locomotives (fast turnaround)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: repower_trips
+        description: "Number of trips requiring locomotive change (repower)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: repower_frequency_pct
+        description: "Percentage of trips requiring repower"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: avg_same_power_turnaround_hours
+        description: "Average turnaround time for same-power trips"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: avg_repower_turnaround_hours
+        description: "Average turnaround time for repower trips"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 72
+      
+      - name: power_efficiency_score
+        description: "Power efficiency score (same_power_trips / total_trips * 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: transfers_at_origin
+        description: "Number of power transfers at origin locations"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: transfers_at_destination
+        description: "Number of power transfers at destination locations"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+    
+    data_tests:
+      - unique_combination_of_columns:
+          columns: ['corridor_id', 'year', 'week']
