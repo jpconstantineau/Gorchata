@@ -42,13 +42,13 @@ enriched_events AS (
     
     -- Transit speed indicator (for travel events)
     CASE 
-      WHEN e.event_type IN ('DEPART_ORIGIN', 'DEPART_STATION', 'DEPART_DESTINATION') THEN 1
+      WHEN e.event_type IN ('departed_origin', 'departed_station', 'departed_destination') THEN 1
       ELSE 0
     END AS is_departure,
     
     -- Queue wait flag (for origin/destination loading/unloading)
     CASE 
-      WHEN e.event_type IN ('LOAD_START', 'LOAD_COMPLETE', 'UNLOAD_START', 'UNLOAD_COMPLETE') THEN 1
+      WHEN e.event_type IN ('load_start', 'load_complete', 'unload_start', 'unload_complete') THEN 1
       ELSE 0
     END AS is_queue_event,
     

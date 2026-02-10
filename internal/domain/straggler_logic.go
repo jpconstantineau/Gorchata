@@ -58,7 +58,7 @@ func (se *StragglerEngine) GenerateStragglerEvents(
 	// Determine set-out point (somewhere in first half of transit)
 	setOutTime := startTime.Add(time.Duration(se.random.Float64() * 0.5 * float64(transitDuration)))
 
-	// Generate SET_OUT event
+	// Generate car_set_out event
 	setOutLocation := fmt.Sprintf("%s_STN_%03d", corridor.ID, 1+se.random.Intn(corridor.StationCount))
 
 	events = append(events, CLMEvent{
@@ -67,7 +67,7 @@ func (se *StragglerEngine) GenerateStragglerEvents(
 		CarIDs:     []string{carID},
 		TrainID:    train.TrainID,
 		LocationID: setOutLocation,
-		EventType:  "SET_OUT",
+		EventType:  "car_set_out",
 		LoadedFlag: loaded,
 		Commodity:  train.CarIDs[0], // Use as placeholder for commodity
 		WeightTons: 0,
@@ -78,7 +78,7 @@ func (se *StragglerEngine) GenerateStragglerEvents(
 	delayHours := se.config.DelayHoursMin + se.random.Float64()*(se.config.DelayHoursMax-se.config.DelayHoursMin)
 	delayDuration := time.Duration(delayHours) * time.Hour
 
-	// Generate RESUME_TRANSIT event
+	// Generate car_picked_up event
 	resumeTime := setOutTime.Add(delayDuration)
 
 	events = append(events, CLMEvent{
@@ -87,7 +87,7 @@ func (se *StragglerEngine) GenerateStragglerEvents(
 		CarIDs:     []string{carID},
 		TrainID:    "", // Independent travel - no train ID
 		LocationID: setOutLocation,
-		EventType:  "RESUME_TRANSIT",
+		EventType:  "car_picked_up",
 		LoadedFlag: loaded,
 		Commodity:  train.CarIDs[0], // Placeholder
 		WeightTons: 0,
@@ -113,7 +113,7 @@ func (se *StragglerEngine) GenerateStragglerEvents(
 		CarIDs:     []string{carID},
 		TrainID:    "",
 		LocationID: destination,
-		EventType:  "ARRIVE_DESTINATION",
+		EventType:  "arrived_destination",
 		LoadedFlag: loaded,
 		Commodity:  train.CarIDs[0], // Placeholder
 		WeightTons: 0,
