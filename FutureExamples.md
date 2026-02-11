@@ -11,7 +11,7 @@
 
 ### In Progress 🚧
 
-- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 4: OEE Calculation (Availability × Performance × Quality)*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 5: Downtime Analysis and Reliability Metrics (MTBF, MTTR)*
 
 ### Future Examples 🔮
 
