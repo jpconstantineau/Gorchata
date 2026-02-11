@@ -231,6 +231,49 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
   6. Join to dim_date to assign date_id
   7. Run tests and verify state history table populated correctly
 
+#### Phase 3 Completion Summary
+**Status:** ✅ COMPLETE
+
+**Files Created:**
+- `examples/osb_machine_event_oee/models/staging/stg_equipment_state_history.sql` (64 lines) - SQL transformation using LEAD window function to calculate state durations from discrete machine events
+- `test/osb_state_duration_test.go` (735 lines) - Comprehensive test suite with 8 test functions validating state duration calculation logic
+
+**Test Results:**
+- 8/8 tests passing (100%)
+- Tests written following TDD methodology (red → green → refactor)
+- All test functions prefixed with `TestOSB` to avoid naming conflicts
+
+**Test Coverage:**
+1. ✅ `TestOSBStateDurationCalculation` - Validates LEAD window function correctly calculates state_end_timestamp from next event's state_start_timestamp
+2. ✅ `TestOSBStateCompleteness` - Ensures every machine event assigned a state duration, including last events per equipment using COALESCE to CURRENT_TIMESTAMP
+3. ✅ `TestOSBStateCategorization` - Validates all state types correctly preserved (Running, Idle, Starved, Blocked, Unplanned Downtime, Planned Downtime)
+4. ✅ `TestOSBReasonCodeJoin` - Ensures reason codes correctly joined and OEE classifications applied (Breakdown, Blocked, Starved, etc.)
+5. ✅ `TestOSBShiftAssignment` - Validates shift_id correctly assigned based on timestamp (Day: 06:00-14:00, Swing: 14:00-22:00, Night: 22:00-06:00)
+6. ✅ `TestOSBDateAssignment` - Validates date_id correctly assigned in YYYYMMDD format
+7. ✅ `TestOSBZeroDurationHandling` - Confirms very short duration states (<1 minute) handled appropriately (rounds to 0)
+8. ✅ `TestOSBMultiDayPeriods` - Validates state periods spanning midnight handled correctly (single record approach)
+
+**Key Implementation Details:**
+- **Duration Calculation:** Used `ROUND((julianday(end_time) - julianday(start_time)) * 24 * 60)` to calculate duration in minutes with proper rounding (avoids truncation issues)
+- **Window Function:** `LEAD(event_timestamp) OVER (PARTITION BY equipment_id ORDER BY event_timestamp)` identifies state end boundaries
+- **Shift Assignment:** CASE statement using `strftime('%H:%M', timestamp)` to classify into 3×8hr shifts
+- **Date Assignment:** `strftime('%Y%m%d', timestamp)` generates date_id for join to dim_date
+- **Last Event Handling:** `COALESCE(state_end_timestamp, CURRENT_TIMESTAMP)` ensures last event per equipment has valid end time
+- **Multi-Day Periods:** Implementation allows states spanning midnight as single records (alternative: split at midnight boundary)
+
+**Technical Decisions:**
+- Chose DuckDB-compatible SQL syntax (julianday for date arithmetic)
+- ROUND instead of CAST/TRUNCATE to avoid off-by-one minute errors (e.g., 29.98 min rounds to 30, not 29)
+- Shift assignment embedded in SQL (alternative: join to dim_shift with time range comparison)
+- Single-record approach for midnight-spanning states (simpler query logic, acceptable for daily aggregations)
+
+**Next Steps (Phase 4):**
+- Implement OEE calculation logic (Availability × Performance × Quality)
+- Aggregate state durations by equipment and date
+- Calculate Planned Production Time = Calendar Time - Planned Downtime
+- Compute Six Big Losses categorization
+- Create `fact_equipment_daily_oee.sql` and corresponding tests
+
 ### Phase 4: OEE Calculation (Availability, Performance, Quality)
 - **Objective:** Implement OEE calculation logic that aggregates equipment state durations and production output to compute Availability Loss, Performance Loss, and Quality Loss, producing daily OEE scores per equipment and shift following standard OEE calculation methodology
 - **Files/Functions to Modify/Create:**
