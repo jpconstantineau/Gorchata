@@ -10,7 +10,7 @@
 
 ### In Progress 🚧
 
-- [x] [Haul Truck Data Transformation and Analysis](examples/haul_truck_analytics/README.md) - *Phase 4 of 8 ✅*
+- [x] [Haul Truck Data Transformation and Analysis](examples/haul_truck_analytics/README.md) - *Phase 5 of 8 ✅*
 
 ### Future Examples 🔮
 
