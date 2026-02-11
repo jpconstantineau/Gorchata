@@ -315,6 +315,64 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
   8. Aggregate by equipment, shift, and day
   9. Run tests and verify OEE calculations match expected results
 
+#### Phase 4 Completion Summary
+**Status:** ✅ COMPLETE
+
+**Files Created:**
+- `examples/osb_machine_event_oee/models/facts/fact_equipment_daily_oee.sql` (177 lines) - Comprehensive OEE calculation model using CTEs for calendar time, planned/unplanned downtime, operating time, production output, and Six Big Losses categorization
+- `test/osb_oee_calculation_test.go` (905 lines) - Complete test suite with 8 test functions validating OEE methodology
+
+**Test Results:**
+- 8/8 tests passing (100%)
+- All tests follow TDD methodology (red → green → refactor)
+- Tests validate standard OEE calculation framework
+
+**Test Coverage:**
+1. ✅ `TestOSBPlannedProductionTimeCalculation` - Validates Planned Production Time = Calendar Time (1440 min) - Planned Downtime (120 min) = 1320 min
+2. ✅ `TestOSBAvailabilityCalculation` - Validates Availability = Operating Time / Planned Production Time = 1200/1320 = 90.91%
+3. ✅ `TestOSBPerformanceCalculation` - Validates Performance = Actual Output / Ideal Output = 54/60 = 90% (ideal cycle time 8 min/panel)
+4. ✅ `TestOSBQualityCalculation` - Validates Quality = Good Output / Total Output = 57/60 = 95%
+5. ✅ `TestOSBOEECalculation` - Validates OEE = Availability × Performance × Quality = 90.91% × 90% × 97.04% ≈ 79%
+6. ✅ `TestOSBSixBigLossesClassification` - Validates downtime categorization into Six Big Losses framework (Equipment Failure: 120 min)
+7. ✅ `TestOSBEquipmentWithoutProductionHandling` - Validates non-production equipment (conveyors) tracked with availability only (Performance/Quality=0/100)
+8. ✅ `TestOSBMultiShiftAggregation` - Validates daily OEE aggregation (shift_id NULL for daily totals)
+
+**Key Implementation Details:**
+- **CTE Structure:** calendar_time → planned_downtime_summary → unplanned_downtime_summary → operating_time_summary → production_output_summary → six_big_losses → oee_base_metrics → oee_calculated → final SELECT
+- **Calendar Time:** Fixed at 1440 minutes per day from dim_date
+- **Planned Production Time:** Calendar Time - Planned Downtime
+- **Operating Time:** Aggregated from state_history WHERE machine_state = 'Running'
+- **Unplanned Downtime:** Aggregated from state_history WHERE machine_state IN ('Unplanned Downtime', 'Breakdown')
+- **Availability (%):** (Operating Time / Planned Production Time) × 100 with CAST to REAL for accurate division
+- **Ideal Output:** Operating Time / Ideal Cycle Time (from dim_product_spec)
+- **Performance (%):** (Actual Output / Ideal Output) × 100
+- **Quality (%):** (Good Output / Total Output) × 100 where Good Output = COUNT(*) WHERE pass_fail = 'Pass'
+- **OEE (%):** (Availability / 100) × (Performance / 100) × (Quality / 100) × 100
+- **Six Big Losses:** Categorized by SUM(state_duration_min) grouped by six_big_losses_category from dim_reason_code
+- **Daily Aggregation:** shift_id set to NULL representing daily total (shift-level breakdown deferred to future enhancement)
+
+**Technical Decisions:**
+- **CAST to REAL:** Used `CAST(x AS REAL)` for all division operations to prevent integer division truncation (e.g., 57/60 = 0 vs 57.0/60.0 = 0.95)
+- **COALESCE Defaults:** Used COALESCE() to default NULL aggregates to 0 for equipment with no state history or production
+- **Ideal Cycle Time:** Retrieved from dim_product_spec via MAX() (assumes single product per equipment per day; multi-product scenarios would require weighted average)
+- **Equipment Filtering:** WHERE EXISTS clauses ensure only equipment with state_history OR production_output included in results
+- **Daily-Only Aggregation:** Initial implementation focuses on daily totals; shift-level OEE breakdown planned for future phase
+- **Six Big Losses Mapping:** Requires dim_reason_code.six_big_losses_category column (Equipment Failure, Setup & Adjustment, Small Stops, Reduced Speed, Startup Rejects, Production Rejects)
+
+**OEE Methodology Validated:**
+- **World Class OEE:** ≥85% (tests use realistic 79-83% range for OSB manufacturing)
+- **Availability Loss:** Captures unplanned downtime (breakdowns, failures)
+- **Performance Loss:** Captures speed losses and minor stops (actual vs ideal cycle time)
+- **Quality Loss:** Captures defects and rework (good vs total output)
+- **Formula Accuracy:** OEE = A × P × Q correctly implemented with floating-point precision
+
+**Next Steps (Phase 5):**
+- Implement detailed downtime analysis (MTBF, MTTR, failure frequency)
+- Create failure mode Pareto analysis  
+- Calculate reliability metrics per equipment
+- Identify chronic failure patterns
+- Prioritize maintenance interventions based on downtime impact
+
 ### Phase 5: Downtime Analysis and Reliability Metrics (MTBF, MTTR)
 - **Objective:** Create detailed downtime analysis tables that aggregate failure events by equipment, categorize by failure mode, calculate Mean Time Between Failures (MTBF), Mean Time To Repair (MTTR), failure frequency, and identify chronic reliability issues for maintenance prioritization
 - **Files/Functions to Modify/Create:**
