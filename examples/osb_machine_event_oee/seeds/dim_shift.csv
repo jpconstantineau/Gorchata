@@ -1,0 +1,4 @@
+shift_id,shift_name,shift_start_time,shift_end_time,crew_size
+SHIFT-01,Day,06:00:00,14:00:00,12
+SHIFT-02,Swing,14:00:00,22:00:00,12
+SHIFT-03,Night,22:00:00,06:00:00,10

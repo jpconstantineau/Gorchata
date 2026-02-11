@@ -1,0 +1,17 @@
+equipment_id,equipment_name,equipment_type,production_area,ideal_cycle_time_sec,rated_capacity_units_hr,installation_date,criticality_level
+DEBARK-01,Debarker 1,Debarker,Log_Yard,0,120,2020-01-15,Standard
+DEBARK-02,Debarker 2,Debarker,Log_Yard,0,120,2020-01-15,Standard
+STRAND-01,Strander 1,Strander,Stranding,0,6,2019-06-10,Important
+STRAND-02,Strander 2,Strander,Stranding,0,6,2019-06-10,Important
+DRYER-01,Rotary Dryer,Dryer,Drying,0,10,2019-03-20,Critical
+SCREEN-01,Screen 1,Screen,Screening,0,12,2019-08-05,Standard
+SCREEN-02,Screen 2,Screen,Screening,0,12,2019-08-05,Standard
+BLEND-01,Blender 1,Blender,Blending,0,11,2019-09-15,Important
+BLEND-02,Blender 2,Blender,Blending,0,11,2019-09-15,Important
+FORM-01,Forming Line,Former,Forming,0,90,2018-11-22,Important
+PRESS-01,Continuous Press,Press,Pressing,480,90,2018-05-10,Critical
+COOL-01,Cooling Conveyor,Cooling_Conveyor,Finishing,0,100,2019-02-14,Standard
+SAW-01,Saw 1,Saw,Finishing,25,95,2019-10-08,Standard
+SAW-02,Saw 2,Saw,Finishing,25,95,2019-10-08,Standard
+SAW-03,Saw 3,Saw,Finishing,25,95,2020-03-12,Standard
+SAW-04,Saw 4,Saw,Finishing,25,95,2020-03-12,Standard

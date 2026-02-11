@@ -11,7 +11,7 @@
 
 ### In Progress 🚧
 
-- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 1: Schema Design and DDL Generation*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 2: Seed Configuration for Event Generation*
 
 ### Future Examples 🔮
 

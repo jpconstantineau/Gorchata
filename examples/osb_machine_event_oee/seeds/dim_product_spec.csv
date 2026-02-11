@@ -1,0 +1,4 @@
+product_id,thickness_inches,density_lbft3,grade,target_thickness,thickness_tolerance_plus,thickness_tolerance_minus,target_density,density_tolerance
+PROD-7/16,0.4375,40,Rated_Sheathing,0.4375,0.015,-0.015,40,2
+PROD-3/8,0.375,40,Rated_Sheathing,0.375,0.015,-0.015,40,2
+PROD-9/16,0.5625,40,Structural_1,0.5625,0.015,-0.015,40,2

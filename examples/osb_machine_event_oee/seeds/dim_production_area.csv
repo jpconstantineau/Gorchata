@@ -1,0 +1,9 @@
+area_id,area_name,sequence_order,upstream_area_id,downstream_area_id,buffer_capacity_hours
+AREA-01,Log_Yard,1,,AREA-02,0
+AREA-02,Stranding,2,AREA-01,AREA-03,4.0
+AREA-03,Drying,3,AREA-02,AREA-04,8.0
+AREA-04,Screening,4,AREA-03,AREA-05,0
+AREA-05,Blending,5,AREA-04,AREA-06,0
+AREA-06,Forming,6,AREA-05,AREA-07,0.5
+AREA-07,Pressing,7,AREA-06,AREA-08,0
+AREA-08,Finishing,8,AREA-07,,0
