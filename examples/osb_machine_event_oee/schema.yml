@@ -1,0 +1,772 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - OSB Machine Event to OEE Analytics
+  # ===================================================================
+  
+  - name: dim_equipment
+    description: "Equipment dimension tracking all OSB manufacturing machinery with capacity and criticality information"
+    columns:
+      - name: equipment_id
+        description: "Unique identifier for manufacturing equipment"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_name
+        description: "Human-readable equipment name (e.g., STRAND-01, DRYER-01)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_type
+        description: "Type of equipment (Debarker, Strander, Dryer, Screen, Blender, Former, Press, Saw, Conveyor)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Debarker', 'Strander', 'Dryer', 'Screen', 'Blender', 'Former', 'Press', 'Cooling_Conveyor', 'Saw']
+      
+      - name: production_area
+        description: "Production area where equipment is located (references dim_production_area)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: ideal_cycle_time_sec
+        description: "Ideal cycle time in seconds for one unit of production (0 for continuous equipment)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 3600
+      
+      - name: rated_capacity_units_hr
+        description: "Rated capacity in units per hour (tons/hr for stranders/dryer, panels/hr for press/saws)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: installation_date
+        description: "Equipment installation date for age tracking"
+        data_tests:
+          - not_null
+      
+      - name: criticality_level
+        description: "Equipment criticality level (Critical, Important, Standard)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Important', 'Standard']
+  
+  - name: dim_production_area
+    description: "Production area dimension defining OSB process stages and buffer relationships"
+    columns:
+      - name: area_id
+        description: "Unique identifier for production area"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: area_name
+        description: "Production area name (Log_Yard, Stranding, Drying, Blending, Forming, Pressing, Finishing)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Log_Yard', 'Stranding', 'Drying', 'Screening', 'Blending', 'Forming', 'Pressing', 'Finishing']
+      
+      - name: sequence_order
+        description: "Sequence order in production flow (1=first, higher=later)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 10
+      
+      - name: upstream_area_id
+        description: "Upstream production area ID (NULL for first stage)"
+      
+      - name: downstream_area_id
+        description: "Downstream production area ID (NULL for last stage)"
+      
+      - name: buffer_capacity_hours
+        description: "Buffer capacity in hours of production (0 if no buffer, NULL if not applicable)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+  
+  - name: dim_reason_code
+    description: "Reason code dimension mapping downtime/state reasons to OEE Time Model and loss categories"
+    columns:
+      - name: reason_code_id
+        description: "Unique identifier for reason code"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: reason_code
+        description: "Short reason code (e.g., MECH_FAIL, ELEC_FAIL, STRAND_BRIDGE)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: reason_category
+        description: "Category of reason (Mechanical, Electrical, Process, Quality, Material, Operational)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Mechanical', 'Electrical', 'Process', 'Quality', 'Material', 'Operational', 'Planned_Maintenance']
+      
+      - name: oee_time_model_class
+        description: "OEE Time Model classification (Planned or Unplanned downtime)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Planned', 'Unplanned']
+      
+      - name: oee_loss_type
+        description: "OEE loss category (Availability, Performance, Quality, or None for planned)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Availability', 'Performance', 'Quality', 'None']
+      
+      - name: equipment_type
+        description: "Equipment type this reason code applies to (NULL for all equipment types)"
+      
+      - name: typical_duration_min
+        description: "Typical duration in minutes for this failure mode"
+        data_tests:
+          - accepted_range:
+              min_value: 1
+              max_value: 1440
+      
+      - name: maintenance_action_required
+        description: "Whether maintenance action is required (YES/NO)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['YES', 'NO']
+  
+  - name: dim_shift
+    description: "Shift dimension for 3x8-hour operations with handover periods"
+    columns:
+      - name: shift_id
+        description: "Unique identifier for shift"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: shift_name
+        description: "Shift name (Day, Swing, Night)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Day', 'Swing', 'Night']
+      
+      - name: shift_start_time
+        description: "Shift start time (06:00 for Day, 14:00 for Swing, 22:00 for Night)"
+        data_tests:
+          - not_null
+      
+      - name: shift_end_time
+        description: "Shift end time (14:00 for Day, 22:00 for Swing, 06:00 for Night)"
+        data_tests:
+          - not_null
+      
+      - name: crew_size
+        description: "Number of crew members on shift"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 50
+  
+  - name: dim_date
+    description: "Date dimension for time-based analysis"
+    columns:
+      - name: date_key
+        description: "Surrogate key for date (YYYYMMDD format)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: full_date
+        description: "Full date value"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Year (YYYY)"
+        data_tests:
+          - not_null
+      
+      - name: quarter
+        description: "Quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: month
+        description: "Month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: week
+        description: "Week of year (1-53)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: day_of_week
+        description: "Day of week (1=Monday, 7=Sunday)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+  
+  - name: dim_product_spec
+    description: "Product specification dimension for OSB panel types with quality tolerances"
+    columns:
+      - name: product_id
+        description: "Unique identifier for product specification"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: thickness_inches
+        description: "Nominal panel thickness in inches (3/8, 7/16, 9/16)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0.375, 0.4375, 0.5625]
+      
+      - name: density_lbft3
+        description: "Nominal density in pounds per cubic foot"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 35
+              max_value: 45
+      
+      - name: grade
+        description: "Product grade (Structural_1, Rated_Sheathing, Utility)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Structural_1', 'Rated_Sheathing', 'Utility']
+      
+      - name: target_thickness
+        description: "Target thickness for manufacturing control"
+        data_tests:
+          - not_null
+      
+      - name: thickness_tolerance_plus
+        description: "Upper thickness tolerance in inches (typically +0.015)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 0.050
+      
+      - name: thickness_tolerance_minus
+        description: "Lower thickness tolerance in inches (typically -0.015)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -0.050
+              max_value: 0
+      
+      - name: target_density
+        description: "Target density for manufacturing control"
+        data_tests:
+          - not_null
+      
+      - name: density_tolerance
+        description: "Density tolerance +/- in lbs/ft³ (typically 2)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+  
+  # ===================================================================
+  # STAGING TABLES - Raw Events and Intermediate Transformations
+  # ===================================================================
+  
+  - name: stg_machine_events
+    description: "Staging table for raw machine state change events"
+    columns:
+      - name: event_id
+        description: "Unique identifier for event"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: equipment_id
+        description: "Foreign key to dim_equipment"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_id
+      
+      - name: event_timestamp
+        description: "Timestamp when state change occurred (second precision)"
+        data_tests:
+          - not_null
+      
+      - name: state
+        description: "Machine state (Running, Idle, Starved, Blocked, Unplanned_Downtime, Planned_Maintenance, Setup)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Running', 'Idle', 'Starved', 'Blocked', 'Unplanned_Downtime', 'Planned_Maintenance', 'Setup', 'Quality_Hold']
+      
+      - name: reason_code_id
+        description: "Foreign key to dim_reason_code (NULL for Running/Idle)"
+        data_tests:
+          - relationships:
+              to: dim_reason_code
+              field: reason_code_id
+      
+      - name: operator_notes
+        description: "Optional operator notes about the state change"
+  
+  - name: stg_equipment_state_history
+    description: "Staging table for equipment state durations calculated from discrete events"
+    columns:
+      - name: equipment_id
+        description: "Foreign key to dim_equipment"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_id
+      
+      - name: state_start_timestamp
+        description: "Start timestamp of state period"
+        data_tests:
+          - not_null
+      
+      - name: state_end_timestamp
+        description: "End timestamp of state period (NULL for ongoing state)"
+      
+      - name: state_duration_min
+        description: "Duration of state in minutes"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 10080
+      
+      - name: machine_state
+        description: "Machine state during this period"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Running', 'Idle', 'Starved', 'Blocked', 'Unplanned_Downtime', 'Planned_Maintenance', 'Setup', 'Quality_Hold']
+      
+      - name: reason_code_id
+        description: "Foreign key to dim_reason_code"
+        data_tests:
+          - relationships:
+              to: dim_reason_code
+              field: reason_code_id
+      
+      - name: shift_id
+        description: "Foreign key to dim_shift based on timestamp"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_shift
+              field: shift_id
+  
+  - name: stg_production_output
+    description: "Staging table for production output events (panels produced)"
+    columns:
+      - name: equipment_id
+        description: "Foreign key to dim_equipment (typically press or saws)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_id
+      
+      - name: production_timestamp
+        description: "Timestamp when production output recorded"
+        data_tests:
+          - not_null
+      
+      - name: output_quantity
+        description: "Quantity produced (panels for press/saws, tons for stranders/dryer)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: product_id
+        description: "Foreign key to dim_product_spec"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product_spec
+              field: product_id
+      
+      - name: batch_id
+        description: "Batch identifier for traceability"
+        data_tests:
+          - not_null
+          - not_empty_string
+  
+  - name: stg_quality_tests
+    description: "Staging table for quality test results"
+    columns:
+      - name: test_id
+        description: "Unique identifier for quality test"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: batch_id
+        description: "Batch identifier linking to production output"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: test_timestamp
+        description: "Timestamp when test was performed"
+        data_tests:
+          - not_null
+      
+      - name: test_type
+        description: "Type of quality test (Thickness, Density, Delamination, Visual)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Thickness', 'Density', 'Delamination', 'Visual', 'Moisture']
+      
+      - name: measured_thickness
+        description: "Measured thickness in inches (NULL if not thickness test)"
+        data_tests:
+          - accepted_range:
+              min_value: 0.300
+              max_value: 0.700
+      
+      - name: measured_density
+        description: "Measured density in lbs/ft³ (NULL if not density test)"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 50
+      
+      - name: pass_fail
+        description: "Test result (Pass, Fail)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pass', 'Fail']
+      
+      - name: defect_type
+        description: "Type of defect if test failed (NULL if passed)"
+        data_tests:
+          - accepted_values:
+              values: ['Overthick', 'Underthick', 'Overdense', 'Underdense', 'Delamination', 'Surface_Defect', 'Edge_Quality']
+  
+  - name: stg_buffer_levels
+    description: "Staging table for buffer inventory level tracking"
+    columns:
+      - name: buffer_name
+        description: "Buffer name (Green_Strand_Bins, Dry_Fiber_Silos, Mat_Buffer)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Green_Strand_Bins', 'Dry_Fiber_Silos', 'Mat_Buffer']
+      
+      - name: timestamp
+        description: "Timestamp of buffer level measurement"
+        data_tests:
+          - not_null
+      
+      - name: inventory_level_tons
+        description: "Current inventory level in tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200
+      
+      - name: capacity_utilization_pct
+        description: "Percentage of total buffer capacity utilized"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: hours_of_supply
+        description: "Estimated hours of supply at current consumption rate"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+  
+  # ===================================================================
+  # FACT TABLES - Equipment Performance and OEE Metrics
+  # ===================================================================
+  
+  - name: fact_equipment_state
+    description: "Fact table capturing equipment state history for OEE analysis"
+    columns:
+      - name: equipment_id
+        description: "Foreign key to dim_equipment"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_id
+      
+      - name: shift_id
+        description: "Foreign key to dim_shift"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_shift
+              field: shift_id
+      
+      - name: date_id
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: state_start
+        description: "State period start timestamp"
+        data_tests:
+          - not_null
+      
+      - name: state_end
+        description: "State period end timestamp"
+      
+      - name: duration_min
+        description: "Duration of state in minutes"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10080
+      
+      - name: machine_state
+        description: "Machine state during this period"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Running', 'Idle', 'Starved', 'Blocked', 'Unplanned_Downtime', 'Planned_Maintenance', 'Setup', 'Quality_Hold']
+      
+      - name: reason_code_id
+        description: "Foreign key to dim_reason_code"
+        data_tests:
+          - relationships:
+              to: dim_reason_code
+              field: reason_code_id
+      
+      - name: oee_loss_category
+        description: "OEE loss category (Availability, Performance, Quality, or NULL)"
+        data_tests:
+          - accepted_values:
+              values: ['Availability', 'Performance', 'Quality']
+  
+  - name: fact_production_output
+    description: "Fact table capturing production output with cycle time and performance metrics"
+    columns:
+      - name: production_id
+        description: "Unique identifier for production record"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: equipment_id
+        description: "Foreign key to dim_equipment"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_equipment
+              field: equipment_id
+      
+      - name: shift_id
+        description: "Foreign key to dim_shift"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_shift
+              field: shift_id
+      
+      - name: date_id
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: timestamp
+        description: "Production timestamp"
+        data_tests:
+          - not_null
+      
+      - name: quantity
+        description: "Quantity produced"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: product_id
+        description: "Foreign key to dim_product_spec"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product_spec
+              field: product_id
+      
+      - name: batch_id
+        description: "Batch identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: cycle_time_sec
+        description: "Actual cycle time in seconds"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 3600
+      
+      - name: performance_pct
+        description: "Performance percentage (actual vs ideal cycle time)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 150
+  
+  - name: fact_quality_results
+    description: "Fact table aggregating quality results by batch"
+    columns:
+      - name: quality_id
+        description: "Unique identifier for quality record"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: batch_id
+        description: "Batch identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_id
+        description: "Foreign key to dim_product_spec"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product_spec
+              field: product_id
+      
+      - name: date_id
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: panels_produced
+        description: "Total panels produced in batch"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: panels_tested
+        description: "Number of panels tested from batch"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: panels_passed
+        description: "Number of panels that passed all tests"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: panels_downgraded
+        description: "Number of panels downgraded to lower grade"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: panels_scrapped
+        description: "Number of panels scrapped"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: thickness_avg
+        description: "Average measured thickness for batch"
+        data_tests:
+          - accepted_range:
+              min_value: 0.300
+              max_value: 0.700
+      
+      - name: thickness_stdev
+        description: "Standard deviation of thickness measurements"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 0.100
+      
+      - name: density_avg
+        description: "Average measured density for batch"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 50
+      
+      - name: density_stdev
+        description: "Standard deviation of density measurements"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 10

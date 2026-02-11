@@ -11,13 +11,13 @@
 
 ### In Progress 🚧
 
-*No examples currently in progress*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 1: Schema Design and DDL Generation*
 
 ### Future Examples 🔮
 
-- [] [Machine Event Data to OEE (OSB Manufacturing)](plans/osb-machine-event-oee-plan.md) - *Planning Complete ✅ | Implementation: Not Started*
 - [] Oil Refinery Data Transformation and Warehousing
 - [] API 584 IOW Data Warehouse
+- [] Statistical Process Control (SPC) in manufacturing
 
 ## Example Design Prompts
 
@@ -54,3 +54,6 @@ Create a data engineering project centered on constructing a mass balance and pe
 
 ### API 584 IOW Data Warehouse
 Design a data engineering project to implement a Risk-Based Integrity Operating Window (IOW) monitoring system compliant with API 584 for a refinery’s static equipment. The scope must include the ingestion and harmonization of high-frequency sensor telemetry (Pressure, Temperature, pH, and flow) with a centralized Asset Registry containing hierarchical IOW limits (Critical, Standard, and Informational). Transformations should identify excursions through time-series analysis, calculating core metrics for frequency, duration, and severity—specifically utilizing "Area Under the Curve" logic to quantify cumulative damage. The resulting data marts must prioritize "Bad Actor" assets, calculate a rolling "Integrity Health Index," and generate automated alerts for inspection schedule adjustments where cumulative process stress indicates accelerated metallurgical degradation or encroachment on design life limits.
+
+### Statistical Process Control (SPC) in manufacturing 
+Develop a data engineering project for the UniCo Bearington manufacturing plant that implements Statistical Process Control (SPC) to safeguard the throughput of the critical NCX-10 bottleneck. The pipeline must transform raw machine telemetry—capturing part dimensions, cycle times, and heat signatures—into a robust analytical layer that calculates rolling averages and three-sigma Upper and Lower Control Limits (UCL/LCL) in accordance with ISO 7870 standards. This project should specifically model the "Theory of Constraints" by using incremental models and tests to detect "assignable causes" of variance that threaten to starve the bottleneck or cause downstream inventory accumulation. By the end, the system should provide the data visibility required to distinguish between normal statistical fluctuations and systemic failures, enabling a flow-oriented "Bottleneck Health" dashboard that prioritizes total plant throughput over misleading local efficiencies.
