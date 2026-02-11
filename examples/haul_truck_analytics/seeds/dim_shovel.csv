@@ -1,0 +1,4 @@
+shovel_id,shovel_type,bucket_size_m3,pit_zone
+SHOVEL-A,CAT 6040 FS,20,North Pit
+SHOVEL-B,Komatsu PC5500,35,East Pit
+SHOVEL-C,Liebherr R9800,60,South Pit
