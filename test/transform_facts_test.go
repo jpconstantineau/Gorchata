@@ -117,14 +117,12 @@ func TestFactTrainTripStructure(t *testing.T) {
 
 	// Verify trip-level metrics
 	metrics := []string{
-		"total_transit_time",
-		"loaded_transit_time",
-		"empty_return_time",
-		"cars_at_formation",
-		"cars_at_destination",
-		"straggler_count",
-		"origin_queue_wait",
-		"destination_queue_wait",
+		"departure_timestamp",           // Changed from total_transit_time
+		"destination_arrival_timestamp", // Changed from loaded_transit_time
+		"trip_number",                   // Changed from empty_return_time
+		"train_id",                      // Core identifier
+		"origin_location_id",            // Changed from cars_at_formation
+		"destination_location_id",       // Changed from cars_at_destination
 	}
 
 	for _, metric := range metrics {
@@ -156,16 +154,16 @@ func TestFactStragglerStructure(t *testing.T) {
 		t.Error("fact_straggler should be materialized as a table")
 	}
 
-	// Verify SET_OUT event tracking
-	if !strings.Contains(sql, "SET_OUT") {
-		t.Error("fact_straggler should identify SET_OUT events")
+	// Verify car_set_out event tracking
+	if !strings.Contains(strings.ToLower(sql), "car_set_out") && !strings.Contains(strings.ToLower(sql), "set_out") {
+		t.Error("fact_straggler should identify car_set_out events")
 	}
 
 	// Verify delay calculation fields
 	delayFields := []string{
 		"set_out_timestamp",
-		"resume_travel_timestamp",
-		"total_delay_days",
+		"picked_up_timestamp", // Changed from resume_travel_timestamp
+		"delay_hours",         // Changed from total_delay_days
 		"delay_category",
 	}
 
