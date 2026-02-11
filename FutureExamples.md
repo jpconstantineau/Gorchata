@@ -15,7 +15,7 @@
 
 ### Future Examples 🔮
 
-- [] Machine Event Data to OEE
+- [] [Machine Event Data to OEE (OSB Manufacturing)](plans/osb-machine-event-oee-plan.md) - *Planning Complete ✅ | Implementation: Not Started*
 - [] Oil Refinery Data Transformation and Warehousing
 - [] API 584 IOW Data Warehouse
 
@@ -25,9 +25,15 @@
 
 Act as a data engineer and analytics expert to design a data warehouse schema and analysis pipeline for refinery DCS alarm and event streams. Create a structured example featuring raw event logs—including timestamps, tag identifiers, priorities, and states (Active, Acknowledged, Inactive)—and provide the SQL logic required to transform this time-series data into actionable ISA 18.2 performance metrics. The example should specifically demonstrate how to calculate operator loading (alarms per hour), determine the duration of standing alarms, identify chattering and "bad actor" tags, and generate a summary report for overall alarm system health.
 
-### Machine Event Data to OEE
+### Machine Event Data to OEE (OSB Manufacturing)
 
-Develop a technical data warehousing tutorial focused on OEE reporting by generating a synthetic dataset that includes: raw machine event logs (MachineID, Timestamp, State, ReasonCodeID), a reason code dimension mapping to the OEE Time Model (Planned vs. Unplanned), and production metrics (Total/Defective units) alongside machine metadata (Ideal Cycle Time). The guide should demonstrate how to calculate interval durations from discrete event timestamps using SQL window functions, classify downtime categories according to the time model, and aggregate the results into daily reporting metrics to calculate OEE (\(\text{Availability} \times \text{Performance} \times \text{Quality}\)).
+Design a comprehensive data engineering project for an Oriented Strand Board (OSB) manufacturing facility that transforms raw machine event logs into an integrated OEE and operational analytics platform. The project should model the complete OSB production flow: raw log handling (log pond, debarking), strand production (stranding, drying, screening), mat formation (blending, forming), board pressing (continuous hot press), and finishing operations (cooling, sawing, stacking, warehousing). Generate realistic synthetic datasets capturing discrete machine state events (Running, Idle, Starved, Blocked, Unplanned Downtime, Planned Maintenance) with reason codes mapped to both the OEE Time Model and OSB-specific failure modes (e.g., "Press Hydraulic Failure", "Dryer Burner Trip", "Strand Bridging", "Resin Mix Ratio Deviation"). 
+
+The architecture must track production metrics including panel throughput, thickness tolerances, density specifications, and edge trim waste rates. Critically, the solution should model material flow constraints and buffer inventories between process stages (green strand bins, dry fiber silos, mat buffer) to analyze downtime propagation—demonstrating how a dryer outage cascades upstream to starve the stranders and downstream to deplete forming station buffers. 
+
+Implement SQL transformation logic using window functions to calculate state durations, classify downtime into Availability Loss categories (breakdowns vs. setup/adjustments), compute Performance Loss from speed reductions and minor stops, and determine Quality Loss from off-spec panels requiring downgrade or scrap. Beyond standard OEE metrics, the data marts should support advanced operational KPIs including Mean Time Between Failures (MTBF), Mean Time To Repair (MTTR), utilization rates by production area, and constraint analysis identifying which process stage (stranding capacity, dryer throughput, press cycle time, or sawing speed) limits overall plant output. 
+
+The final deliverable should enable maintenance teams to prioritize reliability improvements by identifying "bad actor" equipment with chronic breakdown patterns, and support production optimization by quantifying the economic impact of buffer sizing decisions and targeted capacity investments to eliminate the current system constraint.
 
 ### Manufacturing Data for Bottleneck Analysis 
 
