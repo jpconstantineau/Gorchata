@@ -6,13 +6,13 @@
 
 WITH train_formations AS (
   -- Identify train formation events (when trains are formed at origin)
-  -- Each train has multiple FORM_TRAIN events (one per car)
+  -- Each train has multiple train_formed events (one per car)
   SELECT
     train_id,
     MIN(CAST(event_timestamp AS TIMESTAMP)) AS formed_at,
     MIN(location_id) AS origin_location_id
   FROM {{ seed "raw_clm_events" }}
-  WHERE event_type = 'FORM_TRAIN'
+  WHERE event_type = 'train_formed'
   GROUP BY train_id
 ),
 
@@ -22,7 +22,7 @@ train_completions AS (
     train_id,
     MIN(CAST(event_timestamp AS TIMESTAMP)) AS completed_at
   FROM {{ seed "raw_clm_events" }}
-  WHERE event_type = 'ARRIVE_DESTINATION'
+  WHERE event_type = 'arrived_destination'
   GROUP BY train_id
 ),
 
@@ -32,7 +32,7 @@ train_car_counts AS (
     train_id,
     COUNT(DISTINCT car_id) AS num_cars
   FROM {{ seed "raw_clm_events" }}
-  WHERE event_type = 'FORM_TRAIN'
+  WHERE event_type = 'train_formed'
   GROUP BY train_id
 )
 

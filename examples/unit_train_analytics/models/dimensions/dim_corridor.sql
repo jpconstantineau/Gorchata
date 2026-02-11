@@ -14,8 +14,8 @@ WITH origin_dest_pairs AS (
   FROM {{ seed "raw_clm_events" }} r1
   INNER JOIN {{ seed "raw_clm_events" }} r2
     ON r1.train_id = r2.train_id
-  WHERE r1.event_type = 'FORM_TRAIN'
-    AND r2.event_type = 'ARRIVE_DESTINATION'
+  WHERE r1.event_type = 'train_formed'
+    AND r2.event_type = 'arrived_destination'
     AND r1.train_id IS NOT NULL 
     AND r1.train_id != ''
 ),
@@ -26,12 +26,12 @@ train_routes AS (
     od.origin_id,
     od.destination_id,
     od.train_id,
-    CAST((julianday(MAX(CASE WHEN r.event_type = 'ARRIVE_DESTINATION' THEN r.event_timestamp END)) -
-          julianday(MIN(CASE WHEN r.event_type = 'FORM_TRAIN' THEN r.event_timestamp END))) * 24 AS REAL) AS transit_hours
+    CAST((julianday(MAX(CASE WHEN r.event_type = 'arrived_destination' THEN r.event_timestamp END)) -
+          julianday(MIN(CASE WHEN r.event_type = 'train_formed' THEN r.event_timestamp END))) * 24 AS REAL) AS transit_hours
   FROM origin_dest_pairs od
   INNER JOIN {{ seed "raw_clm_events" }} r
     ON od.train_id = r.train_id
-  WHERE r.event_type IN ('FORM_TRAIN', 'ARRIVE_DESTINATION')
+  WHERE r.event_type IN ('train_formed', 'arrived_destination')
   GROUP BY od.origin_id, od.destination_id, od.train_id
 ),
 
