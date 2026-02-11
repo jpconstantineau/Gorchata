@@ -1,0 +1,13 @@
+truck_id,model,payload_capacity_tons,fleet_class,manufacturer
+TRUCK-101,CAT 777F,100,100-ton,Caterpillar
+TRUCK-102,CAT 777G,100,100-ton,Caterpillar
+TRUCK-103,Komatsu HD785-7,100,100-ton,Komatsu
+TRUCK-104,Hitachi EH1700-3,100,100-ton,Hitachi
+TRUCK-201,CAT 789D,200,200-ton,Caterpillar
+TRUCK-202,CAT 789C,200,200-ton,Caterpillar
+TRUCK-203,Komatsu HD1500-8,200,200-ton,Komatsu
+TRUCK-204,Komatsu HD1500-7,200,200-ton,Komatsu
+TRUCK-205,Liebherr T264,200,200-ton,Liebherr
+TRUCK-206,Hitachi EH3500AC-3,200,200-ton,Hitachi
+TRUCK-401,CAT 797F,400,400-ton,Caterpillar
+TRUCK-402,Liebherr T282C,400,400-ton,Liebherr
