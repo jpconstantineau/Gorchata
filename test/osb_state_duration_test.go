@@ -407,12 +407,12 @@ func TestOSBStateCategorization(t *testing.T) {
 	}
 
 	expectedStates := map[string]bool{
-		"Running":             false,
-		"Idle":                false,
-		"Starved":             false,
-		"Blocked":             false,
-		"Unplanned Downtime":  false,
-		"Planned Downtime":    false,
+		"Running":            false,
+		"Idle":               false,
+		"Starved":            false,
+		"Blocked":            false,
+		"Unplanned Downtime": false,
+		"Planned Downtime":   false,
 	}
 
 	for _, row := range result.Rows {
@@ -507,10 +507,10 @@ func TestOSBShiftAssignment(t *testing.T) {
 
 	// Create events across different shifts
 	events := []machineEvent{
-		{"DRYER-01", "2024-01-15 07:00:00", "Running", ""},      // Day shift (06:00-14:00)
-		{"DRYER-01", "2024-01-15 15:00:00", "Running", ""},      // Swing shift (14:00-22:00)
-		{"DRYER-01", "2024-01-15 23:00:00", "Running", ""},      // Night shift (22:00-06:00)
-		{"DRYER-01", "2024-01-16 02:00:00", "Idle", ""},         // Still night shift (crosses midnight)
+		{"DRYER-01", "2024-01-15 07:00:00", "Running", ""}, // Day shift (06:00-14:00)
+		{"DRYER-01", "2024-01-15 15:00:00", "Running", ""}, // Swing shift (14:00-22:00)
+		{"DRYER-01", "2024-01-15 23:00:00", "Running", ""}, // Night shift (22:00-06:00)
+		{"DRYER-01", "2024-01-16 02:00:00", "Idle", ""},    // Still night shift (crosses midnight)
 	}
 
 	insertMachineEvents(t, adapter, ctx, events)
@@ -620,7 +620,7 @@ func TestOSBZeroDurationHandling(t *testing.T) {
 	baseTime := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
 	events := []machineEvent{
 		{"DRYER-01", baseTime.Format("2006-01-02 15:04:05"), "Running", ""},
-		{"DRYER-01", baseTime.Add(1 * time.Second).Format("2006-01-02 15:04:05"), "Idle", ""},  // 1 second transition
+		{"DRYER-01", baseTime.Add(1 * time.Second).Format("2006-01-02 15:04:05"), "Idle", ""}, // 1 second transition
 		{"DRYER-01", baseTime.Add(30 * time.Minute).Format("2006-01-02 15:04:05"), "Running", ""},
 	}
 
@@ -646,7 +646,7 @@ func TestOSBZeroDurationHandling(t *testing.T) {
 	hasVeryShortDuration := false
 	for _, row := range result.Rows {
 		duration := getFloat(row[2])
-		if duration < 1.0 {  // Less than 1 minute
+		if duration < 1.0 { // Less than 1 minute
 			hasVeryShortDuration = true
 		}
 	}
@@ -680,8 +680,8 @@ func TestOSBMultiDayPeriods(t *testing.T) {
 
 	// Create event that spans midnight (starts before midnight, next event after midnight)
 	events := []machineEvent{
-		{"DRYER-01", "2024-01-15 23:00:00", "Running", ""},    // Before midnight
-		{"DRYER-01", "2024-01-16 02:00:00", "Idle", ""},       // After midnight (3 hours later)
+		{"DRYER-01", "2024-01-15 23:00:00", "Running", ""}, // Before midnight
+		{"DRYER-01", "2024-01-16 02:00:00", "Idle", ""},    // After midnight (3 hours later)
 	}
 
 	insertMachineEvents(t, adapter, ctx, events)
@@ -711,7 +711,7 @@ func TestOSBMultiDayPeriods(t *testing.T) {
 	// Check if state was split into two records (one per day) or kept as single record
 	// Single record approach: duration should be 180 minutes (3 hours)
 	// Split record approach: two records, one ending at 23:59:59, next starting at 00:00:00
-	
+
 	if len(result.Rows) == 1 {
 		// Single record spanning midnight
 		duration := getFloat(result.Rows[0][2])
