@@ -7,15 +7,17 @@
 - [x] DCS Alarm Analytics
 - [x] Manufacturing Data for Bottleneck Analysis
 - [x] [Unit Train Analytics Data Warehouse](examples/unit_train_analytics/README.md)
+- [x] [Haul Truck Analytics Data Warehouse](examples/haul_truck_analytics/README.md) - *Complete ✅*
 
 ### In Progress 🚧
 
-- [x] [Haul Truck Data Transformation and Analysis](examples/haul_truck_analytics/README.md) - *Phase 7 of 8 ✅*
+*No examples currently in progress*
 
 ### Future Examples 🔮
 
 - [] Machine Event Data to OEE
 - [] Oil Refinery Data Transformation and Warehousing
+- [] API 584 IOW Data Warehouse
 
 ## Example Design Prompts
 
@@ -42,3 +44,7 @@ Develop a data warehouse project that transforms raw Car Location Message (CLM) 
 
 ### Oil Refinery Data Transformation and Warehousing
 Create a data engineering project centered on constructing a mass balance and performance monitoring system for an integrated oil refinery. The objective is to transform raw transactional records from inbound crude oil deliveries—including specific gravity and chemical composition—and outbound product shipments like gasoline, jet fuel, and raffinates into a reconciled analytical framework. The transformation logic must account for volumetric changes and processing losses to establish an accurate daily material balance across the facility. The final warehouse architecture should feature structured tables that aggregate yields and conversion rates by specific process units, enabling engineers to evaluate the efficiency of unit operations and identify performance deviations relative to theoretical benchmarks.
+
+
+### API 584 IOW Data Warehouse
+Design a data engineering project to implement a Risk-Based Integrity Operating Window (IOW) monitoring system compliant with API 584 for a refinery’s static equipment. The scope must include the ingestion and harmonization of high-frequency sensor telemetry (Pressure, Temperature, pH, and flow) with a centralized Asset Registry containing hierarchical IOW limits (Critical, Standard, and Informational). Transformations should identify excursions through time-series analysis, calculating core metrics for frequency, duration, and severity—specifically utilizing "Area Under the Curve" logic to quantify cumulative damage. The resulting data marts must prioritize "Bad Actor" assets, calculate a rolling "Integrity Health Index," and generate automated alerts for inspection schedule adjustments where cumulative process stress indicates accelerated metallurgical degradation or encroachment on design life limits.
