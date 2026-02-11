@@ -1,0 +1,498 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Haul Truck Analytics
+  # ===================================================================
+  
+  - name: dim_truck
+    description: "Truck dimension tracking haul truck fleet with capacity and class information"
+    columns:
+      - name: truck_id
+        description: "Unique identifier for haul truck"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: model
+        description: "Truck model/manufacturer identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: payload_capacity_tons
+        description: "Rated payload capacity in tons (100, 200, or 400)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 50
+              max_value: 500
+      
+      - name: fleet_class
+        description: "Fleet size class (100-ton, 200-ton, 400-ton)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['100-ton', '200-ton', '400-ton']
+  
+  - name: dim_shovel
+    description: "Shovel/excavator dimension for loading operations"
+    columns:
+      - name: shovel_id
+        description: "Unique identifier for shovel"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: bucket_size_m3
+        description: "Shovel bucket capacity in cubic meters (20, 35, or 60)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 100
+      
+      - name: pit_zone
+        description: "Pit zone where shovel operates"
+        data_tests:
+          - not_null
+          - not_empty_string
+  
+  - name: dim_crusher
+    description: "Crusher dimension for dumping location"
+    columns:
+      - name: crusher_id
+        description: "Unique identifier for crusher"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: capacity_tph
+        description: "Crusher capacity in tons per hour"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1000
+              max_value: 5000
+  
+  - name: dim_operator
+    description: "Operator dimension for tracking truck drivers"
+    columns:
+      - name: operator_id
+        description: "Unique identifier for operator"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: experience_level
+        description: "Operator experience level (Junior, Intermediate, Senior)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Junior', 'Intermediate', 'Senior']
+  
+  - name: dim_shift
+    description: "Shift dimension for 12-hour day/night operations"
+    columns:
+      - name: shift_id
+        description: "Unique identifier for shift"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: shift_name
+        description: "Shift name (Day, Night)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Day', 'Night']
+      
+      - name: start_time
+        description: "Shift start time (07:00 for Day, 19:00 for Night)"
+        data_tests:
+          - not_null
+      
+      - name: end_time
+        description: "Shift end time (19:00 for Day, 07:00 for Night)"
+        data_tests:
+          - not_null
+  
+  - name: dim_date
+    description: "Date dimension for time-based analysis"
+    columns:
+      - name: date_key
+        description: "Surrogate key for date (YYYYMMDD format)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: full_date
+        description: "Full date value"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Year (YYYY)"
+        data_tests:
+          - not_null
+      
+      - name: quarter
+        description: "Quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: month
+        description: "Month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: week
+        description: "Week of year (1-53)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: day_of_week
+        description: "Day of week (1=Monday, 7=Sunday)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+  
+  # ===================================================================
+  # STAGING TABLES - Raw Telemetry and State Detection
+  # ===================================================================
+  
+  - name: stg_telemetry_events
+    description: "Staging table for raw telemetry events from haul trucks"
+    columns:
+      - name: truck_id
+        description: "Foreign key to dim_truck"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_truck
+              field: truck_id
+      
+      - name: timestamp
+        description: "Event timestamp (5-10 second intervals)"
+        data_tests:
+          - not_null
+      
+      - name: gps_lat
+        description: "GPS latitude coordinate"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -90
+              max_value: 90
+      
+      - name: gps_lon
+        description: "GPS longitude coordinate"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -180
+              max_value: 180
+      
+      - name: speed_kmh
+        description: "Vehicle speed in kilometers per hour"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 80
+      
+      - name: payload_tons
+        description: "Current payload weight in tons from suspension sensors"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      
+      - name: suspension_pressure_psi
+        description: "Suspension pressure in PSI (correlates with payload)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5000
+      
+      - name: engine_rpm
+        description: "Engine RPM"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 3000
+      
+      - name: fuel_level_liters
+        description: "Fuel tank level in liters"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: engine_hours
+        description: "Cumulative engine hours (for refueling detection)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100000
+      
+      - name: geofence_zone
+        description: "Geofence zone identifier (Shovel_A, Shovel_B, Shovel_C, Crusher, Road, Other)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Shovel_A', 'Shovel_B', 'Shovel_C', 'Crusher', 'Road', 'Other']
+  
+  - name: stg_truck_states
+    description: "Staging table for detected operational states using payload thresholds and geofence logic"
+    columns:
+      - name: truck_id
+        description: "Foreign key to dim_truck"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_truck
+              field: truck_id
+      
+      - name: state_start
+        description: "State start timestamp"
+        data_tests:
+          - not_null
+      
+      - name: state_end
+        description: "State end timestamp"
+        data_tests:
+          - not_null
+      
+      - name: operational_state
+        description: "Detected operational state during this period"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: 
+                - 'queued_at_shovel'
+                - 'loading'
+                - 'hauling_loaded'
+                - 'queued_at_crusher'
+                - 'dumping'
+                - 'returning_empty'
+                - 'spot_delay'
+                - 'idle'
+      
+      - name: location_zone
+        description: "Geofence zone during this state"
+        data_tests:
+          - not_null
+      
+      - name: payload_at_start
+        description: "Payload in tons at state start"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      
+      - name: payload_at_end
+        description: "Payload in tons at state end"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+  
+  # ===================================================================
+  # FACT TABLES - Haul Cycle Analytics
+  # ===================================================================
+  
+  - name: fact_haul_cycle
+    description: "Fact table for completed haul cycles from shovel to crusher and back"
+    columns:
+      - name: cycle_id
+        description: "Unique identifier for haul cycle"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: truck_id
+        description: "Foreign key to dim_truck"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_truck
+              field: truck_id
+      
+      - name: shovel_id
+        description: "Foreign key to dim_shovel (loading location)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_shovel
+              field: shovel_id
+      
+      - name: crusher_id
+        description: "Foreign key to dim_crusher (dumping location)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_crusher
+              field: crusher_id
+      
+      - name: operator_id
+        description: "Foreign key to dim_operator"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_operator
+              field: operator_id
+      
+      - name: shift_id
+        description: "Foreign key to dim_shift"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_shift
+              field: shift_id
+      
+      - name: date_id
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: cycle_start
+        description: "Cycle start timestamp (loading begins)"
+        data_tests:
+          - not_null
+      
+      - name: cycle_end
+        description: "Cycle end timestamp (loading begins again)"
+        data_tests:
+          - not_null
+      
+      - name: payload_tons
+        description: "Payload hauled in this cycle"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      
+      - name: distance_loaded_km
+        description: "Distance traveled loaded (shovel to crusher)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50
+      
+      - name: distance_empty_km
+        description: "Distance traveled empty (crusher back to shovel)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50
+      
+      - name: duration_loading_min
+        description: "Duration spent loading at shovel (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 30
+      
+      - name: duration_hauling_loaded_min
+        description: "Duration hauling loaded to crusher (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
+      
+      - name: duration_queue_crusher_min
+        description: "Duration queued at crusher waiting to dump (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
+      
+      - name: duration_dumping_min
+        description: "Duration dumping at crusher (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 10
+      
+      - name: duration_returning_min
+        description: "Duration returning empty to shovel (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
+      
+      - name: duration_queue_shovel_min
+        description: "Duration queued at shovel waiting to load (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
+      
+      - name: duration_spot_delays_min
+        description: "Duration of spot delays during cycle (minutes)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
+      
+      - name: fuel_consumed_liters
+        description: "Fuel consumed during cycle (liters)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000
+      
+      - name: speed_avg_loaded_kmh
+        description: "Average speed when hauling loaded (km/h)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50
+      
+      - name: speed_avg_empty_kmh
+        description: "Average speed when returning empty (km/h)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 60
