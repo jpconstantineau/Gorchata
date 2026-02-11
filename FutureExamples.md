@@ -10,12 +10,11 @@
 
 ### In Progress 🚧
 
-- [] None currently
+- [x] [Haul Truck Data Transformation and Analysis](examples/haul_truck_analytics/README.md) - *Phase 1 of 8*
 
 ### Future Examples 🔮
 
 - [] Machine Event Data to OEE
-- [] Haul Truck Data Transformation and Analysis
 - [] Oil Refinery Data Transformation and Warehousing
 
 ## Example Design Prompts
