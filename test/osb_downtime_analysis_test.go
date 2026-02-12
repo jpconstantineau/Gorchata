@@ -113,8 +113,8 @@ func setupDowntimeAnalysisTest(t *testing.T) (*sqlite.SQLiteAdapter, context.Con
 		sql := fmt.Sprintf(`
 			INSERT INTO dim_date VALUES 
 			('%s', '%s', %d, %d, %d, %d, %d, %d)
-		`, dateID, date.Format("2006-01-02"), date.Year(), (date.Month()-1)/3+1, 
-		   int(date.Month()), date.Day(), int(date.Weekday()), week)
+		`, dateID, date.Format("2006-01-02"), date.Year(), (date.Month()-1)/3+1,
+			int(date.Month()), date.Day(), int(date.Weekday()), week)
 		if err := adapter.ExecuteDDL(ctx, sql); err != nil {
 			t.Fatalf("Failed to insert date: %v", err)
 		}
@@ -142,14 +142,14 @@ func setupDowntimeAnalysisTest(t *testing.T) (*sqlite.SQLiteAdapter, context.Con
 
 // downtimeEvent represents a downtime event for test data
 type downtimeEvent struct {
-	EquipmentID          string
-	StateStartTimestamp  string
-	StateEndTimestamp    string
-	StateDurationMin     float64
-	MachineState         string
-	ReasonCodeID         string
-	ShiftID              string
-	DateID               string
+	EquipmentID         string
+	StateStartTimestamp string
+	StateEndTimestamp   string
+	StateDurationMin    float64
+	MachineState        string
+	ReasonCodeID        string
+	ShiftID             string
+	DateID              string
 }
 
 // insertDowntimeEvents is a helper to insert downtime events
@@ -467,11 +467,11 @@ func TestOSBMTTRCalculation(t *testing.T) {
 		{"PRESS-01", baseTime.Format("2006-01-02 15:04:05"), baseTime.Add(10 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "NIGHT", "20240101"},
 		{"PRESS-01", baseTime.Add(10 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(12 * time.Hour).Format("2006-01-02 15:04:05"), 120, "Unplanned Downtime", "RC_BEARING_FAIL", "DAY", "20240101"},
 		{"PRESS-01", baseTime.Add(12 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(22 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "DAY", "20240101"},
-		
+
 		{"PRESS-01", baseTime.Add(24 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(34 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "NIGHT", "20240102"},
 		{"PRESS-01", baseTime.Add(34 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(37 * time.Hour).Format("2006-01-02 15:04:05"), 180, "Unplanned Downtime", "RC_HYDRAULIC_LEAK", "DAY", "20240102"},
 		{"PRESS-01", baseTime.Add(37 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(46 * time.Hour).Format("2006-01-02 15:04:05"), 540, "Running", "", "DAY", "20240102"},
-		
+
 		{"PRESS-01", baseTime.Add(48 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(58 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "NIGHT", "20240103"},
 		{"PRESS-01", baseTime.Add(58 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(59 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BURNER_TRIP", "DAY", "20240103"},
 		{"PRESS-01", baseTime.Add(59 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(70 * time.Hour).Format("2006-01-02 15:04:05"), 660, "Running", "", "DAY", "20240103"},
@@ -749,7 +749,7 @@ func TestOSBParetoAnalysis(t *testing.T) {
 	// - Burner trip: 5 occurrences × 60 min = 300 min total (second highest)
 	// - Hydraulic leak: 1 occurrence × 180 min = 180 min total (lowest)
 	// - Strand bridging: 8 occurrences × 15 min = 120 min total (frequent but short)
-	
+
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	events := []downtimeEvent{
 		// Add running states and failures
@@ -763,7 +763,7 @@ func TestOSBParetoAnalysis(t *testing.T) {
 		{"DRYER-01", baseTime.Add(15 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(15*time.Hour + 15*time.Minute).Format("2006-01-02 15:04:05"), 15, "Unplanned Downtime", "RC_STRAND_BRIDGE", "SWING", "20240101"},
 		{"DRYER-01", baseTime.Add(15*time.Hour + 15*time.Minute).Format("2006-01-02 15:04:05"), baseTime.Add(17 * time.Hour).Format("2006-01-02 15:04:05"), 105, "Running", "", "SWING", "20240101"},
 		{"DRYER-01", baseTime.Add(17 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(18 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BURNER_TRIP", "SWING", "20240101"},
-		
+
 		// Day 2
 		{"DRYER-01", baseTime.Add(24 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(28 * time.Hour).Format("2006-01-02 15:04:05"), 240, "Running", "", "NIGHT", "20240102"},
 		{"DRYER-01", baseTime.Add(28 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(30 * time.Hour).Format("2006-01-02 15:04:05"), 120, "Unplanned Downtime", "RC_BEARING_FAIL", "DAY", "20240102"},
@@ -773,7 +773,7 @@ func TestOSBParetoAnalysis(t *testing.T) {
 		{"DRYER-01", baseTime.Add(38 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(38*time.Hour + 15*time.Minute).Format("2006-01-02 15:04:05"), 15, "Unplanned Downtime", "RC_STRAND_BRIDGE", "SWING", "20240102"},
 		{"DRYER-01", baseTime.Add(38*time.Hour + 15*time.Minute).Format("2006-01-02 15:04:05"), baseTime.Add(40 * time.Hour).Format("2006-01-02 15:04:05"), 105, "Running", "", "SWING", "20240102"},
 		{"DRYER-01", baseTime.Add(40 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(41 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BURNER_TRIP", "SWING", "20240102"},
-		
+
 		// Additional failures for cumulative impact
 		{"DRYER-01", baseTime.Add(48 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(50 * time.Hour).Format("2006-01-02 15:04:05"), 120, "Running", "", "NIGHT", "20240103"},
 		{"DRYER-01", baseTime.Add(50 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(52 * time.Hour).Format("2006-01-02 15:04:05"), 120, "Unplanned Downtime", "RC_BEARING_FAIL", "DAY", "20240103"},
@@ -876,13 +876,13 @@ func TestOSBCriticalEquipmentPrioritization(t *testing.T) {
 		{"DRYER-01", baseTime.Add(18 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(19 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BURNER_TRIP", "SWING", "20240101"},
 		{"DRYER-01", baseTime.Add(19 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(27 * time.Hour).Format("2006-01-02 15:04:05"), 480, "Running", "", "SWING", "20240101"},
 		{"DRYER-01", baseTime.Add(27 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(28 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BURNER_TRIP", "DAY", "20240102"},
-		
+
 		// PRESS-01 (Critical): 2 failures, 300 min downtime
 		{"PRESS-01", baseTime.Format("2006-01-02 15:04:05"), baseTime.Add(10 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "NIGHT", "20240101"},
 		{"PRESS-01", baseTime.Add(10 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(12 * time.Hour).Format("2006-01-02 15:04:05"), 120, "Unplanned Downtime", "RC_HYDRAULIC_LEAK", "DAY", "20240101"},
 		{"PRESS-01", baseTime.Add(12 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(22 * time.Hour).Format("2006-01-02 15:04:05"), 600, "Running", "", "DAY", "20240101"},
 		{"PRESS-01", baseTime.Add(22 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(25 * time.Hour).Format("2006-01-02 15:04:05"), 180, "Unplanned Downtime", "RC_HYDRAULIC_LEAK", "NIGHT", "20240101"},
-		
+
 		// STRAND-01 (Important): 1 failure, 60 min downtime
 		{"STRAND-01", baseTime.Format("2006-01-02 15:04:05"), baseTime.Add(22 * time.Hour).Format("2006-01-02 15:04:05"), 1320, "Running", "", "DAY", "20240101"},
 		{"STRAND-01", baseTime.Add(22 * time.Hour).Format("2006-01-02 15:04:05"), baseTime.Add(23 * time.Hour).Format("2006-01-02 15:04:05"), 60, "Unplanned Downtime", "RC_BEARING_FAIL", "NIGHT", "20240101"},

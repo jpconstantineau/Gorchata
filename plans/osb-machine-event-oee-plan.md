@@ -701,6 +701,169 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
      - Quality defect rate trend
   8. Run tests and verify analytics provide actionable insights
 
+---
+
+## Phase 7 Completion Summary (Advanced Analytics and Improvement Opportunities)
+
+**Date Completed:** 2024-01-XX  
+**Status:** ✅ Complete - All 6 tests passing (100%)
+
+### Files Created/Modified
+
+1. **test/osb_advanced_analytics_test.go** (900+ lines)
+   - Comprehensive test suite for advanced analytics
+   - 6 test functions covering operational improvement analytics
+   - Setup function with equipment, reliability, downtime, shift, and date data
+   - Validates bad actor scoring, shift comparison, trending, quality correlation, maintenance effectiveness, and ROI calculations
+
+2. **models/analytics/bad_actor_prioritization.sql** (80+ lines)
+   - Equipment prioritization by impact score for maintenance investment decisions
+   - Joins equipment_reliability_metrics + dim_equipment
+   - Impact score formula: downtime_hours × failure_count × criticality_multiplier
+   - Criticality multipliers: Critical=3, Important=2, Standard=1
+   - Returns top bad actors ranked by composite impact score
+
+3. **models/analytics/shift_performance_comparison.sql** (55+ lines)
+   - Compares OEE and availability across shifts (Day, Swing, Night)
+   - Aggregates equipment state history by shift
+   - Calculates availability percentage and ranks shifts
+   - Identifies training opportunities and handover effectiveness issues
+
+### Test Results
+
+All 6 Phase 7 tests passing:
+1. ✅ **TestOSBBadActorScoring** - Validates equipment prioritized by impact (DRYER-01 scored 180.0 with 5 failures × 720 min downtime × 3 criticality)
+2. ✅ **TestOSBShiftPerformanceComparison** - Validates shift availability comparison (Night Shift 93.8% vs Swing Shift 75.0%)
+3. ✅ **TestOSBTrendAnalysis** - Validates MTBF improvement trending (40h Week 1 → 167h Week 4, downtime reduced 8h → 1h)
+4. ✅ **TestOSBQualityIssueCorrelation** - Validates quality defects correlated with process parameters (3 thickness defects at avg 143.3°C press temp)
+5. ✅ **TestOSBMaintenanceEffectivenessAnalysis** - Validates PM vs breakdown ratio analysis (DRYER-01: 28.6% PM ratio, $15K breakdown vs $2K PM costs = 7.5× ratio)
+6. ✅ **TestOSBImprovementROICalculation** - Validates ROI for reliability improvements (MTBF 48h→96h avoids 156 annual downtime hours, $156K revenue recovery, 56.4% ROI, 7.7 month payback)
+
+### Key Implementation Details
+
+#### Bad Actor Prioritization
+- **Purpose:** Prioritize equipment for reliability investments by quantifying total impact
+- **Algorithm:** 
+  - Impact Score = total_downtime_hours × failure_count × criticality_multiplier
+  - Weight critical equipment 3×, important equipment 2×, standard equipment 1×
+  - Combines frequency (failure_count) with severity (downtime) and business criticality
+- **Business Value:** Objectively prioritizes limited maintenance budget/resources
+- **Test Validation:** DRYER-01 (Critical, 5 failures, 12h downtime) scored highest (180.0) above PRESS-01 (Critical, 2 failures, 6h downtime, score 36.0)
+
+#### Shift Performance Comparison
+- **Purpose:** Identify training needs and handover effectiveness issues across shifts
+- **Metrics:**
+  - Availability % by shift (operating time / total time)
+  - Total operating hours and downtime hours per shift
+  - Shift performance ranking (1=best)
+- **Business Value:** Targets training programs, improves handover procedures, identifies shift-specific issues
+- **Test Validation:** Night Shift achieved 93.8% availability (7.5h run, 0.5h down) vs Swing Shift 75.0% (6h run, 2h down), revealing training opportunity for Swing crew
+
+#### Trend Analysis
+- **Purpose:** Track reliability improvement programs over time, validate investments working
+- **Approach:** Weekly aggregation of MTBF, MTTR, failure frequency, downtime hours
+- **Business Value:** Evidence-based assessment of improvement initiatives (e.g., bearing upgrade program effectiveness)
+- **Test Validation:** 4-week trend showed MTBF improvement from 40h to 167h (4.2× improvement) and downtime reduction from 8h to 1h per week (87.5% reduction)
+
+#### Quality Root Cause Analysis
+- **Purpose:** Correlate quality defects with equipment states and process parameters
+- **Approach:**
+  - Join quality defects with process parameters at defect timestamps
+  - Correlate defect types (thickness, delamination) with parameter values (temperature, pressure)
+  - Identify patterns: "Thickness defects occur when press temp <150°C"
+- **Business Value:** Targets process improvements, reduces scrap/rework costs, improves first-pass yield
+- **Test Validation:** 3 thickness defects all correlated with low press temperature (avg 143.3°C), below 150°C normal operating range
+
+#### Maintenance Effectiveness Analysis  
+- **Purpose:** Optimize maintenance strategy (reactive vs preventive vs predictive)
+- **Metrics:**
+  - PM ratio = planned_maintenance_count / (planned + breakdown) × 100%
+  - Breakdown-to-PM cost ratio (target <2×, observed 7.5×)
+  - Downtime hours: planned vs unplanned split
+- **Business Value:** Shift from expensive reactive breakdowns to cost-effective preventive maintenance
+- **Test Validation:** DRYER-01 had poor 28.6% PM ratio (2 PM + 5 breakdowns), breakdown costs ($15K) were 7.5× PM costs ($2K), indicating under-investment in preventive maintenance
+
+#### Improvement ROI Calculation
+- **Purpose:** Quantify financial return on proposed reliability investments
+- **Approach:**
+  - Baseline: Current MTBF, failure rate, annual downtime hours
+  - Scenario: Improved MTBF (e.g., 2× via bearing upgrade), reduced failure rate
+  - Financial: Avoided downtime hours × revenue/hour - investment cost
+  - Metrics: ROI %, payback period (months)
+- **Business Value:** Justifies capital expenditure for reliability programs with data-driven business case
+- **Test Validation:** Doubling DRYER-01 MTBF (48h→96h) avoids 156 annual downtime hours, recovers $156K revenue/year, achieves 56.4% ROI with 7.7 month payback on $100K investment
+
+### Technical Decisions & Patterns
+
+1. **Hybrid Model Architecture:**
+   - 2 SQL models (bad_actor_prioritization, shift_performance_comparison) created separate files
+   - 4 analytics (trend, quality, maintenance, ROI) embedded directly in test queries
+   - Trade-off: Reusable models vs test-specific queries based on complexity and reuse likelihood
+
+2. **Criticality Weighting:**
+   - Critical equipment (3×): Plant-stopping bottlenecks (dryer, press)
+   - Important equipment (2×): Upstream constraints (strander, former)
+   - Standard equipment (1×): Downstream finishing (saw, sander)
+   - Aligns maintenance prioritization with Theory of Constraints principles
+
+3. **Time-Series Aggregation:**
+   - Weekly rollups for trending (balance noise reduction vs responsiveness)
+   - 30-day rolling windows for trend analysis
+   - Week-over-week comparison to detect improvement/degradation
+
+4. **Financial Calculations:**
+   - Revenue per production hour: $1000/hr (conservative estimate)
+   - Annual extrapolation: (downtime / analysis_days) × 365
+   - ROI formula: (annual_benefit - investment) / investment × 100%
+   - Payback: investment / (annual_benefit / 12 months)
+
+5. **Quality Correlation:**
+   - Timestamp-based join (defect timestamp = parameter timestamp)
+   - Windowing approach for parameter drift: defect ± 1 hour window
+   - Statistical validation: compare parameter values during defects vs normal production
+
+### Business Analytics Enabled
+
+Phase 7 enables **continuous improvement decision-making** beyond basic monitoring:
+
+1. **Maintenance Budget Allocation:**
+   - Rank equipment by impact score
+   - Allocate reliability engineering resources to top 3-5 bad actors
+   - Track improvement: did impact score decrease after intervention?
+
+2. **Training Program Design:**
+   - Identify worst-performing shift (Swing Shift 75% vs Night 94%)
+   - Root cause: operator skill, supervision, handover procedures?
+   - Measure effectiveness: availability improvement after training
+
+3. **Process Optimization:**
+   - Quality defects correlate with press temperature <150°C
+   - Action: Adjust setpoint, improve temperature controller, better operator SOP
+   - Validate: defect rate reduction after process change
+
+4. **Maintenance Strategy Shift:**
+   - DRYER-01: 28.6% PM ratio, 7.5× higher breakdown costs
+   - Recommendation: Increase PM frequency (quarterly → monthly bearing inspections)
+   - Expected outcome: Reduce breakdowns 60%, improve PM ratio to 60%+
+
+5. **Capital Investment Justification:**
+   - Bearing upgrade program: $100K investment
+   - Expected: Double MTBF (48h→96h), avoid 156h/year downtime
+   - Return: $156K/year revenue recovery, 56% ROI, <8 month payback
+   - Decision: **Approve project**, compelling business case
+
+### Next Steps (Phase 8: Documentation and Visualization)
+
+Phase 7 completes the **analytical foundation**. Phase 8 focuses on **knowledge transfer and operationalization**:
+
+1. Create comprehensive README explaining OSB manufacturing process, OEE methodology, analytics use cases
+2. Document data dictionary with table schemas, business definitions, calculation formulas
+3. Provide example queries for common analytics scenarios (daily OEE report, Pareto analysis, constraint identification)
+4. Guide visualization design (dashboard layouts, chart recommendations, KPI cards)
+5. Enable plant managers, reliability engineers, and process engineers to independently query and visualize insights
+
+---
+
 ### Phase 8: Documentation, Example Queries, and Visualization Guidance
 - **Objective:** Create comprehensive documentation including README with domain overview, data dictionary, example SQL queries for common analytics scenarios, visualization guidance for dashboards (OEE trending, Pareto charts, buffer utilization), and troubleshooting guide for common data quality issues
 - **Files/Functions to Modify/Create:**
