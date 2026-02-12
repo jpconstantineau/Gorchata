@@ -11,7 +11,7 @@
 
 ### In Progress 🚧
 
-- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 6: Buffer and Constraint Analysis*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 7: Advanced Analytics and Improvement Opportunities*
 
 ### Future Examples 🔮
 
