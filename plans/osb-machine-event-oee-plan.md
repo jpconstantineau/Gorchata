@@ -542,6 +542,99 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
      - Prioritize investments: $/ton capacity increase for each bottleneck option
   7. Run tests and verify constraint identification and buffer analysis
 
+#### Phase 6 Completion Summary
+**Status:** ✅ COMPLETE
+
+**Files Created:**
+- `examples/osb_machine_event_oee/models/metrics/buffer_utilization_analysis.sql` (161 lines) - Track buffer inventory levels between production stages with time-series simulation from 50% starting point
+- `examples/osb_machine_event_oee/models/metrics/starvation_blocking_analysis.sql` (180 lines) - Correlate starvation/blocking events with upstream/downstream equipment failures for root cause analysis
+- `examples/osb_machine_event_oee/models/metrics/constraint_analysis.sql` (224 lines) - Multi-analysis view combining constraint identification, buffer sizing, throughput calculation, and capacity gap quantification
+- `test/osb_buffer_constraint_test.go` (996 lines) - Complete test suite with 9 test functions validating TOC (Theory of Constraints) analysis
+
+**Test Results:**
+- 9/9 tests passing (100%)
+- All tests follow TDD methodology (red → green → refactor)
+- Tests validate buffer tracking, starvation/blocking correlation, constraint scoring, and throughput limits
+
+**Test Coverage:**
+1. ✅ `TestOSBBufferLevelTracking` - Validates buffer inventory depletion pattern (avg=25%, min=0%, max=50% when dryer 10 t/hr > strander 6 t/hr)
+2. ✅ `TestOSBBufferCapacityUtilization` - Validates buffer reaches high utilization during downstream downtime (max=150%, hours above 90%=4.0)
+3. ✅ `TestOSBStarvationEventDetection` - Validates starvation correlation with upstream failures (DRYER-01 starved 360 min → root cause: STRAND-01 failure)
+4. ✅ `TestOSBBlockingEventDetection` - Validates blocking correlation with downstream failures (FORMER-01 blocked 300 min → root cause: PRESS-01 failure)
+5. ✅ `TestOSBDowntimePropagationAnalysis` - Validates downstream propagation (DRYER-01 failure → STRAND-01 blocked 240 min, FORMER-01 starved 360 min)
+6. ✅ `TestOSBBufferSizingImpact` - Validates buffer sizing recommendations (current=0.5h, blocked=3h → recommend=2h, reduction=1.8h blocking time)
+7. ✅ `TestOSBConstraintIdentification` - Validates constraint scoring (PRESS-01: 95.8% utilization = system constraint)
+8. ✅ `TestOSBThroughputCalculation` - Validates plant throughput limited by constraint (240 tons/day limited by DRYER-01 at 10 t/hr, 100% utilization)
+9. ✅ `TestOSBCapacityGapAnalysis` - Validates capacity gap quantification (demand=450 tons, actual=396 tons, gap=54 tons (12%), revenue loss=$13,500)
+
+**Key Implementation Details:**
+- **buffer_utilization_analysis.sql:**
+  - Defines production flow relationships from dim_production_area (upstream_area_id → downstream_area_id)
+  - Creates time slices from state_events for buffer level simulation at each state transition point
+  - Calculates net flow rate: `upstream_rate_tons_hr - downstream_rate_tons_hr`
+  - Simulates cumulative buffer level over time using window function: `SUM(net_flow × duration) OVER (PARTITION BY buffer, date ORDER BY time)`
+  - Converts buffer capacity from hours to tons: `buffer_capacity_hours × avg(upstream_rate)`
+  - Calculates buffer level %: `50% + (cumulative_net_tons / buffer_capacity_tons × 100)` with clamping to 0-150% range
+  - Aggregates per buffer per day: avg/min/max level %, hours above 90%, hours below 10%
+  
+- **starvation_blocking_analysis.sql:**
+  - Identifies starvation events: `machine_state = 'Starved'` (downstream waiting for material from upstream)
+  - Identifies blocking events: `machine_state = 'Blocked'` (upstream waiting for space in downstream)
+  - Correlates starvation with upstream equipment downtime in same production area's upstream_area_id
+  - Correlates blocking with downstream equipment downtime in downstream_area_id
+  - Uses FULL OUTER JOIN to combine starvation_with_cause and blocking_with_cause CTEs
+  - Identifies root_cause_equipment: COALESCE(upstream causing equipment, downstream causing equipment)
+  - Provides actionable insights: "DRYER-01 starved for 6 hours due to STRAND-01 failure"
+  
+- **constraint_analysis.sql:**
+  - Multi-analysis UNION ALL combining 4 analysis types: Constraint Identification, Buffer Sizing, Throughput Calculation, Capacity Gap
+  - **Constraint Scoring:** `utilization_pct × (1.0 + downstream_starvation_hours / 100.0)` - higher score = more critical constraint
+  - **Constraint Identification:** Equipment with highest constraint score flagged as `is_system_constraint = 1`
+  - **Buffer Sizing Recommendations:** Analyzes blocking events, recommends doubling buffer capacity where blocking >2 hours observed
+  - **Throughput Calculation:** `plant_throughput_tons = constraint_capacity_tons_hr × constraint_utilization_pct × 24 / 100`
+  - **Capacity Gap Analysis:** Joins with forecast_demand table (gracefully handles missing table with LEFT JOIN returning NULL)
+  - Orders results by analysis_type and constraint_score DESC for dashboard-ready output
+  
+**Technical Decisions:**
+- **Buffer Level Simulation:** Time-series approach tracking buffer level at each state transition (not just end-of-day aggregate) provides accurate min/max/avg calculations
+- **50% Starting Point:** Assumes buffers start half-full at beginning of analysis period (industry standard for steady-state operations)
+- **Net Flow Rate:** Positive = filling (upstream > downstream), Negative = depleting (downstream > upstream)
+- **Clamping Logic:** MIN(150, MAX(0, buffer_level)) allows overflow detection (>100%) while preventing negative values
+- **Production Flow Mapping:** Uses dim_production_area relationships (upstream_area_id, downstream_area_id) to define material flow paths
+- **Constraint Score Algorithm:** Combines equipment utilization with downstream impact (starvation hours caused), aligns with TOC methodology
+- **Buffer Sizing Heuristic:** Recommends 2× current capacity when blocking observed, estimates blocking reduction at 60% (industry rule of thumb)
+- **forecast_demand Table:** Optional table for capacity gap analysis - query gracefully returns no capacity_gap rows if table doesn't exist
+- **UNION ALL Structure:** Combines multiple analysis dimensions into single view for unified reporting, each with standardized column structure
+
+**Theory of Constraints (TOC) Concepts Validated:**
+- **System Constraint:** Equipment with highest utilization and causing most downstream starvation (e.g., DRYER-01 at 100% utilization limits plant to 240 tons/day)
+- **Buffer Management:** Inventory positioned between production stages absorbs variation, prevents starvation and blocking
+- **Starvation:** Downstream equipment idle waiting for material from upstream (DRYER-01 starved → STRAND-01 failure upstream)
+- **Blocking:** Upstream equipment idle waiting for space downstream (FORMER-01 blocked → PRESS-01 failure downstream)
+- **Throughput Calculation:** Plant output = constraint capacity × constraint utilization (240 tons = 10 t/hr × 100% × 24 hr)
+- **Capacity Gap:** Difference between market demand and constraint-limited actual throughput (450 - 396 = 54 tons/day shortfall)
+- **Economic Impact:** Revenue loss = capacity gap × selling price (54 tons × $250/ton = $13,500/day lost revenue)
+- **Buffer Sizing:** Strategic buffer placement and capacity recommendations to reduce blocking/starvation impact
+- **Downtime Propagation:** Single equipment failure ripples through production line via buffer depletion/overflow
+
+**Constraint Analysis Metrics:**
+- **Constraint Score:** Composite metric combining utilization % and downstream impact for constraint prioritization
+- **Utilization %:** Equipment operating time / available time (100% = always running when available)
+- **Downstream Starvation Hours:** Time downstream equipment starved due to this equipment's constraint
+- **Plant Throughput:** Total plant output in tons/day, limited by weakest link (constraint)
+- **Constraint Capacity:** Rated capacity (tons/hr) of identified constraint equipment
+- **Capacity Gap:** Market demand minus actual production (reveals lost revenue opportunity)
+- **Buffer Capacity:** Storage capacity in hours of production at typical rates
+- **Blocked Hours:** Time upstream equipment blocked waiting for downstream space
+- **Recommended Buffer Capacity:** Data-driven buffer sizing to reduce blocking frequency
+
+**Next Steps (Phase 7):**
+- Implement bad actor prioritization (equipment scoring by downtime × frequency × criticality)
+- Create shift performance comparison analytics
+- Develop quality root cause analysis correlating defects with process parameters
+- Build maintenance strategy recommendations (PM vs breakdown analysis)
+- Add improvement ROI calculations
+
 ### Phase 7: Advanced Analytics and Improvement Opportunities
 - **Objective:** Create advanced analytical views that identify operational improvement opportunities including "bad actor" equipment prioritization for reliability improvements, shift and crew performance comparisons, quality issue root cause analysis, and maintenance strategy optimization recommendations
 - **Files/Functions to Modify/Create:**
