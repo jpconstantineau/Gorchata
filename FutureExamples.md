@@ -8,10 +8,11 @@
 - [x] Manufacturing Data for Bottleneck Analysis
 - [x] [Unit Train Analytics Data Warehouse](examples/unit_train_analytics/README.md)
 - [x] [Haul Truck Analytics Data Warehouse](examples/haul_truck_analytics/README.md) - *Complete ✅*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Complete ✅*
 
 ### In Progress 🚧
 
-- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 8: Documentation, Example Queries, and Visualization Guidance*
+_(No projects currently in progress)_
 
 ### Future Examples 🔮
 
