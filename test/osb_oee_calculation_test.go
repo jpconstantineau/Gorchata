@@ -198,14 +198,14 @@ func setupOEECalculationTest(t *testing.T) (*sqlite.SQLiteAdapter, context.Conte
 
 // stateHistoryRecord represents an equipment state period
 type stateHistoryRecord struct {
-	EquipmentID          string
-	StateStartTimestamp  string
-	StateEndTimestamp    string
-	StateDurationMin     float64
-	MachineState         string
-	ReasonCodeID         string
-	ShiftID              string
-	DateID               string
+	EquipmentID         string
+	StateStartTimestamp string
+	StateEndTimestamp   string
+	StateDurationMin    float64
+	MachineState        string
+	ReasonCodeID        string
+	ShiftID             string
+	DateID              string
 }
 
 // productionOutputRecord represents a production output event
