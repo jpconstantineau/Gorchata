@@ -11,7 +11,7 @@
 
 ### In Progress 🚧
 
-- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 7: Advanced Analytics and Improvement Opportunities*
+- [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Phase 8: Documentation, Example Queries, and Visualization Guidance*
 
 ### Future Examples 🔮
 
