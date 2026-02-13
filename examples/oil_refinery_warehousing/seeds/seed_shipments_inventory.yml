@@ -1,0 +1,1317 @@
+# ===================================================================
+# OIL REFINERY DATA WAREHOUSING - PHASE 5 SEED FILE
+# Product Shipments and Tank Inventory
+# ===================================================================
+# This seed file provides sample data for:
+# - Tank dimension (15 tanks across product types)
+# - Product shipments (45 shipments over 10 days)
+# - Tank inventory with daily reconciliation
+#
+# Key Business Rules:
+# - Inventory Equation: Closing = Opening + Receipts - Withdrawals
+# - Variance Threshold: Flag if |variance_pct| > 0.3%
+# - Multiple shipment modes: Pipeline, Truck, Marine, Rail
+# ===================================================================
+
+version: 2
+
+# ===================================================================
+# DIM_TANK - Storage Tank Dimension (~15 tanks)
+# ===================================================================
+table: dim_tank
+records:
+  # Gasoline Tanks (5 tanks, 500k-1M bbl capacity)
+  - tank_id: "TK-GAS-01"
+    tank_code: "TK-101"
+    tank_name: "Gasoline Storage Tank 1"
+    product_type: "Gasoline"
+    capacity_bbl: 850000
+    location: "Gulf Coast"
+    tank_type: "Floating Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-GAS-02"
+    tank_code: "TK-102"
+    tank_name: "Gasoline Storage Tank 2"
+    product_type: "Gasoline"
+    capacity_bbl: 950000
+    location: "Gulf Coast"
+    tank_type: "Floating Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-GAS-03"
+    tank_code: "TK-103"
+    tank_name: "Gasoline Storage Tank 3"
+    product_type: "Gasoline"
+    capacity_bbl: 750000
+    location: "Midwest"
+    tank_type: "Fixed Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-GAS-04"
+    tank_code: "TK-104"
+    tank_name: "Gasoline Storage Tank 4"
+    product_type: "Gasoline"
+    capacity_bbl: 600000
+    location: "West Coast"
+    tank_type: "Floating Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-GAS-05"
+    tank_code: "TK-105"
+    tank_name: "Gasoline Storage Tank 5"
+    product_type: "Gasoline"
+    capacity_bbl: 500000
+    location: "Midwest"
+    tank_type: "Fixed Roof"
+    operational_status: "Standby"
+  
+  # Diesel Tanks (4 tanks, 400k-800k bbl)
+  - tank_id: "TK-DSL-01"
+    tank_code: "TK-201"
+    tank_name: "Diesel Storage Tank 1"
+    product_type: "Diesel"
+    capacity_bbl: 800000
+    location: "Gulf Coast"
+    tank_type: "Floating Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-DSL-02"
+    tank_code: "TK-202"
+    tank_name: "Diesel Storage Tank 2"
+    product_type: "Diesel"
+    capacity_bbl: 650000
+    location: "Midwest"
+    tank_type: "Fixed Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-DSL-03"
+    tank_code: "TK-203"
+    tank_name: "Diesel Storage Tank 3"
+    product_type: "Diesel"
+    capacity_bbl: 500000
+    location: "East Coast"
+    tank_type: "Cone Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-DSL-04"
+    tank_code: "TK-204"
+    tank_name: "Diesel Storage Tank 4"
+    product_type: "Diesel"
+    capacity_bbl: 400000
+    location: "West Coast"
+    tank_type: "Fixed Roof"
+    operational_status: "Maintenance"
+  
+  # Jet Fuel Tanks (3 tanks, 300k-600k bbl)
+  - tank_id: "TK-JET-01"
+    tank_code: "TK-301"
+    tank_name: "Jet Fuel Storage Tank 1"
+    product_type: "Jet Fuel"
+    capacity_bbl: 600000
+    location: "Gulf Coast"
+    tank_type: "Floating Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-JET-02"
+    tank_code: "TK-302"
+    tank_name: "Jet Fuel Storage Tank 2"
+    product_type: "Jet Fuel"
+    capacity_bbl: 450000
+    location: "East Coast"
+    tank_type: "Fixed Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-JET-03"
+    tank_code: "TK-303"
+    tank_name: "Jet Fuel Storage Tank 3"
+    product_type: "Jet Fuel"
+    capacity_bbl: 300000
+    location: "West Coast"
+    tank_type: "Fixed Roof"
+    operational_status: "Active"
+  
+  # Fuel Oil Tanks (2 tanks, 200k-400k bbl)
+  - tank_id: "TK-FO-01"
+    tank_code: "TK-401"
+    tank_name: "Fuel Oil Storage Tank 1"
+    product_type: "Fuel Oil"
+    capacity_bbl: 400000
+    location: "Gulf Coast"
+    tank_type: "Fixed Roof"
+    operational_status: "Active"
+  
+  - tank_id: "TK-FO-02"
+    tank_code: "TK-402"
+    tank_name: "Fuel Oil Storage Tank 2"
+    product_type: "Fuel Oil"
+    capacity_bbl: 200000
+    location: "East Coast"
+    tank_type: "Cone Roof"
+    operational_status: "Active"
+  
+  # LPG Sphere (1 tank, 100k bbl)
+  - tank_id: "TK-LPG-01"
+    tank_code: "TK-501"
+    tank_name: "LPG Storage Sphere 1"
+    product_type: "LPG"
+    capacity_bbl: 100000
+    location: "Gulf Coast"
+    tank_type: "Sphere"
+    operational_status: "Active"
+
+---
+
+# ===================================================================
+# FACT_PRODUCT_SHIPMENTS - Product Shipments (45 shipments, 10 days)
+# ===================================================================
+# Shipment Distribution:
+# - Gasoline: 45% (20 shipments)
+# - Diesel: 30% (13 shipments)
+# - Jet Fuel: 15% (7 shipments)
+# - Fuel Oil: 7% (3 shipments)
+# - LPG: 3% (2 shipments)
+#
+# Shipment Modes:
+# - Pipeline: Large volumes (10k-20k bbl)
+# - Truck: Small volumes (200-500 bbl)
+# - Marine: Very large (50k-100k bbl)
+# - Rail: Medium volumes (5k-10k bbl)
+# ===================================================================
+
+table: fact_product_shipments
+records:
+  # Day 1 - 20240101 (5 shipments)
+  - shipment_id: "SHP-20240101-001"
+    date_key: 20240101
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 15000
+    shipment_weight_tons: 1575
+    shipment_mode: "Pipeline"
+    destination_location: "Houston Distribution Center"
+    customer_id: "CUST-001"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240101-002"
+    date_key: 20240101
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-01"
+    shipment_volume_bbl: 12000
+    shipment_weight_tons: 1380
+    shipment_mode: "Pipeline"
+    destination_location: "Dallas Terminal"
+    customer_id: "CUST-002"
+    api_gravity: 35.0
+    temperature_f: 68.0
+  
+  - shipment_id: "SHP-20240101-003"
+    date_key: 20240101
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 450
+    shipment_weight_tons: 47.2
+    shipment_mode: "Truck"
+    destination_location: "Local Gas Station"
+    customer_id: "CUST-003"
+    api_gravity: 60.0
+    temperature_f: 72.0
+  
+  - shipment_id: "SHP-20240101-004"
+    date_key: 20240101
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-01"
+    shipment_volume_bbl: 8500
+    shipment_weight_tons: 942
+    shipment_mode: "Rail"
+    destination_location: "Airport Fuel Farm"
+    customer_id: "CUST-004"
+    api_gravity: 42.0
+    temperature_f: 66.0
+  
+  - shipment_id: "SHP-20240101-005"
+    date_key: 20240101
+    product_id: "PROD-GAS-PREM93"
+    tank_id: "TK-GAS-03"
+    shipment_volume_bbl: 350
+    shipment_weight_tons: 36.8
+    shipment_mode: "Truck"
+    destination_location: "Premium Station Chain"
+    customer_id: "CUST-005"
+    api_gravity: 61.0
+    temperature_f: 71.0
+  
+  # Day 2 - 20240102 (4 shipments)
+  - shipment_id: "SHP-20240102-001"
+    date_key: 20240102
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-02"
+    shipment_volume_bbl: 9500
+    shipment_weight_tons: 1092
+    shipment_mode: "Rail"
+    destination_location: "Midwest Distribution"
+    customer_id: "CUST-006"
+    api_gravity: 35.5
+    temperature_f: 69.0
+  
+  - shipment_id: "SHP-20240102-002"
+    date_key: 20240102
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 18000
+    shipment_weight_tons: 1890
+    shipment_mode: "Pipeline"
+    destination_location: "Louisiana Terminal"
+    customer_id: "CUST-007"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240102-003"
+    date_key: 20240102
+    product_id: "PROD-FO-RFO"
+    tank_id: "TK-FO-01"
+    shipment_volume_bbl: 6000
+    shipment_weight_tons: 750
+    shipment_mode: "Marine"
+    destination_location: "Power Plant"
+    customer_id: "CUST-008"
+    api_gravity: 15.0
+    temperature_f: 90.0
+  
+  - shipment_id: "SHP-20240102-004"
+    date_key: 20240102
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-02"
+    shipment_volume_bbl: 7200
+    shipment_weight_tons: 798
+    shipment_mode: "Truck"
+    destination_location: "Regional Airport"
+    customer_id: "CUST-009"
+    api_gravity: 42.0
+    temperature_f: 67.0
+  
+  # Day 3 - 20240103 (5 shipments)
+ - shipment_id: "SHP-20240103-001"
+    date_key: 20240103
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 16500
+    shipment_weight_tons: 1732
+    shipment_mode: "Pipeline"
+    destination_location: "Oklahoma City Terminal"
+    customer_id: "CUST-010"
+    api_gravity: 60.0
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240103-002"
+    date_key: 20240103
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-01"
+    shipment_volume_bbl: 11000
+    shipment_weight_tons: 1265
+    shipment_mode: "Pipeline"
+    destination_location: "San Antonio Distribution"
+    customer_id: "CUST-011"
+    api_gravity: 35.0
+    temperature_f: 68.0
+  
+  - shipment_id: "SHP-20240103-003"
+    date_key: 20240103
+    product_id: "PROD-LPG-MIX"
+    tank_id: "TK-LPG-01"
+    shipment_volume_bbl: 3500
+    shipment_weight_tons: 210
+    shipment_mode: "Rail"
+    destination_location: "Chemical Plant"
+    customer_id: "CUST-012"
+    api_gravity: 55.0
+    temperature_f: 45.0
+  
+  - shipment_id: "SHP-20240103-004"
+    date_key: 20240103
+    product_id: "PROD-GAS-PREM93"
+    tank_id: "TK-GAS-03"
+    shipment_volume_bbl: 420
+    shipment_weight_tons: 44.1
+    shipment_mode: "Truck"
+    destination_location: "Retail Chain Depot"
+    customer_id: "CUST-013"
+    api_gravity: 61.0
+    temperature_f: 72.0
+  
+  - shipment_id: "SHP-20240103-005"
+    date_key: 20240103
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-01"
+    shipment_volume_bbl: 9000
+    shipment_weight_tons: 998
+    shipment_mode: "Rail"
+    destination_location: "International Airport"
+    customer_id: "CUST-014"
+    api_gravity: 42.0
+    temperature_f: 66.0
+  
+  # Day 4 - 20240104 (4 shipments)
+  - shipment_id: "SHP-20240104-001"
+    date_key: 20240104
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 17200
+    shipment_weight_tons: 1806
+    shipment_mode: "Pipeline"
+    destination_location: "Memphis Terminal"
+    customer_id: "CUST-015"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240104-002"
+    date_key: 20240104
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-02"
+    shipment_volume_bbl: 8800
+    shipment_weight_tons: 1012
+    shipment_mode: "Truck"
+    destination_location: "Trucking Fleet Depot"
+    customer_id: "CUST-016"
+    api_gravity: 35.5
+    temperature_f: 69.0
+  
+  - shipment_id: "SHP-20240104-003"
+    date_key: 20240104
+    product_id: "PROD-GAS-MID89"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 380
+    shipment_weight_tons: 39.9
+    shipment_mode: "Truck"
+    destination_location: "Rural Gas Station"
+    customer_id: "CUST-017"
+    api_gravity: 60.5
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240104-004"
+    date_key: 20240104
+    product_id: "PROD-FO-RFO"
+    tank_id: "TK-FO-01"
+    shipment_volume_bbl: 7500
+    shipment_weight_tons: 937
+    shipment_mode: "Marine"
+    destination_location: "Industrial Facility"
+    customer_id: "CUST-018"
+    api_gravity: 15.0
+    temperature_f: 91.0
+  
+  # Day 5 - 20240105 (5 shipments - Marine export day)
+  - shipment_id: "SHP-20240105-001"
+    date_key: 20240105
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 85000
+    shipment_weight_tons: 8925
+    shipment_mode: "Marine"
+    destination_location: "Export Terminal - Mexico"
+    customer_id: "CUST-019"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240105-002"
+    date_key: 20240105
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-01"
+    shipment_volume_bbl: 65000
+    shipment_weight_tons: 7475
+    shipment_mode: "Marine"
+    destination_location: "Export Terminal - Brazil"
+    customer_id: "CUST-020"
+    api_gravity: 35.0
+    temperature_f: 68.0
+  
+  - shipment_id: "SHP-20240105-003"
+    date_key: 20240105
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-01"
+    shipment_volume_bbl: 42000
+    shipment_weight_tons: 4656
+    shipment_mode: "Marine"
+    destination_location: "Export Terminal - Europe"
+    customer_id: "CUST-021"
+    api_gravity: 42.0
+    temperature_f: 66.0
+  
+  - shipment_id: "SHP-20240105-004"
+    date_key: 20240105
+    product_id: "PROD-GAS-PREM93"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 480
+    shipment_weight_tons: 50.4
+    shipment_mode: "Truck"
+    destination_location: "Premium Retail Network"
+    customer_id: "CUST-022"
+    api_gravity: 61.0
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240105-005"
+    date_key: 20240105
+    product_id: "PROD-LPG-MIX"
+    tank_id: "TK-LPG-01"
+    shipment_volume_bbl: 4200
+    shipment_weight_tons: 252
+    shipment_mode: "Rail"
+    destination_location: "Propane Distribution"
+    customer_id: "CUST-023"
+    api_gravity: 55.0
+    temperature_f: 46.0
+  
+  # Day 6 - 20240106 (4 shipments)
+  - shipment_id: "SHP-20240106-001"
+    date_key: 20240106
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 14500
+    shipment_weight_tons: 1522
+    shipment_mode: "Pipeline"
+    destination_location: "Austin Distribution"
+    customer_id: "CUST-024"
+    api_gravity: 60.0
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240106-002"
+    date_key: 20240106
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-02"
+    shipment_volume_bbl: 10500
+    shipment_weight_tons: 1207
+    shipment_mode: "Pipeline"
+    destination_location: "Kansas City Terminal"
+    customer_id: "CUST-025"
+    api_gravity: 35.5
+    temperature_f: 69.0
+  
+  - shipment_id: "SHP-20240106-003"
+    date_key: 20240106
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-02"
+    shipment_volume_bbl: 8300
+    shipment_weight_tons: 920
+    shipment_mode: "Rail"
+    destination_location: "Military Airbase"
+    customer_id: "CUST-026"
+    api_gravity: 42.0
+    temperature_f: 67.0
+  
+  - shipment_id: "SHP-20240106-004"
+    date_key: 20240106
+    product_id: "PROD-FO-RFO"
+    tank_id: "TK-FO-02"
+    shipment_volume_bbl: 5500
+    shipment_weight_tons: 687
+    shipment_mode: "Truck"
+    destination_location: "Marine Bunker Fuel"
+    customer_id: "CUST-027"
+    api_gravity: 14.0
+    temperature_f: 88.0
+  
+  # Day 7 - 20240107 (5 shipments)
+  - shipment_id: "SHP-20240107-001"
+    date_key: 20240107
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 16800
+    shipment_weight_tons: 1764
+    shipment_mode: "Pipeline"
+    destination_location: "New Orleans Terminal"
+    customer_id: "CUST-028"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240107-002"
+    date_key: 20240107
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-01"
+    shipment_volume_bbl: 13200
+    shipment_weight_tons: 1518
+    shipment_mode: "Pipeline"
+    destination_location: "Baton Rouge Distribution"
+    customer_id: "CUST-029"
+    api_gravity: 35.0
+    temperature_f: 68.0
+  
+  - shipment_id: "SHP-20240107-003"
+    date_key: 20240107
+    product_id: "PROD-GAS-MID89"
+    tank_id: "TK-GAS-03"
+    shipment_volume_bbl: 410
+    shipment_weight_tons: 43.1
+    shipment_mode: "Truck"
+    destination_location: "Suburban Gas Stations"
+    customer_id: "CUST-030"
+    api_gravity: 60.5
+    temperature_f: 72.0
+  
+  - shipment_id: "SHP-20240107-004"
+    date_key: 20240107
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-01"
+    shipment_volume_bbl: 9500
+    shipment_weight_tons: 1053
+    shipment_mode: "Rail"
+    destination_location: "Major Hub Airport"
+    customer_id: "CUST-031"
+    api_gravity: 42.0
+    temperature_f: 66.0
+  
+  - shipment_id: "SHP-20240107-005"
+    date_key: 20240107
+    product_id: "PROD-GAS-PREM93"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 390
+    shipment_weight_tons: 41.0
+    shipment_mode: "Truck"
+    destination_location: "Convenience Store Chain"
+    customer_id: "CUST-032"
+    api_gravity: 61.0
+    temperature_f: 71.0
+  
+  # Day 8 - 20240108 (4 shipments)
+  - shipment_id: "SHP-20240108-001"
+    date_key: 20240108
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 15500
+    shipment_weight_tons: 1627
+    shipment_mode: "Pipeline"
+    destination_location: "Fort Worth Distribution"
+    customer_id: "CUST-033"
+    api_gravity: 60.0
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240108-002"
+    date_key: 20240108
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-02"
+    shipment_volume_bbl: 9800
+    shipment_weight_tons: 1127
+    shipment_mode: "Rail"
+    destination_location: "Chicago Terminal"
+    customer_id: "CUST-034"
+    api_gravity: 35.5
+    temperature_f: 69.0
+  
+  - shipment_id: "SHP-20240108-003"
+    date_key: 20240108
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-03"
+    shipment_volume_bbl: 6800
+    shipment_weight_tons: 754
+    shipment_mode: "Truck"
+    destination_location: "West Coast Airport"
+    customer_id: "CUST-035"
+    api_gravity: 42.0
+    temperature_f: 65.0
+  
+  - shipment_id: "SHP-20240108-004"
+    date_key: 20240108
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-03"
+    shipment_volume_bbl: 440
+    shipment_weight_tons: 46.2
+    shipment_mode: "Truck"
+    destination_location: "Interstate Rest Stops"
+    customer_id: "CUST-036"
+    api_gravity: 60.0
+    temperature_f: 72.0
+  
+  # Day 9 - 20240109 (4 shipments)
+  - shipment_id: "SHP-20240109-001"
+    date_key: 20240109
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 17500
+    shipment_weight_tons: 1837
+    shipment_mode: "Pipeline"
+    destination_location: "Corpus Christi Terminal"
+    customer_id: "CUST-037"
+    api_gravity: 60.0
+    temperature_f: 70.0
+  
+  - shipment_id: "SHP-20240109-002"
+    date_key: 20240109
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-01"
+    shipment_volume_bbl: 12500
+    shipment_weight_tons: 1437
+    shipment_mode: "Pipeline"
+    destination_location: "Laredo Distribution"
+    customer_id: "CUST-038"
+    api_gravity: 35.0
+    temperature_f: 68.0
+  
+  - shipment_id: "SHP-20240109-003"
+    date_key: 20240109
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-03"
+    shipment_volume_bbl: 7200
+    shipment_weight_tons: 828
+    shipment_mode: "Truck"
+    destination_location: "East Coast Distribution"
+    customer_id: "CUST-039"
+    api_gravity: 35.0
+    temperature_f: 67.0
+  
+  - shipment_id: "SHP-20240109-004"
+    date_key: 20240109
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-02"
+    shipment_volume_bbl: 8900
+    shipment_weight_tons: 987
+    shipment_mode: "Rail"
+    destination_location: "Northeast Hub Airport"
+    customer_id: "CUST-040"
+    api_gravity: 42.0
+    temperature_f: 67.0
+  
+  # Day 10 - 20240110 (5 shipments)
+  - shipment_id: "SHP-20240110-001"
+    date_key: 20240110
+    product_id: "PROD-GAS-REG87"
+    tank_id: "TK-GAS-02"
+    shipment_volume_bbl: 16200
+    shipment_weight_tons: 1701
+    shipment_mode: "Pipeline"
+    destination_location: "Tulsa Distribution"
+    customer_id: "CUST-041"
+    api_gravity: 60.0
+    temperature_f: 71.0
+  
+  - shipment_id: "SHP-20240110-002"
+    date_key: 20240110
+    product_id: "PROD-DSL-ULSD"
+    tank_id: "TK-DSL-02"
+    shipment_volume_bbl: 11500
+    shipment_weight_tons: 1322
+    shipment_mode: "Pipeline"
+    destination_location: "Denver Terminal"
+    customer_id: "CUST-042"
+    api_gravity: 35.5
+    temperature_f: 69.0
+  
+  - shipment_id: "SHP-20240110-003"
+    date_key: 20240110
+    product_id: "PROD-GAS-PREM93"
+    tank_id: "TK-GAS-03"
+    shipment_volume_bbl: 460
+    shipment_weight_tons: 48.3
+    shipment_mode: "Truck"
+    destination_location: "High-End Retail Stations"
+    customer_id: "CUST-043"
+    api_gravity: 61.0
+    temperature_f: 72.0
+  
+  - shipment_id: "SHP-20240110-004"
+    date_key: 20240110
+    product_id: "PROD-JET-A1"
+    tank_id: "TK-JET-01"
+    shipment_volume_bbl: 9300
+    shipment_weight_tons: 1031
+    shipment_mode: "Rail"
+    destination_location: "Southwest Hub Airport"
+    customer_id: "CUST-044"
+    api_gravity: 42.0
+    temperature_f: 66.0
+  
+  - shipment_id: "SHP-20240110-005"
+    date_key: 20240110
+    product_id: "PROD-GAS-MID89"
+    tank_id: "TK-GAS-01"
+    shipment_volume_bbl: 400
+    shipment_weight_tons: 42.0
+    shipment_mode: "Truck"
+    destination_location: "Local Station Network"
+    customer_id: "CUST-045"
+    api_gravity: 60.5
+    temperature_f: 70.0
+
+---
+
+# ===================================================================
+# FACT_TANK_INVENTORY - Daily Tank Inventory (10 days)
+# ===================================================================
+# Inventory Reconciliation Formula:
+# Expected_Closing = Opening_Balance + Receipts - Withdrawals
+# Variance = Actual_Closing - Expected_Closing
+# Variance_Pct = (Variance / Expected_Closing) × 100
+# Variance_Flag = TRUE if |Variance_Pct| > 0.3%
+#
+# Sample Inventory Pattern (TK-GAS-01):
+# - Opening: 450,000 bbl
+# - Receipts: ~45,000 bbl/day (from FCC/Reformer)
+# - Withdrawals: Match shipment volumes above
+# - Expected Closing: Opening + Receipts - Withdrawals
+# - Actual Closing: With small variance
+# ===================================================================
+
+table: fact_tank_inventory
+records:
+  # TK-GAS-01 - Gasoline Tank 1 (10 days)
+  - inventory_id: "INV-20240101-TK-GAS-01"
+    date_key: 20240101
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 450000
+    receipts_bbl: 45000
+    withdrawals_bbl: 15000
+    closing_balance_bbl: 479850
+    expected_closing_bbl: 480000
+    variance_bbl: -150
+    variance_pct: -0.031
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240102-TK-GAS-01"
+    date_key: 20240102
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 479850
+    receipts_bbl: 45000
+    withdrawals_bbl: 18000
+    closing_balance_bbl: 506750
+    expected_closing_bbl: 506850
+    variance_bbl: -100
+    variance_pct: -0.020
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240103-TK-GAS-01"
+    date_key: 20240103
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 506750
+    receipts_bbl: 45000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 551650
+    expected_closing_bbl: 551750
+    variance_bbl: -100
+    variance_pct: -0.018
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240104-TK-GAS-01"
+    date_key: 20240104
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 551650
+    receipts_bbl: 45000
+    withdrawals_bbl: 17200
+    closing_balance_bbl: 579350
+    expected_closing_bbl: 579450
+    variance_bbl: -100
+    variance_pct: -0.017
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240105-TK-GAS-01"
+    date_key: 20240105
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 579350
+    receipts_bbl: 45000
+    withdrawals_bbl: 85000
+    closing_balance_bbl: 536850
+    expected_closing_bbl: 539350
+    variance_bbl: -2500
+    variance_pct: -0.463
+    variance_flag: true
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240106-TK-GAS-01"
+    date_key: 20240106
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 536850
+    receipts_bbl: 45000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 581750
+    expected_closing_bbl: 581850
+    variance_bbl: -100
+    variance_pct: -0.017
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240107-TK-GAS-01"
+    date_key: 20240107
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 581750
+    receipts_bbl: 45000
+    withdrawals_bbl: 16800
+    closing_balance_bbl: 609850
+    expected_closing_bbl: 609950
+    variance_bbl: -100
+    variance_pct: -0.016
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240108-TK-GAS-01"
+    date_key: 20240108
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 609850
+    receipts_bbl: 45000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 654750
+    expected_closing_bbl: 654850
+    variance_bbl: -100
+    variance_pct: -0.015
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240109-TK-GAS-01"
+    date_key: 20240109
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 654750
+    receipts_bbl: 45000
+    withdrawals_bbl: 17500
+    closing_balance_bbl: 682150
+    expected_closing_bbl: 682250
+    variance_bbl: -100
+    variance_pct: -0.015
+    variance_flag: false
+    temperature_f: 70.0
+  
+  - inventory_id: "INV-20240110-TK-GAS-01"
+    date_key: 20240110
+    tank_id: "TK-GAS-01"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 682150
+    receipts_bbl: 45000
+    withdrawals_bbl: 400
+    closing_balance_bbl: 726650
+    expected_closing_bbl: 726750
+    variance_bbl: -100
+    variance_pct: -0.014
+    variance_flag: false
+    temperature_f: 70.0
+  
+  # TK-GAS-02 - Gasoline Tank 2 (10 days)
+  - inventory_id: "INV-20240101-TK-GAS-02"
+    date_key: 20240101
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 520000
+    receipts_bbl: 42000
+    withdrawals_bbl: 450
+    closing_balance_bbl: 561450
+    expected_closing_bbl: 561550
+    variance_bbl: -100
+    variance_pct: -0.018
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240102-TK-GAS-02"
+    date_key: 20240102
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 561450
+    receipts_bbl: 42000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 603350
+    expected_closing_bbl: 603450
+    variance_bbl: -100
+    variance_pct: -0.017
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240103-TK-GAS-02"
+    date_key: 20240103
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 603350
+    receipts_bbl: 42000
+    withdrawals_bbl: 16500
+    closing_balance_bbl: 628750
+    expected_closing_bbl: 628850
+    variance_bbl: -100
+    variance_pct: -0.016
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240104-TK-GAS-02"
+    date_key: 20240104
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 628750
+    receipts_bbl: 42000
+    withdrawals_bbl: 380
+    closing_balance_bbl: 670270
+    expected_closing_bbl: 670370
+    variance_bbl: -100
+    variance_pct: -0.015
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240105-TK-GAS-02"
+    date_key: 20240105
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 670270
+    receipts_bbl: 42000
+    withdrawals_bbl: 480
+    closing_balance_bbl: 711690
+    expected_closing_bbl: 711790
+    variance_bbl: -100
+    variance_pct: -0.014
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240106-TK-GAS-02"
+    date_key: 20240106
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 711690
+    receipts_bbl: 42000
+    withdrawals_bbl: 14500
+    closing_balance_bbl: 737090
+    expected_closing_bbl: 739190
+    variance_bbl: -2100
+    variance_pct: -0.284
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240107-TK-GAS-02"
+    date_key: 20240107
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 737090
+    receipts_bbl: 42000
+    withdrawals_bbl: 390
+    closing_balance_bbl: 778600
+    expected_closing_bbl: 778700
+    variance_bbl: -100
+    variance_pct: -0.013
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240108-TK-GAS-02"
+    date_key: 20240108
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 778600
+    receipts_bbl: 42000
+    withdrawals_bbl: 15500
+    closing_balance_bbl: 805000
+    expected_closing_bbl: 805100
+    variance_bbl: -100
+    variance_pct: -0.012
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240109-TK-GAS-02"
+    date_key: 20240109
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 805000
+    receipts_bbl: 42000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 846900
+    expected_closing_bbl: 847000
+    variance_bbl: -100
+    variance_pct: -0.012
+    variance_flag: false
+    temperature_f: 71.0
+  
+  - inventory_id: "INV-20240110-TK-GAS-02"
+    date_key: 20240110
+    tank_id: "TK-GAS-02"
+    product_id: "PROD-GAS-REG87"
+    opening_balance_bbl: 846900
+    receipts_bbl: 42000
+    withdrawals_bbl: 16200
+    closing_balance_bbl: 872600
+    expected_closing_bbl: 872700
+    variance_bbl: -100
+    variance_pct: -0.011
+    variance_flag: false
+    temperature_f: 71.0
+  
+  # TK-DSL-01 - Diesel Tank 1 (10 days)
+  - inventory_id: "INV-20240101-TK-DSL-01"
+    date_key: 20240101
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 380000
+    receipts_bbl: 38000
+    withdrawals_bbl: 12000
+    closing_balance_bbl: 405900
+    expected_closing_bbl: 406000
+    variance_bbl: -100
+    variance_pct: -0.025
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240102-TK-DSL-01"
+    date_key: 20240102
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 405900
+    receipts_bbl: 38000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 443800
+    expected_closing_bbl: 443900
+    variance_bbl: -100
+    variance_pct: -0.023
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240103-TK-DSL-01"
+    date_key: 20240103
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 443800
+    receipts_bbl: 38000
+    withdrawals_bbl: 11000
+    closing_balance_bbl: 470700
+    expected_closing_bbl: 470800
+    variance_bbl: -100
+    variance_pct: -0.021
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240104-TK-DSL-01"
+    date_key: 20240104
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 470700
+    receipts_bbl: 38000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 508600
+    expected_closing_bbl: 508700
+    variance_bbl: -100
+    variance_pct: -0.020
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240105-TK-DSL-01"
+    date_key: 20240105
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 508600
+    receipts_bbl: 38000
+    withdrawals_bbl: 65000
+    closing_balance_bbl: 479500
+    expected_closing_bbl: 481600
+    variance_bbl: -2100
+    variance_pct: -0.436
+    variance_flag: true
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240106-TK-DSL-01"
+    date_key: 20240106
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 479500
+    receipts_bbl: 38000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 517400
+    expected_closing_bbl: 517500
+    variance_bbl: -100
+    variance_pct: -0.019
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240107-TK-DSL-01"
+    date_key: 20240107
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 517400
+    receipts_bbl: 38000
+    withdrawals_bbl: 13200
+    closing_balance_bbl: 542100
+    expected_closing_bbl: 542200
+    variance_bbl: -100
+    variance_pct: -0.018
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240108-TK-DSL-01"
+    date_key: 20240108
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 542100
+    receipts_bbl: 38000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 580000
+    expected_closing_bbl: 580100
+    variance_bbl: -100
+    variance_pct: -0.017
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240109-TK-DSL-01"
+    date_key: 20240109
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 580000
+    receipts_bbl: 38000
+    withdrawals_bbl: 12500
+    closing_balance_bbl: 605400
+    expected_closing_bbl: 605500
+    variance_bbl: -100
+    variance_pct: -0.017
+    variance_flag: false
+    temperature_f: 68.0
+  
+  - inventory_id: "INV-20240110-TK-DSL-01"
+    date_key: 20240110
+    tank_id: "TK-DSL-01"
+    product_id: "PROD-DSL-ULSD"
+    opening_balance_bbl: 605400
+    receipts_bbl: 38000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 643300
+    expected_closing_bbl: 643400
+    variance_bbl: -100
+    variance_pct: -0.016
+    variance_flag: false
+    temperature_f: 68.0
+  
+  # TK-JET-01 - Jet Fuel Tank 1 (10 days)
+  - inventory_id: "INV-20240101-TK-JET-01"
+    date_key: 20240101
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 280000
+    receipts_bbl: 28000
+    withdrawals_bbl: 8500
+    closing_balance_bbl: 299400
+    expected_closing_bbl: 299500
+    variance_bbl: -100
+    variance_pct: -0.033
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240102-TK-JET-01"
+    date_key: 20240102
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 299400
+    receipts_bbl: 28000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 327300
+    expected_closing_bbl: 327400
+    variance_bbl: -100
+    variance_pct: -0.031
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240103-TK-JET-01"
+    date_key: 20240103
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 327300
+    receipts_bbl: 28000
+    withdrawals_bbl: 9000
+    closing_balance_bbl: 346200
+    expected_closing_bbl: 346300
+    variance_bbl: -100
+    variance_pct: -0.029
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240104-TK-JET-01"
+    date_key: 20240104
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 346200
+    receipts_bbl: 28000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 374100
+    expected_closing_bbl: 374200
+    variance_bbl: -100
+    variance_pct: -0.027
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240105-TK-JET-01"
+    date_key: 20240105
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 374100
+    receipts_bbl: 28000
+    withdrawals_bbl: 42000
+    closing_balance_bbl: 360000
+    expected_closing_bbl: 360100
+    variance_bbl: -100
+    variance_pct: -0.028
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240106-TK-JET-01"
+    date_key: 20240106
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 360000
+    receipts_bbl: 28000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 387900
+    expected_closing_bbl: 388000
+    variance_bbl: -100
+    variance_pct: -0.026
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240107-TK-JET-01"
+    date_key: 20240107
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 387900
+    receipts_bbl: 28000
+    withdrawals_bbl: 9500
+    closing_balance_bbl: 406300
+    expected_closing_bbl: 406400
+    variance_bbl: -100
+    variance_pct: -0.025
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240108-TK-JET-01"
+    date_key: 20240108
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 406300
+    receipts_bbl: 28000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 434200
+    expected_closing_bbl: 434300
+    variance_bbl: -100
+    variance_pct: -0.023
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240109-TK-JET-01"
+    date_key: 20240109
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 434200
+    receipts_bbl: 28000
+    withdrawals_bbl: 0
+    closing_balance_bbl: 462100
+    expected_closing_bbl: 462200
+    variance_bbl: -100
+    variance_pct: -0.022
+    variance_flag: false
+    temperature_f: 66.0
+  
+  - inventory_id: "INV-20240110-TK-JET-01"
+    date_key: 20240110
+    tank_id: "TK-JET-01"
+    product_id: "PROD-JET-A1"
+    opening_balance_bbl: 462100
+    receipts_bbl: 28000
+    withdrawals_bbl: 9300
+    closing_balance_bbl: 480700
+    expected_closing_bbl: 480800
+    variance_bbl: -100
+    variance_pct: -0.021
+    variance_flag: false
+    temperature_f: 66.0

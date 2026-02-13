@@ -610,6 +610,49 @@ func floatEquals(a, b, tolerance float64) bool {
 	return diff <= tolerance
 }
 
+// findColumn is a helper function to find a column by name
+func findColumn(columns []schema.ColumnSchema, name string) *schema.ColumnSchema {
+	for i := range columns {
+		if columns[i].Name == name {
+			return &columns[i]
+		}
+	}
+	return nil
+}
+
+// hasDataTest checks if a column has a specific data test (e.g., "unique", "not_null")
+func hasDataTest(dataTests []interface{}, testName string) bool {
+	for _, test := range dataTests {
+		switch v := test.(type) {
+		case string:
+			if v == testName {
+				return true
+			}
+		case map[string]interface{}:
+			if _, ok := v[testName]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasRelationship checks if a column has a relationship to a specific table
+func hasRelationship(dataTests []interface{}, toTable string) bool {
+	for _, test := range dataTests {
+		if testMap, ok := test.(map[string]interface{}); ok {
+			if rel, ok := testMap["relationships"]; ok {
+				if relMap, ok := rel.(map[string]interface{}); ok {
+					if to, ok := relMap["to"].(string); ok && to == toTable {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 // TestAPIGravityConversion verifies the API gravity to specific gravity formula
 func TestAPIGravityConversion(t *testing.T) {
 	tests := []struct {
@@ -1384,5 +1427,427 @@ func TestSeedUnitProductionValid(t *testing.T) {
 
 	if foundProducts < 3 {
 		t.Errorf("Seed file should include multiple product types (found %d)", foundProducts)
+	}
+}
+
+// ===================================================================
+// PHASE 5 TESTS - Product Shipments and Tank Inventory
+// ===================================================================
+
+// TestDimTankStructure verifies dim_tank dimension has required columns
+func TestDimTankStructure(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var dimTank *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "dim_tank" {
+			dimTank = &model
+			break
+		}
+	}
+
+	if dimTank == nil {
+		t.Fatal("dim_tank not found in schema")
+	}
+
+	requiredColumns := []string{
+		"tank_id",
+		"tank_code",
+		"tank_name",
+		"product_type",
+		"capacity_bbl",
+		"location",
+		"tank_type",
+		"operational_status",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range dimTank.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("dim_tank missing required column: %s", colName)
+		}
+	}
+
+	// Verify tank_id is primary key (has unique and not_null tests)
+	tankIDCol := findColumn(dimTank.Columns, "tank_id")
+	if tankIDCol == nil {
+		t.Fatal("tank_id column not found")
+	}
+
+	if !hasDataTest(tankIDCol.DataTests, "unique") {
+		t.Error("tank_id should have unique constraint")
+	}
+
+	if !hasDataTest(tankIDCol.DataTests, "not_null") {
+		t.Error("tank_id should have not_null constraint")
+	}
+}
+
+// TestFactProductShipmentsTableExists verifies fact_product_shipments table is defined
+func TestFactProductShipmentsTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factShipments *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_product_shipments" {
+			factShipments = &model
+			break
+		}
+	}
+
+	if factShipments == nil {
+		t.Fatal("fact_product_shipments not found in schema")
+	}
+
+	requiredColumns := []string{
+		"shipment_id",
+		"date_key",
+		"product_id",
+		"tank_id",
+		"shipment_volume_bbl",
+		"shipment_weight_tons",
+		"shipment_mode",
+		"destination_location",
+		"customer_id",
+		"api_gravity",
+		"temperature_f",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factShipments.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_product_shipments missing required column: %s", colName)
+		}
+	}
+
+	// Verify foreign key relationships
+	dateKeyCol := findColumn(factShipments.Columns, "date_key")
+	if dateKeyCol == nil {
+		t.Fatal("date_key column not found")
+	}
+
+	if !hasRelationship(dateKeyCol.DataTests, "dim_date") {
+		t.Error("date_key should have relationship to dim_date")
+	}
+
+	productIDCol := findColumn(factShipments.Columns, "product_id")
+	if productIDCol != nil && !hasRelationship(productIDCol.DataTests, "dim_product") {
+		t.Error("product_id should have relationship to dim_product")
+	}
+
+	tankIDCol := findColumn(factShipments.Columns, "tank_id")
+	if tankIDCol != nil && !hasRelationship(tankIDCol.DataTests, "dim_tank") {
+		t.Error("tank_id should have relationship to dim_tank")
+	}
+}
+
+// TestFactTankInventoryTableExists verifies fact_tank_inventory table is defined
+func TestFactTankInventoryTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factInventory *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_tank_inventory" {
+			factInventory = &model
+			break
+		}
+	}
+
+	if factInventory == nil {
+		t.Fatal("fact_tank_inventory not found in schema")
+	}
+
+	requiredColumns := []string{
+		"inventory_id",
+		"date_key",
+		"tank_id",
+		"product_id",
+		"opening_balance_bbl",
+		"receipts_bbl",
+		"withdrawals_bbl",
+		"closing_balance_bbl",
+		"expected_closing_bbl",
+		"variance_bbl",
+		"variance_pct",
+		"variance_flag",
+		"temperature_f",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factInventory.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_tank_inventory missing required column: %s", colName)
+		}
+	}
+
+	// Verify inventory equation columns have proper tests
+	openingCol := findColumn(factInventory.Columns, "opening_balance_bbl")
+	if openingCol == nil {
+		t.Fatal("opening_balance_bbl column not found")
+	}
+
+	if !hasDataTest(openingCol.DataTests, "not_null") {
+		t.Error("opening_balance_bbl should have not_null constraint")
+	}
+}
+
+// TestInventoryCalculation verifies inventory equation fields exist
+func TestInventoryCalculation(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factInventory *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_tank_inventory" {
+			factInventory = &model
+			break
+		}
+	}
+
+	if factInventory == nil {
+		t.Fatal("fact_tank_inventory not found in schema")
+	}
+
+	// Verify all components of inventory equation exist
+	inventoryComponents := []string{
+		"opening_balance_bbl",
+		"receipts_bbl",
+		"withdrawals_bbl",
+		"closing_balance_bbl",
+		"expected_closing_bbl",
+	}
+
+	for _, component := range inventoryComponents {
+		col := findColumn(factInventory.Columns, component)
+		if col == nil {
+			t.Errorf("Inventory equation component missing: %s", component)
+		}
+	}
+
+	// Verify description mentions calculation
+	expectedClosingCol := findColumn(factInventory.Columns, "expected_closing_bbl")
+	if expectedClosingCol != nil {
+		if expectedClosingCol.Description == "" {
+			t.Error("expected_closing_bbl should have description explaining calculation")
+		}
+	}
+}
+
+// TestInventoryVarianceDetection verifies variance detection fields
+func TestInventoryVarianceDetection(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factInventory *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_tank_inventory" {
+			factInventory = &model
+			break
+		}
+	}
+
+	if factInventory == nil {
+		t.Fatal("fact_tank_inventory not found in schema")
+	}
+
+	// Verify variance components exist
+	varianceFields := []string{
+		"variance_bbl",
+		"variance_pct",
+		"variance_flag",
+	}
+
+	for _, field := range varianceFields {
+		col := findColumn(factInventory.Columns, field)
+		if col == nil {
+			t.Errorf("Variance detection field missing: %s", field)
+		}
+	}
+
+	// Verify variance_flag is boolean/integer
+	varianceFlagCol := findColumn(factInventory.Columns, "variance_flag")
+	if varianceFlagCol != nil {
+		if varianceFlagCol.Description == "" {
+			t.Error("variance_flag should have description explaining threshold")
+		}
+	}
+}
+
+// TestProductAvailabilityCheck verifies staging table for shipments exists
+func TestProductAvailabilityCheck(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Check for staging table
+	var stgShipments *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "stg_product_shipments" {
+			stgShipments = &model
+			break
+		}
+	}
+
+	if stgShipments == nil {
+		t.Fatal("stg_product_shipments staging table not found in schema")
+	}
+
+	// Verify it has shipment_volume_bbl
+	shipmentVolumeCol := findColumn(stgShipments.Columns, "shipment_volume_bbl")
+	if shipmentVolumeCol == nil {
+		t.Error("stg_product_shipments should have shipment_volume_bbl column")
+	}
+}
+
+// TestInventoryBalanceByProduct verifies tank and product relationships
+func TestInventoryBalanceByProduct(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factInventory *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_tank_inventory" {
+			factInventory = &model
+			break
+		}
+	}
+
+	if factInventory == nil {
+		t.Fatal("fact_tank_inventory not found in schema")
+	}
+
+	// Verify both tank_id and product_id exist for aggregation
+	tankIDCol := findColumn(factInventory.Columns, "tank_id")
+	if tankIDCol == nil {
+		t.Error("fact_tank_inventory should have tank_id for tank-level aggregation")
+	}
+
+	productIDCol := findColumn(factInventory.Columns, "product_id")
+	if productIDCol == nil {
+		t.Error("fact_tank_inventory should have product_id for product-level aggregation")
+	}
+
+	// Verify relationships
+	if tankIDCol != nil && !hasRelationship(tankIDCol.DataTests, "dim_tank") {
+		t.Error("tank_id should have relationship to dim_tank")
+	}
+
+	if productIDCol != nil && !hasRelationship(productIDCol.DataTests, "dim_product") {
+		t.Error("product_id should have relationship to dim_product")
+	}
+}
+
+// TestSeedShipmentsInventoryValid verifies seed file exists and has required structure
+func TestSeedShipmentsInventoryValid(t *testing.T) {
+	seedPath := filepath.Join("seeds", "seed_shipments_inventory.yml")
+
+	// Verify file exists
+	if _, err := os.Stat(seedPath); os.IsNotExist(err) {
+		t.Fatalf("Seed file does not exist: %s", seedPath)
+	}
+
+	// Read and parse file content
+	content, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("Failed to read seed file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify basic structure
+	if !containsSubstring(contentStr, "version:") {
+		t.Error("Seed file missing version declaration")
+	}
+
+	if !containsSubstring(contentStr, "table:") {
+		t.Error("Seed file missing table declaration")
+	}
+
+	if !containsSubstring(contentStr, "records:") {
+		t.Error("Seed file missing records section")
+	}
+
+	// Verify key inventory fields
+	inventoryFields := []string{
+		"opening_balance_bbl",
+		"receipts_bbl",
+		"withdrawals_bbl",
+		"closing_balance_bbl",
+		"variance_pct",
+		"variance_flag",
+	}
+
+	for _, field := range inventoryFields {
+		if !containsSubstring(contentStr, field) {
+			t.Errorf("Seed file missing required inventory field: %s", field)
+		}
+	}
+
+	// Verify shipment modes
+	shipmentModes := []string{"Pipeline", "Truck", "Marine"}
+	foundModes := 0
+	for _, mode := range shipmentModes {
+		if containsSubstring(contentStr, mode) {
+			foundModes++
+		}
+	}
+
+	if foundModes < 2 {
+		t.Errorf("Seed file should include multiple shipment modes (found %d)", foundModes)
+	}
+
+	// Verify product types in shipments
+	productTypes := []string{"Gasoline", "Diesel", "Jet"}
+	foundProducts := 0
+	for _, product := range productTypes {
+		if containsSubstring(contentStr, product) {
+			foundProducts++
+		}
+	}
+
+	if foundProducts < 2 {
+		t.Errorf("Seed file should include multiple product types in shipments (found %d)", foundProducts)
 	}
 }

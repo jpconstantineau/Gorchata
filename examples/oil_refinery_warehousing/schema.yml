@@ -1259,3 +1259,421 @@ models:
           - accepted_range:
               min_value: 30
               max_value: 70
+
+  # ===================================================================
+  # DIMENSION TABLE - Tank (Phase 5)
+  # ===================================================================
+
+  - name: dim_tank
+    description: "Tank dimension tracking storage tanks with capacity and operational status"
+    columns:
+      - name: tank_id
+        description: "Unique identifier for storage tank"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: tank_code
+        description: "Tank code/number (e.g., TK-101, TK-GAS-5)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: tank_name
+        description: "Full tank name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_type
+        description: "Type of product stored (Gasoline, Diesel, Jet Fuel, Fuel Oil, LPG)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Gasoline', 'Diesel', 'Jet Fuel', 'Fuel Oil', 'LPG', 'Naphtha', 'Kerosene', 'Asphalt']
+      
+      - name: capacity_bbl
+        description: "Tank capacity in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10000
+              max_value: 2000000
+      
+      - name: location
+        description: "Tank farm location/region"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Gulf Coast', 'Midwest', 'West Coast', 'East Coast', 'Southwest']
+      
+      - name: tank_type
+        description: "Tank construction type"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Fixed Roof', 'Floating Roof', 'Sphere', 'Cone Roof', 'Pressurized']
+      
+      - name: operational_status
+        description: "Current operational status of tank"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Active', 'Maintenance', 'Decommissioned', 'Standby']
+
+  # ===================================================================
+  # STAGING TABLES - Product Shipments and Tank Inventory (Phase 5)
+  # ===================================================================
+
+  - name: stg_product_shipments
+    description: "Staging table for product shipments before transformation"
+    columns:
+      - name: shipment_id
+        description: "Unique identifier for shipment record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: product_id
+        description: "Foreign key to dim_product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: tank_id
+        description: "Foreign key to dim_tank"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_tank
+              field: tank_id
+      
+      - name: shipment_volume_bbl
+        description: "Shipment volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 150000
+      
+      - name: shipment_weight_tons
+        description: "Shipment weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 40000
+      
+      - name: shipment_mode
+        description: "Mode of transportation (Pipeline, Truck, Marine, Rail)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pipeline', 'Truck', 'Marine', 'Rail', 'Barge']
+      
+      - name: destination_location
+        description: "Destination location/customer site"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: customer_id
+        description: "Customer identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: api_gravity
+        description: "API gravity of shipped product"
+        data_tests:
+          - accepted_range:
+              min_value: 10
+              max_value: 70
+      
+      - name: temperature_f
+        description: "Product temperature at shipment in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+
+  - name: stg_tank_inventory
+    description: "Staging table for daily tank inventory before transformation"
+    columns:
+      - name: inventory_id
+        description: "Unique identifier for inventory record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: tank_id
+        description: "Foreign key to dim_tank"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_tank
+              field: tank_id
+      
+      - name: product_id
+        description: "Foreign key to dim_product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: opening_balance_bbl
+        description: "Opening inventory balance in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000000
+      
+      - name: receipts_bbl
+        description: "Product receipts during the day in barrels (from unit production)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: withdrawals_bbl
+        description: "Product withdrawals during the day in barrels (from shipments)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: closing_balance_bbl
+        description: "Actual closing inventory balance in barrels (measured via tank gauge)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000000
+      
+      - name: temperature_f
+        description: "Average tank temperature in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+
+  # ===================================================================
+  # FACT TABLES - Product Shipments and Tank Inventory (Phase 5)
+  # ===================================================================
+
+  - name: fact_product_shipments
+    description: "Fact table tracking product shipments with volume, weight, and destination tracking"
+    columns:
+      - name: shipment_id
+        description: "Unique identifier for shipment record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: product_id
+        description: "Foreign key to dim_product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: tank_id
+        description: "Foreign key to dim_tank (source tank)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_tank
+              field: tank_id
+      
+      - name: shipment_volume_bbl
+        description: "Shipment volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 150000
+      
+      - name: shipment_weight_tons
+        description: "Shipment weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 40000
+      
+      - name: shipment_mode
+        description: "Mode of transportation (Pipeline, Truck, Marine, Rail, Barge)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pipeline', 'Truck', 'Marine', 'Rail', 'Barge']
+      
+      - name: destination_location
+        description: "Destination location/customer site"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: customer_id
+        description: "Customer identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: api_gravity
+        description: "API gravity of shipped product"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 70
+      
+      - name: temperature_f
+        description: "Product temperature at shipment in Fahrenheit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+
+  - name: fact_tank_inventory
+    description: "Fact table tracking daily tank inventory with reconciliation, variance detection, and balance verification (Closing = Opening + Receipts - Withdrawals)"
+    columns:
+      - name: inventory_id
+        description: "Unique identifier for inventory record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: tank_id
+        description: "Foreign key to dim_tank"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_tank
+              field: tank_id
+      
+      - name: product_id
+        description: "Foreign key to dim_product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: opening_balance_bbl
+        description: "Opening inventory balance in barrels at start of day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000000
+      
+      - name: receipts_bbl
+        description: "Product receipts during the day in barrels (from unit production)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: withdrawals_bbl
+        description: "Product withdrawals during the day in barrels (from shipments)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: closing_balance_bbl
+        description: "Actual closing inventory balance in barrels at end of day (measured via tank gauge)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000000
+      
+      - name: expected_closing_bbl
+        description: "Expected closing balance calculated as: Opening + Receipts - Withdrawals"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000000
+      
+      - name: variance_bbl
+        description: "Inventory variance in barrels calculated as: Actual Closing - Expected Closing"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -50000
+              max_value: 50000
+      
+      - name: variance_pct
+        description: "Inventory variance percentage calculated as: (Variance / Expected Closing) × 100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -5
+              max_value: 5
+      
+      - name: variance_flag
+        description: "Flag indicating variance exceeds threshold (TRUE if |variance_pct| > 0.3%, FALSE otherwise)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, true, false]
+      
+      - name: temperature_f
+        description: "Average tank temperature in Fahrenheit during the day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+
