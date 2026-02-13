@@ -1,0 +1,360 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Precision Scheduled Railroading (PSR)
+  # ===================================================================
+  
+  - name: dim_date
+    description: >
+      Date dimension covering 10-year PSR transformation period (2016-2025).
+      Includes 3,653 days with PSR period classifications (pre-PSR, transition, mature PSR).
+      Maps seasonal patterns, weekend flags, and calendar attributes for temporal analysis.
+    columns:
+      - name: date_id
+        description: "Date key in YYYYMMDD integer format (e.g., 20160101)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: date
+        description: "Actual date value"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Calendar year (2016-2025)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 2016
+              max_value: 2025
+      
+      - name: quarter
+        description: "Calendar quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: month
+        description: "Calendar month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: month_name
+        description: "Full month name (January, February, etc.)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December']
+      
+      - name: week_of_year
+        description: "ISO week number (1-53)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: day_of_month
+        description: "Day of month (1-31)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 31
+      
+      - name: day_of_week
+        description: "Day of week with Monday=1, Sunday=7"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      
+      - name: day_name
+        description: "Full day name (Monday, Tuesday, etc.)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      
+      - name: is_weekend
+        description: "Weekend flag (1=Saturday/Sunday, 0=weekday)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: season
+        description: "Meteorological season (Winter, Spring, Summer, Fall)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Winter', 'Spring', 'Summer', 'Fall']
+      
+      - name: psr_period
+        description: "PSR adoption period: pre_psr (2016-2017), transition (2018-2020), mature_psr (2021-2025)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['pre_psr', 'transition', 'mature_psr']
+  
+  - name: dim_location
+    description: >
+      Location dimension with 200 SPLC-coded facilities across North American rail network.
+      Includes terminals, interchanges, yards, customer sites, and sidings.
+      Features shadow yard risk scoring based on dwell time pattern analysis.
+    columns:
+      - name: location_id
+        description: "Surrogate key (auto-increment)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: splc_code
+        description: "Standard Point Location Code (natural key)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: location_name
+        description: "Human-readable location name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: location_type
+        description: "Facility type classification"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['terminal', 'interchange', 'yard', 'customer_site', 'siding']
+      
+      - name: latitude
+        description: "Geographic latitude (decimal degrees)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -90
+              max_value: 90
+      
+      - name: longitude
+        description: "Geographic longitude (decimal degrees)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -180
+              max_value: 180
+      
+      - name: state_code
+        description: "US state code"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: capacity_classification
+        description: "Facility capacity class based on type"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['high', 'medium', 'low']
+      
+      - name: shadow_yard_risk_score
+        description: "Shadow yard detection score (0-100, >70 indicates high risk of shadow yard practices)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: region
+        description: "Geographic region"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Northeast', 'Southeast', 'Midwest', 'Southwest', 'West']
+  
+  - name: dim_railcar
+    description: >
+      Railcar dimension with 12,000 cars distributed across 7 Class I railroads.
+      Fleet composition: hopper 35%, tank 25%, box 20%, gondola 15%, intermodal 5%.
+      All cars in active service with manufacture years 2000-2020.
+    columns:
+      - name: railcar_id
+        description: "Surrogate key (auto-increment)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: car_number
+        description: "Unique railcar reporting mark and number (e.g., BNSF123456)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: railroad_owner
+        description: "Class I railroad owner"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['BNSF', 'UP', 'CSX', 'NS', 'CN', 'CP', 'KCS']
+      
+      - name: car_type
+        description: "Railcar equipment type"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['hopper', 'tank', 'box', 'gondola', 'intermodal']
+      
+      - name: capacity_tons
+        description: "Cargo capacity in tons (varies by car type)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 60
+              max_value: 120
+      
+      - name: manufacture_year
+        description: "Year railcar was manufactured"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 2000
+              max_value: 2020
+      
+      - name: acquisition_date
+        description: "Date railcar was acquired (all before 2016-01-01)"
+        data_tests:
+          - not_null
+      
+      - name: in_service
+        description: "Active service flag (1=in service, 0=out of service)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [1]
+  
+  - name: dim_train
+    description: >
+      Train consists dimension extracted from CLM events.
+      Classifications: manifest, intermodal, unit, autorack.
+      Priority levels indicate schedule importance (1=highest priority).
+      PSR-optimized flag indicates trains operating under PSR principles.
+    columns:
+      - name: train_id
+        description: "Surrogate key (auto-increment)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: train_number
+        description: "Train identifier/reporting mark (natural key)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: train_type
+        description: "Train classification by service type"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['manifest', 'intermodal', 'unit', 'autorack']
+      
+      - name: priority_level
+        description: "Schedule priority (1=highest to 5=lowest)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 5
+      
+      - name: typical_car_count
+        description: "Typical number of cars in consist"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 50
+              max_value: 150
+      
+      - name: psr_optimized
+        description: "PSR optimization flag (1=PSR optimized, 0=traditional)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+  
+  - name: dim_corridor
+    description: >
+      Major rail corridors representing high-traffic origin-destination pairs.
+      30-50 corridors with distance calculations, lane classifications, and congestion metrics.
+      Derived from actual traffic patterns in CLM data.
+    columns:
+      - name: corridor_id
+        description: "Surrogate key (auto-increment)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: corridor_code
+        description: "Corridor identifier (C001, C002, etc.)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: origin_splc
+        description: "Origin location SPLC code"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: splc_code
+      
+      - name: destination_splc
+        description: "Destination location SPLC code"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: splc_code
+      
+      - name: distance_miles
+        description: "Corridor distance in miles (calculated from lat/long)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 5000
+      
+      - name: lane_type
+        description: "Rail lane classification"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['mainline', 'branch', 'shortline']
+      
+      - name: traffic_volume_class
+        description: "Traffic volume classification"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['high', 'medium', 'low']
+      
+      - name: congestion_level
+        description: "Congestion score (0-100, higher = more congested)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
