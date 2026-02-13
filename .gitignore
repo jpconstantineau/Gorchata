@@ -8,6 +8,8 @@ bin/
 *.db-wal
 .gorchata/
 
+examples/precision_railroading/seeds/raw_clm_events.csv
+
 # Go workspace
 # Note: go.sum MUST be committed for reproducible builds
 # See: https://go.dev/ref/mod#go-sum-files
