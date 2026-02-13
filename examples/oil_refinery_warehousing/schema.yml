@@ -1,0 +1,435 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - Oil Refinery Data Warehousing
+  # ===================================================================
+  
+  - name: dim_date
+    description: "Date dimension for time-based analysis with calendar and fiscal attributes"
+    columns:
+      - name: date_key
+        description: "Surrogate key for date (YYYYMMDD format)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: full_date
+        description: "Full date value (YYYY-MM-DD)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Calendar year (YYYY)"
+        data_tests:
+          - not_null
+      
+      - name: quarter
+        description: "Calendar quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: month
+        description: "Calendar month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: week
+        description: "Week of year (1-53)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 53
+      
+      - name: day_of_week
+        description: "Day of week (1=Monday, 7=Sunday)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      
+      - name: day_name
+        description: "Full day name (Monday, Tuesday, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: month_name
+        description: "Full month name (January, February, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: fiscal_year
+        description: "Fiscal year (may differ from calendar year)"
+        data_tests:
+          - not_null
+      
+      - name: fiscal_quarter
+        description: "Fiscal quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: is_weekend
+        description: "Flag indicating weekend (1=weekend, 0=weekday)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: is_holiday
+        description: "Flag indicating public holiday (1=holiday, 0=regular)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: dim_unit
+    description: "Process unit dimension tracking refinery units with capacity and hierarchy"
+    columns:
+      - name: unit_id
+        description: "Unique identifier for process unit"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Full name of process unit (e.g., CDU-1, FCC-2)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_type
+        description: "Type of process unit (CDU, VDU, FCC, Hydrocracker, Reformer, Hydrotreater, Alkylation, Coker)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'Hydrocracker', 'Reformer', 'Hydrotreater', 'Alkylation', 'Coker', 'Isomerization', 'Blending']
+      
+      - name: complex_name
+        description: "Parent complex/plant name for hierarchical rollup"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: capacity_bpd
+        description: "Current operating capacity in barrels per day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500000
+      
+      - name: design_capacity_bpd
+        description: "Design/nameplate capacity in barrels per day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500000
+      
+      - name: commissioned_date
+        description: "Date when unit was commissioned"
+        data_tests:
+          - not_null
+      
+      - name: unit_description
+        description: "Detailed description of unit function and purpose"
+      
+      - name: feed_type
+        description: "Primary feed type (crude oil, intermediate product, etc.)"
+      
+      - name: product_type
+        description: "Primary product output type"
+
+  - name: dim_product
+    description: "Product dimension with hierarchy and typical properties"
+    columns:
+      - name: product_id
+        description: "Unique identifier for product"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: product_name
+        description: "Full product name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_grade
+        description: "Specific product grade/specification (e.g., Regular 87, Premium 93, ULSD)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_type
+        description: "Product type level (Gasoline, Diesel, Jet Fuel, Fuel Oil, Asphalt, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: product_category
+        description: "Top-level product category (Light Distillates, Middle Distillates, Heavy Products, Specialty)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Light Distillates', 'Middle Distillates', 'Heavy Products', 'Specialty', 'Intermediate']
+      
+      - name: api_gravity
+        description: "Typical API gravity for this product"
+        data_tests:
+          - accepted_range:
+              min_value: 5
+              max_value: 70
+      
+      - name: sulfur_pct
+        description: "Typical sulfur content percentage"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+      
+      - name: specific_gravity
+        description: "Specific gravity at 60°F"
+      
+      - name: pour_point_f
+        description: "Pour point in Fahrenheit"
+      
+      - name: flash_point_f
+        description: "Flash point in Fahrenheit"
+      
+      - name: rvp_psi
+        description: "Reid Vapor Pressure in PSI (for gasoline)"
+      
+      - name: cetane_number
+        description: "Cetane number (for diesel)"
+      
+      - name: octane_number
+        description: "Octane rating (for gasoline)"
+
+  - name: dim_crude_grade
+    description: "Crude oil grade dimension tracking crude types and properties"
+    columns:
+      - name: crude_grade_id
+        description: "Unique identifier for crude grade"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: crude_name
+        description: "Standard crude name (WTI, Brent, Maya, Dubai, Mars)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['WTI', 'Brent', 'Maya', 'Dubai', 'Mars', 'Mixed']
+      
+      - name: api_gravity
+        description: "API gravity of crude oil (light >31.1, medium 22.3-31.1, heavy <22.3)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 50
+      
+      - name: sulfur_pct
+        description: "Sulfur content percentage (sweet <0.5%, sour >0.5%)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+      
+      - name: crude_type
+        description: "Crude classification (Light Sweet, Light Sour, Heavy Sweet, Heavy Sour)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Light Sweet', 'Light Sour', 'Heavy Sweet', 'Heavy Sour', 'Medium']
+      
+      - name: origin
+        description: "Geographic origin of crude"
+      
+      - name: specific_gravity
+        description: "Specific gravity at 60°F"
+        data_tests:
+          - accepted_range:
+              min_value: 0.7
+              max_value: 1.1
+      
+      - name: pour_point_f
+        description: "Pour point in Fahrenheit"
+      
+      - name: typical_yield_light_pct
+        description: "Typical yield of light products (gasoline, naphtha) percentage"
+      
+      - name: typical_yield_middle_pct
+        description: "Typical yield of middle distillates (diesel, jet fuel) percentage"
+      
+      - name: typical_yield_heavy_pct
+        description: "Typical yield of heavy products (fuel oil, asphalt) percentage"
+
+  - name: dim_stream
+    description: "Intermediate stream dimension tracking refinery internal streams and boiling ranges"
+    columns:
+      - name: stream_id
+        description: "Unique identifier for intermediate stream"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: stream_name
+        description: "Stream name (Naphtha, Kerosene, Gas Oil, Atmospheric Residue, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: stream_type
+        description: "Stream classification (Light, Medium, Heavy, Residue)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Light', 'Medium', 'Heavy', 'Residue', 'Gas']
+      
+      - name: boiling_range_min_f
+        description: "Minimum boiling point in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: -50
+              max_value: 1200
+      
+      - name: boiling_range_max_f
+        description: "Maximum boiling point in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: -50
+              max_value: 1200
+      
+      - name: typical_api_gravity
+        description: "Typical API gravity range"
+      
+      - name: typical_sulfur_pct
+        description: "Typical sulfur content percentage"
+      
+      - name: primary_use
+        description: "Primary downstream use or processing unit"
+      
+      - name: stream_description
+        description: "Detailed description of stream characteristics"
+
+  - name: dim_location
+    description: "Location dimension for crude sources and product destinations"
+    columns:
+      - name: location_id
+        description: "Unique identifier for location"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: location_name
+        description: "Full location name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: location_type
+        description: "Type of location (Pipeline, Marine Terminal, Truck Terminal, Rail Terminal, Storage, Customer)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pipeline', 'Marine Terminal', 'Truck Terminal', 'Rail Terminal', 'Storage', 'Customer', 'Supplier', 'Internal']
+      
+      - name: location_category
+        description: "Category (Source, Destination, Both)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Source', 'Destination', 'Both', 'Internal']
+      
+      - name: region
+        description: "Geographic region"
+      
+      - name: state_province
+        description: "State or province"
+      
+      - name: country
+        description: "Country"
+      
+      - name: is_active
+        description: "Flag indicating active location"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: dim_catalyst_cycle
+    description: "Catalyst lifecycle dimension tracking catalyst age and efficiency stages"
+    columns:
+      - name: catalyst_cycle_id
+        description: "Unique identifier for catalyst cycle stage"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: cycle_stage
+        description: "Stage in catalyst lifecycle (Fresh, Early-Mid, Mid-Cycle, Late-Mid, End-of-Run)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Fresh', 'Early-Mid', 'Mid-Cycle', 'Late-Mid', 'End-of-Run']
+      
+      - name: stage_description
+        description: "Detailed description of catalyst condition and expected performance"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: typical_efficiency_pct
+        description: "Typical conversion efficiency percentage for this stage"
+        data_tests:
+          - accepted_range:
+              min_value: 50
+              max_value: 100
+      
+      - name: age_days_min
+        description: "Minimum age in days for this stage"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 3650
+      
+      - name: age_days_max
+        description: "Maximum age in days for this stage (NULL for End-of-Run)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 3650
+      
+      - name: typical_activity_index
+        description: "Relative activity index (1.0 = fresh catalyst baseline)"
+      
+      - name: requires_attention
+        description: "Flag indicating this stage requires operational attention"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]

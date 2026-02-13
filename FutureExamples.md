@@ -12,11 +12,9 @@
 
 ### In Progress 🚧
 
-_(No projects currently in progress)_
+- [-] Oil Refinery Data Transformation and Warehousing
 
 ### Future Examples 🔮
-
-- [] Oil Refinery Data Transformation and Warehousing
 - [] API 584 IOW Data Warehouse
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
