@@ -1,0 +1,278 @@
+version: 2
+
+models:
+  # ===================================================================
+  # STAGING TABLES - Precision Scheduled Railroading (PSR)
+  # ===================================================================
+  
+  - name: stg_clm_events
+    description: >
+      First-stage staging of raw CLM (Car Location Message) events.
+      Performs basic data cleaning, type casting, and deduplication.
+      Source data: 110M+ events from raw_clm_events seed covering 2016-2025 (10 years).
+      Grain: One row per CLM event (minute-level precision).
+    
+    columns:
+      - name: event_key
+        description: "Surrogate key generated via ROW_NUMBER for uniqueness"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: event_id
+        description: "Original event identifier from source system"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: car_number
+        description: "Railcar number (12,000 unique cars in system)"
+        data_tests:
+          - not_null
+      
+      - name: timestamp
+        description: "Event timestamp with minute-level precision (no seconds)"
+        data_tests:
+          - not_null
+      
+      - name: event_type
+        description: "CLM event type: DEPA (departure), ARRI (arrival), PULL (unload), PLAC (load)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['DEPA', 'ARRI', 'PULL', 'PLAC']
+      
+      - name: splc_code
+        description: "Standard Point Location Code identifying the location"
+        data_tests:
+          - not_null
+      
+      - name: train_id
+        description: "Train identifier (may be NULL for some events)"
+      
+      - name: location_name
+        description: "Human-readable location name"
+        data_tests:
+          - not_null
+      
+      - name: load_timestamp
+        description: "Timestamp when record was loaded into staging (audit trail)"
+        data_tests:
+          - not_null
+    
+    data_tests:
+      - dbt_utils.expression_is_true:
+          name: stg_clm_timestamp_minute_precision
+          expression: "strftime('%S', timestamp) = '00'"
+          config:
+            severity: error
+
+  - name: stg_clm_enriched
+    description: >
+      Second-stage staging with dimension lookups and derived fields.
+      Enriches CLM events with location metadata, railcar attributes, train properties,
+      and date dimension attributes. Adds calculated flags for event classification
+      and temporal sequencing per railcar.
+      Grain: One row per CLM event with full dimensional context.
+    
+    columns:
+      # Base Event Columns
+      - name: event_key
+        description: "Surrogate key from stg_clm_events"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: event_id
+        description: "Original event identifier"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: car_number
+        description: "Railcar number"
+        data_tests:
+          - not_null
+      
+      - name: timestamp
+        description: "Event timestamp (minute precision)"
+        data_tests:
+          - not_null
+      
+      - name: event_type
+        description: "CLM event type"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['DEPA', 'ARRI', 'PULL', 'PLAC']
+      
+      - name: splc_code
+        description: "Standard Point Location Code"
+        data_tests:
+          - not_null
+      
+      - name: train_id
+        description: "Train identifier string (may be NULL)"
+      
+      - name: location_name
+        description: "Human-readable location name"
+        data_tests:
+          - not_null
+      
+      - name: load_timestamp
+        description: "Record load timestamp"
+        data_tests:
+          - not_null
+      
+      # Dimension Foreign Keys
+      - name: location_id
+        description: "Foreign key to dim_location"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+      
+      - name: railcar_id
+        description: "Foreign key to dim_railcar"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: train_db_id
+        description: "Foreign key to dim_train (may be NULL for non-train events)"
+        data_tests:
+          - relationships:
+              to: ref('dim_train')
+              field: train_id
+              where: "train_db_id IS NOT NULL"
+      
+      - name: date_id
+        description: "Foreign key to dim_date"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+      
+      # Location Attributes
+      - name: location_type
+        description: "Location type: terminal, interchange, yard, customer_site, siding"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['terminal', 'interchange', 'yard', 'customer_site', 'siding']
+      
+      - name: latitude
+        description: "Location latitude (-90 to 90)"
+        data_tests:
+          - not_null
+      
+      - name: longitude
+        description: "Location longitude (-180 to 180)"
+        data_tests:
+          - not_null
+      
+      - name: shadow_yard_risk_score
+        description: "Risk score (0-100) for shadow yard behavior at this location"
+        data_tests:
+          - not_null
+      
+      - name: region
+        description: "Geographic region classification"
+        data_tests:
+          - not_null
+      
+      # Railcar Attributes
+      - name: railroad_owner
+        description: "Railroad company that owns the car (Class I railroads)"
+        data_tests:
+          - not_null
+      
+      - name: car_type
+        description: "Type of railcar (boxcar, hopper, tank, etc.)"
+        data_tests:
+          - not_null
+      
+      # Train Attributes (nullable for non-train events)
+      - name: train_type
+        description: "Type of train (manifest, unit, intermodal, local)"
+      
+      - name: priority_level
+        description: "Train priority level (1-5, 1=highest)"
+      
+      # Date Attributes
+      - name: psr_period
+        description: "PSR period: pre_psr (2016-2017), transition (2018-2020), mature_psr (2021-2025)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['pre_psr', 'transition', 'mature_psr']
+      
+      - name: season
+        description: "Meteorological season"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Winter', 'Spring', 'Summer', 'Fall']
+      
+      # Calculated Fields
+      - name: is_loaded_event
+        description: "Boolean flag: TRUE for PLAC (load), FALSE for PULL (unload), NULL for movement events"
+      
+      - name: is_movement_event
+        description: "Boolean flag: TRUE for DEPA/ARRI (movement), FALSE for PLAC/PULL (load/unload)"
+        data_tests:
+          - not_null
+      
+      - name: event_sequence
+        description: "Sequential event number per railcar ordered by timestamp (starts at 1)"
+        data_tests:
+          - not_null
+    
+    data_tests:
+      # Custom test references
+      - dbt_utils.expression_is_true:
+          name: stg_clm_temporal_order_per_car
+          expression: >
+            (SELECT COUNT(*) FROM (
+              SELECT car_number, timestamp, event_sequence,
+                LAG(timestamp) OVER (PARTITION BY car_number ORDER BY event_sequence) AS prev_timestamp
+              FROM stg_clm_enriched
+            ) WHERE prev_timestamp IS NOT NULL AND timestamp < prev_timestamp) = 0
+          config:
+            severity: error
+      
+      - dbt_utils.expression_is_true:
+          name: stg_clm_loaded_flag_plac_logic
+          expression: "(event_type = 'PLAC' AND is_loaded_event = 1) OR event_type != 'PLAC'"
+          config:
+            severity: error
+      
+      - dbt_utils.expression_is_true:
+          name: stg_clm_loaded_flag_pull_logic
+          expression: "(event_type = 'PULL' AND is_loaded_event = 0) OR event_type != 'PULL'"
+          config:
+            severity: error
+      
+      - dbt_utils.expression_is_true:
+          name: stg_clm_movement_flag_logic
+          expression: >
+            (event_type IN ('DEPA', 'ARRI') AND is_movement_event = 1) OR 
+            (event_type IN ('PLAC', 'PULL') AND is_movement_event = 0)
+          config:
+            severity: error
+
+# Custom Tests
+tests:
+  - name: test_stg_clm_events
+    description: "Comprehensive data quality tests for stg_clm_events"
+    config:
+      severity: error
+  
+  - name: test_stg_clm_enriched
+    description: "Comprehensive data quality tests for stg_clm_enriched including dimension lookups"
+    config:
+      severity: error

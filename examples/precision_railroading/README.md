@@ -110,6 +110,40 @@ All tests follow strict TDD principles and must pass before data generation.
 
 ## Notes
 
+### Phase 3: Staging Layer (COMPLETE ✓)
+
+**Build and Test:**
+```powershell
+# Load seed data (one-time)
+..\..\bin\gorchata.exe seed
+
+# Build staging models
+python build_phase3.py
+
+# Run tests (25 tests)
+python test_phase3.py
+
+# Data quality report
+python verify_phase3.py
+```
+
+**Deliverables:**
+- `models/staging/stg_clm_events.sql` - Basic staging
+- `models/staging/stg_clm_enriched.sql` - Enriched staging
+- `models/staging/schema.yml` - Documentation
+- Test coverage: 100% (25/25 tests passing)
+
+See [PHASE3_COMPLETE.md](PHASE3_COMPLETE.md) for implementation details.
+
+### Phase 2: Dimension Tables (COMPLETE)
+
+- `dim_location`, `dim_railcar`, `dim_train`, `dim_corridor`, `dim_date`
+- See [PHASE2_COMPLETE.md](PHASE2_COMPLETE.md)
+
+---
+
+## Notes (Original)
+
 - This is Phase 1 of the implementation focusing on project setup and seed data generation
 - Full model development, metrics, and analytics will be added in subsequent phases
 - The seed data file (`raw_clm_events.csv`) is approximately 8GB and not suitable for version control
