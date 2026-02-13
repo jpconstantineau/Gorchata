@@ -15,7 +15,7 @@
 - [] API 584 IOW Data Warehouse
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
-- [] Precision Scheduled Railroading (PSR) performance monitoring
+- [-] Precision Scheduled Railroading (PSR) performance monitoring - *In Progress 🚧*
 
 ## Example Design Prompts
 
