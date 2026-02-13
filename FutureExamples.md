@@ -9,10 +9,7 @@
 - [x] [Unit Train Analytics Data Warehouse](examples/unit_train_analytics/README.md)
 - [x] [Haul Truck Analytics Data Warehouse](examples/haul_truck_analytics/README.md) - *Complete ✅*
 - [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Complete ✅*
-
-### In Progress 🚧
-
-- [-] Oil Refinery Data Transformation and Warehousing
+- [x] [Oil Refinery Data Transformation and Warehousing](examples/oil_refinery_warehousing/README.md) - *Complete ✅*
 
 ### Future Examples 🔮
 - [] API 584 IOW Data Warehouse

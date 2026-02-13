@@ -2089,3 +2089,480 @@ models:
       - name: notes
         description: "Optional notes explaining the check result"
 
+  # ===================================================================
+  # FACT TABLES - KPI Aggregations (Phase 8)
+  # ===================================================================
+
+  - name: fact_daily_kpi
+    description: "Daily KPI aggregate table for yield optimization, energy efficiency, and operational performance monitoring"
+    columns:
+      - name: kpi_id
+        description: "Unique identifier for daily KPI record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: crude_input_bbl
+        description: "Total daily crude oil receipts in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: crude_input_tons
+        description: "Total daily crude oil receipts in tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: total_throughput_bbl
+        description: "Total refinery throughput across all units in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: gasoline_production_bbl
+        description: "Total gasoline production in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: distillate_production_bbl
+        description: "Total distillate (diesel, jet fuel) production in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: gasoline_yield_pct
+        description: "Gasoline yield percentage (gasoline production / crude input × 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: distillate_yield_pct
+        description: "Distillate yield percentage (distillate production / crude input × 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: high_value_product_pct
+        description: "High-value product percentage (gasoline + distillate + jet / crude input × 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: energy_consumed_mmbtu
+        description: "Total refinery fuel consumed in MMBtu"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: energy_intensity_index
+        description: "Energy Intensity Index (MMBtu per barrel throughput); target < 0.7 for complex refineries"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2.0
+      
+      - name: avg_capacity_utilization_pct
+        description: "Weighted average capacity utilization across all units"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: planned_downtime_hours
+        description: "Total planned downtime hours across all units"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unplanned_downtime_hours
+        description: "Total unplanned downtime hours across all units"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: reliability_factor_pct
+        description: "Reliability factor percentage (100 - downtime% relative to available hours)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: ufl_pct
+        description: "Unaccounted for loss percentage from mass balance"
+        data_tests:
+          - not_null
+      
+      - name: data_quality_pass_rate_pct
+        description: "Data quality check pass rate (checks passed / total checks × 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: fact_monthly_kpi
+    description: "Monthly KPI aggregate table with trending and volatility analysis for executive dashboards"
+    columns:
+      - name: kpi_id
+        description: "Unique identifier for monthly KPI record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date representing first day of month (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: month_year
+        description: "Month-year identifier in YYYY-MM format"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: crude_input_bbl
+        description: "Total monthly crude oil receipts in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: crude_input_tons
+        description: "Total monthly crude oil receipts in tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: total_throughput_bbl
+        description: "Total monthly refinery throughput in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: gasoline_production_bbl
+        description: "Total monthly gasoline production in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: distillate_production_bbl
+        description: "Total monthly distillate production in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: gasoline_yield_pct
+        description: "Monthly gasoline yield percentage (gasoline production / crude input × 100)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: distillate_yield_pct
+        description: "Monthly distillate yield percentage"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: high_value_product_pct
+        description: "Monthly high-value product percentage"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: energy_consumed_mmbtu
+        description: "Total monthly energy consumed in MMBtu"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: energy_intensity_index
+        description: "Monthly average Energy Intensity Index (MMBtu/bbl)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2.0
+      
+      - name: avg_capacity_utilization_pct
+        description: "Monthly average capacity utilization percentage"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: planned_downtime_hours
+        description: "Total monthly planned downtime hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unplanned_downtime_hours
+        description: "Total monthly unplanned downtime hours"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: reliability_factor_pct
+        description: "Monthly reliability factor percentage"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: avg_daily_throughput_bbl
+        description: "Average daily throughput for the month"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: max_daily_throughput_bbl
+        description: "Maximum daily throughput in the month"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: min_daily_throughput_bbl
+        description: "Minimum daily throughput in the month"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: throughput_volatility
+        description: "Standard deviation of daily throughput (measures operational stability)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: operating_days
+        description: "Number of days with active operations in the month"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 31
+      
+      - name: month_over_month_change_pct
+        description: "Month-over-month percentage change in throughput for trending"
+      
+      - name: ufl_pct
+        description: "Monthly average unaccounted for loss percentage"
+        data_tests:
+          - not_null
+      
+      - name: data_quality_pass_rate_pct
+        description: "Monthly average data quality pass rate"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+
+  # ===================================================================
+  # STAGING TABLES - KPI Aggregations (Phase 8)
+  # ===================================================================
+
+  - name: stg_daily_kpi
+    description: "Staging table for daily KPI calculations before final aggregation and validation"
+    columns:
+      - name: kpi_id
+        description: "Unique identifier for daily KPI record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: crude_input_bbl
+        description: "Total daily crude oil receipts in barrels"
+      
+      - name: crude_input_tons
+        description: "Total daily crude oil receipts in tons"
+      
+      - name: total_throughput_bbl
+        description: "Total refinery throughput in barrels"
+      
+      - name: gasoline_production_bbl
+        description: "Total gasoline production in barrels"
+      
+      - name: distillate_production_bbl
+        description: "Total distillate production in barrels"
+      
+      - name: gasoline_yield_pct
+        description: "Gasoline yield percentage"
+      
+      - name: distillate_yield_pct
+        description: "Distillate yield percentage"
+      
+      - name: high_value_product_pct
+        description: "High-value product percentage"
+      
+      - name: energy_consumed_mmbtu
+        description: "Total energy consumed in MMBtu"
+      
+      - name: energy_intensity_index
+        description: "Energy Intensity Index (MMBtu/bbl)"
+      
+      - name: avg_capacity_utilization_pct
+        description: "Weighted average capacity utilization"
+      
+      - name: planned_downtime_hours
+        description: "Total planned downtime hours"
+      
+      - name: unplanned_downtime_hours
+        description: "Total unplanned downtime hours"
+      
+      - name: reliability_factor_pct
+        description: "Reliability factor percentage"
+      
+      - name: ufl_pct
+        description: "Unaccounted for loss percentage"
+      
+      - name: data_quality_pass_rate_pct
+        description: "Data quality check pass rate"
+
+  - name: stg_monthly_kpi
+    description: "Staging table for monthly KPI calculations with trending analysis"
+    columns:
+      - name: kpi_id
+        description: "Unique identifier for monthly KPI record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (first day of month)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: month_year
+        description: "Month-year identifier in YYYY-MM format"
+      
+      - name: crude_input_bbl
+        description: "Total monthly crude oil receipts in barrels"
+      
+      - name: crude_input_tons
+        description: "Total monthly crude oil receipts in tons"
+      
+      - name: total_throughput_bbl
+        description: "Total monthly throughput in barrels"
+      
+      - name: gasoline_production_bbl
+        description: "Total monthly gasoline production in barrels"
+      
+      - name: distillate_production_bbl
+        description: "Total monthly distillate production in barrels"
+      
+      - name: gasoline_yield_pct
+        description: "Monthly gasoline yield percentage"
+      
+      - name: distillate_yield_pct
+        description: "Monthly distillate yield percentage"
+      
+      - name: high_value_product_pct
+        description: "Monthly high-value product percentage"
+      
+      - name: energy_consumed_mmbtu
+        description: "Total monthly energy consumed in MMBtu"
+      
+      - name: energy_intensity_index
+        description: "Monthly average Energy Intensity Index"
+      
+      - name: avg_capacity_utilization_pct
+        description: "Monthly average capacity utilization"
+      
+      - name: planned_downtime_hours
+        description: "Total monthly planned downtime hours"
+      
+      - name: unplanned_downtime_hours
+        description: "Total monthly unplanned downtime hours"
+      
+      - name: reliability_factor_pct
+        description: "Monthly reliability factor percentage"
+      
+      - name: avg_daily_throughput_bbl
+        description: "Average daily throughput for the month"
+      
+      - name: max_daily_throughput_bbl
+        description: "Maximum daily throughput in the month"
+      
+      - name: min_daily_throughput_bbl
+        description: "Minimum daily throughput in the month"
+      
+      - name: throughput_volatility
+        description: "Standard deviation of daily throughput"
+      
+      - name: operating_days
+        description: "Number of days with active operations"
+      
+      - name: month_over_month_change_pct
+        description: "Month-over-month percentage change in throughput"
+      
+      - name: ufl_pct
+        description: "Monthly average unaccounted for loss percentage"
+      
+      - name: data_quality_pass_rate_pct
+        description: "Monthly average data quality pass rate"
+
+

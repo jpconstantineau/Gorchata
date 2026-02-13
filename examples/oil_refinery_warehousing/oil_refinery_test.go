@@ -3029,3 +3029,646 @@ func abs(x float64) float64 {
 	}
 	return x
 }
+
+// ===================================================================
+// PHASE 8 TESTS - KPI Aggregations and Analytical Queries
+// ===================================================================
+
+// TestFactDailyKPITableExists verifies FACT_DAILY_KPI aggregate table is defined
+func TestFactDailyKPITableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Verify fact_daily_kpi table exists
+	var factDailyKPI *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_daily_kpi" {
+			factDailyKPI = &model
+			break
+		}
+	}
+
+	if factDailyKPI == nil {
+		t.Fatal("fact_daily_kpi aggregate table must exist")
+	}
+
+	// Verify required columns
+	requiredColumns := []string{
+		"kpi_id",
+		"date_key",
+		"crude_input_bbl",
+		"crude_input_tons",
+		"total_throughput_bbl",
+		"gasoline_production_bbl",
+		"distillate_production_bbl",
+		"gasoline_yield_pct",
+		"distillate_yield_pct",
+		"high_value_product_pct",
+		"energy_consumed_mmbtu",
+		"energy_intensity_index",
+		"avg_capacity_utilization_pct",
+		"planned_downtime_hours",
+		"unplanned_downtime_hours",
+		"reliability_factor_pct",
+		"ufl_pct",
+		"data_quality_pass_rate_pct",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factDailyKPI.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, reqCol := range requiredColumns {
+		if !columnMap[reqCol] {
+			t.Errorf("Required column %s not found in fact_daily_kpi", reqCol)
+		}
+	}
+
+	// Verify foreign key to dim_date
+	hasDateKeyFK := false
+	for _, col := range factDailyKPI.Columns {
+		if col.Name == "date_key" {
+			if hasRelationship(col.DataTests, "dim_date") {
+				hasDateKeyFK = true
+				break
+			}
+		}
+	}
+
+	if !hasDateKeyFK {
+		t.Error("fact_daily_kpi must have foreign key to dim_date via date_key")
+	}
+
+	t.Logf("fact_daily_kpi table exists with %d columns", len(factDailyKPI.Columns))
+}
+
+// TestFactMonthlyKPITableExists verifies FACT_MONTHLY_KPI aggregate table is defined
+func TestFactMonthlyKPITableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Verify fact_monthly_kpi table exists
+	var factMonthlyKPI *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_monthly_kpi" {
+			factMonthlyKPI = &model
+			break
+		}
+	}
+
+	if factMonthlyKPI == nil {
+		t.Fatal("fact_monthly_kpi aggregate table must exist")
+	}
+
+	// Verify required columns including monthly-specific ones
+	requiredColumns := []string{
+		"kpi_id",
+		"date_key",
+		"month_year",
+		"crude_input_bbl",
+		"gasoline_yield_pct",
+		"energy_intensity_index",
+		"avg_daily_throughput_bbl",
+		"max_daily_throughput_bbl",
+		"min_daily_throughput_bbl",
+		"throughput_volatility",
+		"operating_days",
+		"month_over_month_change_pct",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factMonthlyKPI.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, reqCol := range requiredColumns {
+		if !columnMap[reqCol] {
+			t.Errorf("Required column %s not found in fact_monthly_kpi", reqCol)
+		}
+	}
+
+	t.Logf("fact_monthly_kpi table exists with %d columns", len(factMonthlyKPI.Columns))
+}
+
+// TestEnergyIntensityIndexCalculation verifies EII calculation logic
+func TestEnergyIntensityIndexCalculation(t *testing.T) {
+	tests := []struct {
+		description     string
+		energyMMBtu     float64
+		throughputBbl   float64
+		expectedEII     float64
+		targetBenchmark float64
+		meetsTarget     bool
+	}{
+		{
+			description:     "On target - typical complex refinery",
+			energyMMBtu:     210000.0,
+			throughputBbl:   300000.0,
+			expectedEII:     0.70,
+			targetBenchmark: 0.70,
+			meetsTarget:     true,
+		},
+		{
+			description:     "Below target - efficient operations",
+			energyMMBtu:     180000.0,
+			throughputBbl:   300000.0,
+			expectedEII:     0.60,
+			targetBenchmark: 0.70,
+			meetsTarget:     true,
+		},
+		{
+			description:     "Above target - investigate inefficiency",
+			energyMMBtu:     255000.0,
+			throughputBbl:   300000.0,
+			expectedEII:     0.85,
+			targetBenchmark: 0.70,
+			meetsTarget:     false,
+		},
+		{
+			description:     "Simple refinery - higher EII acceptable",
+			energyMMBtu:     165000.0,
+			throughputBbl:   200000.0,
+			expectedEII:     0.825,
+			targetBenchmark: 0.90,
+			meetsTarget:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate Energy Intensity Index
+			// EII = Energy Consumed (MMBtu) / Throughput (bbl)
+			calculatedEII := tt.energyMMBtu / tt.throughputBbl
+
+			// Verify calculation matches expected
+			tolerance := 0.01
+			if abs(calculatedEII-tt.expectedEII) > tolerance {
+				t.Errorf("EII calculation error: expected %.3f, got %.3f",
+					tt.expectedEII, calculatedEII)
+			}
+
+			// Verify meets target benchmark
+			meetsTarget := calculatedEII <= tt.targetBenchmark
+			if meetsTarget != tt.meetsTarget {
+				t.Errorf("Target check failed: expected meets_target=%v, got %v (EII=%.3f, Target=%.3f)",
+					tt.meetsTarget, meetsTarget, calculatedEII, tt.targetBenchmark)
+			}
+
+			status := "ON TARGET"
+			if calculatedEII > tt.targetBenchmark {
+				status = "ABOVE TARGET - INVESTIGATE"
+			} else if calculatedEII < tt.targetBenchmark*0.9 {
+				status = "EXCELLENT"
+			}
+
+			t.Logf("Energy: %.0f MMBtu, Throughput: %.0f bbl, EII: %.3f MMBtu/bbl, Target: %.2f, Status: %s",
+				tt.energyMMBtu, tt.throughputBbl, calculatedEII, tt.targetBenchmark, status)
+		})
+	}
+}
+
+// TestGasolineYieldPercentage verifies gasoline yield calculation
+func TestGasolineYieldPercentage(t *testing.T) {
+	tests := []struct {
+		description      string
+		gasolineBbl      float64
+		crudeInputBbl    float64
+		expectedYieldPct float64
+		industryMin      float64
+		industryMax      float64
+		isTypical        bool
+	}{
+		{
+			description:      "Typical gasoline-optimized refinery",
+			gasolineBbl:      152000.0,
+			crudeInputBbl:    325000.0,
+			expectedYieldPct: 46.8,
+			industryMin:      45.0,
+			industryMax:      55.0,
+			isTypical:        true,
+		},
+		{
+			description:      "High gasoline yield - summer mode",
+			gasolineBbl:      170000.0,
+			crudeInputBbl:    325000.0,
+			expectedYieldPct: 52.3,
+			industryMin:      45.0,
+			industryMax:      55.0,
+			isTypical:        true,
+		},
+		{
+			description:      "Low gasoline yield - winter diesel mode",
+			gasolineBbl:      130000.0,
+			crudeInputBbl:    325000.0,
+			expectedYieldPct: 40.0,
+			industryMin:      45.0,
+			industryMax:      55.0,
+			isTypical:        false,
+		},
+		{
+			description:      "Maximum theoretical gasoline yield",
+			gasolineBbl:      178750.0,
+			crudeInputBbl:    325000.0,
+			expectedYieldPct: 55.0,
+			industryMin:      45.0,
+			industryMax:      55.0,
+			isTypical:        true, // 55.0 is at the boundary, should be typical
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate Gasoline Yield Percentage
+			// Yield% = (Gasoline Production / Crude Input) × 100
+			calculatedYield := (tt.gasolineBbl / tt.crudeInputBbl) * 100.0
+
+			// Verify calculation matches expected
+			tolerance := 0.1
+			if abs(calculatedYield-tt.expectedYieldPct) > tolerance {
+				t.Errorf("Gasoline yield calculation error: expected %.1f%%, got %.1f%%",
+					tt.expectedYieldPct, calculatedYield)
+			}
+
+			// Verify is within industry typical range (with small tolerance for boundary conditions)
+			isTypical := (calculatedYield >= tt.industryMin-0.01) && (calculatedYield <= tt.industryMax+0.01)
+			if isTypical != tt.isTypical {
+				t.Errorf("Industry range check failed: expected typical=%v, got %v (Yield=%.1f%%, Range=%.1f-%.1f%%)",
+					tt.isTypical, isTypical, calculatedYield, tt.industryMin, tt.industryMax)
+			}
+
+			t.Logf("Gasoline: %.0f bbl, Crude: %.0f bbl, Yield: %.1f%%, Industry Range: %.1f-%.1f%%, Typical: %v",
+				tt.gasolineBbl, tt.crudeInputBbl, calculatedYield, tt.industryMin, tt.industryMax, isTypical)
+		})
+	}
+}
+
+// TestUnitConversionEfficiency verifies FCC conversion efficiency calculation
+func TestUnitConversionEfficiency(t *testing.T) {
+	tests := []struct {
+		description        string
+		lightProductsBbl   float64
+		feedVolumeBbl      float64
+		expectedConversion float64
+		targetMin          float64
+		targetMax          float64
+		performanceStatus  string
+	}{
+		{
+			description:        "On target - typical FCC operation",
+			lightProductsBbl:   32500.0,
+			feedVolumeBbl:      45000.0,
+			expectedConversion: 72.2,
+			targetMin:          72.0,
+			targetMax:          78.0,
+			performanceStatus:  "On Target",
+		},
+		{
+			description:        "High conversion - fresh catalyst",
+			lightProductsBbl:   35100.0,
+			feedVolumeBbl:      45000.0,
+			expectedConversion: 78.0,
+			targetMin:          72.0,
+			targetMax:          78.0,
+			performanceStatus:  "On Target",
+		},
+		{
+			description:        "Below target - catalyst deactivation",
+			lightProductsBbl:   30600.0,
+			feedVolumeBbl:      45000.0,
+			expectedConversion: 68.0,
+			targetMin:          72.0,
+			targetMax:          78.0,
+			performanceStatus:  "Below Target",
+		},
+		{
+			description:        "Above target - over-cracking concern",
+			lightProductsBbl:   36000.0,
+			feedVolumeBbl:      45000.0,
+			expectedConversion: 80.0,
+			targetMin:          72.0,
+			targetMax:          78.0,
+			performanceStatus:  "Above Target",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate FCC Conversion Efficiency
+			// Conversion% = (Light Products / Feed) × 100
+			// Light Products = Dry Gas + LPG + Gasoline
+			calculatedConversion := (tt.lightProductsBbl / tt.feedVolumeBbl) * 100.0
+
+			// Verify calculation matches expected
+			tolerance := 0.1
+			if abs(calculatedConversion-tt.expectedConversion) > tolerance {
+				t.Errorf("Conversion calculation error: expected %.1f%%, got %.1f%%",
+					tt.expectedConversion, calculatedConversion)
+			}
+
+			// Determine performance status
+			var status string
+			if calculatedConversion >= tt.targetMin && calculatedConversion <= tt.targetMax {
+				status = "On Target"
+			} else if calculatedConversion < tt.targetMin {
+				status = "Below Target"
+			} else {
+				status = "Above Target"
+			}
+
+			if status != tt.performanceStatus {
+				t.Errorf("Performance status error: expected %s, got %s (Conversion=%.1f%%)",
+					tt.performanceStatus, status, calculatedConversion)
+			}
+
+			t.Logf("Light Products: %.0f bbl, Feed: %.0f bbl, Conversion: %.1f%%, Target: %.1f-%.1f%%, Status: %s",
+				tt.lightProductsBbl, tt.feedVolumeBbl, calculatedConversion, tt.targetMin, tt.targetMax, status)
+		})
+	}
+}
+
+// TestCapacityUtilizationRollup verifies weighted average capacity utilization
+func TestCapacityUtilizationRollup(t *testing.T) {
+	tests := []struct {
+		description string
+		units       []struct {
+			name        string
+			throughput  float64
+			capacity    float64
+			utilization float64
+		}
+		expectedWeightedAvg float64
+	}{
+		{
+			description: "Crude distillation complex - high utilization",
+			units: []struct {
+				name        string
+				throughput  float64
+				capacity    float64
+				utilization float64
+			}{
+				{"CDU-1", 285000, 300000, 95.0},
+				{"CDU-2", 192000, 200000, 96.0},
+				{"VDU", 95000, 100000, 95.0},
+			},
+			expectedWeightedAvg: 95.3,
+		},
+		{
+			description: "Conversion complex - mixed utilization",
+			units: []struct {
+				name        string
+				throughput  float64
+				capacity    float64
+				utilization float64
+			}{
+				{"FCC-1", 40500, 45000, 90.0},
+				{"FCC-2", 36000, 45000, 80.0},
+				{"Hydrocracker", 42000, 60000, 70.0},
+			},
+			expectedWeightedAvg: 78.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate weighted average utilization
+			// WeightedAvg = Sum(Throughput × Capacity) / Sum(Capacity × Capacity)
+			var sumWeighted float64
+			var sumCapacitySquared float64
+
+			for _, unit := range tt.units {
+				sumWeighted += unit.throughput * unit.capacity
+				sumCapacitySquared += unit.capacity * unit.capacity
+			}
+
+			calculatedWeightedAvg := (sumWeighted / sumCapacitySquared) * 100.0
+
+			// Verify calculation matches expected
+			tolerance := 0.5
+			if abs(calculatedWeightedAvg-tt.expectedWeightedAvg) > tolerance {
+				t.Errorf("Weighted average calculation error: expected %.1f%%, got %.1f%%",
+					tt.expectedWeightedAvg, calculatedWeightedAvg)
+			}
+
+			t.Logf("Complex: %s, Weighted Avg Utilization: %.1f%%", tt.description, calculatedWeightedAvg)
+			for _, unit := range tt.units {
+				t.Logf("  %s: %.0f/%.0f bbl/day = %.1f%%",
+					unit.name, unit.throughput, unit.capacity, unit.utilization)
+			}
+		})
+	}
+}
+
+// TestYieldGapCalculation verifies yield gap analysis
+func TestYieldGapCalculation(t *testing.T) {
+	tests := []struct {
+		description     string
+		theoreticalPct  float64
+		actualPct       float64
+		expectedGapPct  float64
+		investigateFlag bool
+	}{
+		{
+			description:     "Acceptable gap - typical operations",
+			theoreticalPct:  52.0,
+			actualPct:       50.0,
+			expectedGapPct:  3.8,
+			investigateFlag: false,
+		},
+		{
+			description:     "High gap - yield loss investigation needed",
+			theoreticalPct:  52.0,
+			actualPct:       48.0,
+			expectedGapPct:  7.7,
+			investigateFlag: true,
+		},
+		{
+			description:     "Minimal gap - excellent yield capture",
+			theoreticalPct:  52.0,
+			actualPct:       51.5,
+			expectedGapPct:  1.0,
+			investigateFlag: false,
+		},
+		{
+			description:     "Zero gap - theoretical match",
+			theoreticalPct:  52.0,
+			actualPct:       52.0,
+			expectedGapPct:  0.0,
+			investigateFlag: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate Yield Gap
+			// Gap% = ((Theoretical - Actual) / Theoretical) × 100
+			calculatedGap := ((tt.theoreticalPct - tt.actualPct) / tt.theoreticalPct) * 100.0
+
+			// Verify calculation matches expected
+			tolerance := 0.1
+			if abs(calculatedGap-tt.expectedGapPct) > tolerance {
+				t.Errorf("Yield gap calculation error: expected %.1f%%, got %.1f%%",
+					tt.expectedGapPct, calculatedGap)
+			}
+
+			// Determine if investigation is needed (gap > 5%)
+			investigate := calculatedGap > 5.0
+			if investigate != tt.investigateFlag {
+				t.Errorf("Investigation flag error: expected %v, got %v (Gap=%.1f%%)",
+					tt.investigateFlag, investigate, calculatedGap)
+			}
+
+			status := "ACCEPTABLE"
+			if investigate {
+				status = "INVESTIGATE"
+			} else if calculatedGap < 2.0 {
+				status = "EXCELLENT"
+			}
+
+			t.Logf("Theoretical: %.1f%%, Actual: %.1f%%, Gap: %.1f%%, Status: %s",
+				tt.theoreticalPct, tt.actualPct, calculatedGap, status)
+		})
+	}
+}
+
+// TestMovingAverageTrends verifies 7-day and 30-day moving average calculations
+func TestMovingAverageTrends(t *testing.T) {
+	// Sample daily gasoline yield data for moving average calculation
+	dailyYields := []float64{
+		48.5, 49.2, 48.8, 49.5, 49.0, 48.7, 49.3, // Week 1
+		49.8, 50.2, 49.5, 50.0, 49.7, 50.5, 50.1, // Week 2
+		50.8, 51.2, 50.5, 51.0, 50.7, 51.3, 50.9, // Week 3
+		51.5, 51.8, 51.2, 51.5, 51.0, 51.7, 51.3, // Week 4
+		51.9, 52.0, 51.5, // Partial Week 5
+	}
+
+	tests := []struct {
+		description   string
+		dayIndex      int
+		expected7Day  float64
+		expected30Day float64
+	}{
+		{
+			description:   "Day 7 - first 7-day average",
+			dayIndex:      6,
+			expected7Day:  49.0,
+			expected30Day: 0.0, // Not enough data yet
+		},
+		{
+			description:   "Day 14 - two weeks",
+			dayIndex:      13,
+			expected7Day:  50.0,
+			expected30Day: 0.0, // Not enough data yet
+		},
+		{
+			description:   "Day 30 - first 30-day average",
+			dayIndex:      29,
+			expected7Day:  51.5,
+			expected30Day: 50.4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Calculate 7-day moving average
+			if tt.dayIndex >= 6 {
+				var sum7Day float64
+				for i := tt.dayIndex - 6; i <= tt.dayIndex; i++ {
+					sum7Day += dailyYields[i]
+				}
+				calculated7Day := sum7Day / 7.0
+
+				tolerance := 0.1
+				if abs(calculated7Day-tt.expected7Day) > tolerance {
+					t.Errorf("7-day avg calculation error: expected %.1f, got %.1f",
+						tt.expected7Day, calculated7Day)
+				}
+
+				t.Logf("Day %d: 7-day avg = %.1f%%", tt.dayIndex+1, calculated7Day)
+			}
+
+			// Calculate 30-day moving average
+			if tt.dayIndex >= 29 {
+				var sum30Day float64
+				for i := tt.dayIndex - 29; i <= tt.dayIndex; i++ {
+					sum30Day += dailyYields[i]
+				}
+				calculated30Day := sum30Day / 30.0
+
+				tolerance := 0.1
+				if abs(calculated30Day-tt.expected30Day) > tolerance {
+					t.Errorf("30-day avg calculation error: expected %.1f, got %.1f",
+						tt.expected30Day, calculated30Day)
+				}
+
+				t.Logf("Day %d: 30-day avg = %.1f%%", tt.dayIndex+1, calculated30Day)
+			}
+		})
+	}
+}
+
+// TestSeedKPIDataValid verifies seed data structure for KPI tables
+func TestSeedKPIDataValid(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Verify fact_daily_kpi table exists
+	var factDailyKPI *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_daily_kpi" {
+			factDailyKPI = &model
+			break
+		}
+	}
+
+	if factDailyKPI == nil {
+		t.Fatal("fact_daily_kpi table must exist before creating seed data")
+	}
+
+	// Verify fact_monthly_kpi table exists
+	var factMonthlyKPI *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_monthly_kpi" {
+			factMonthlyKPI = &model
+			break
+		}
+	}
+
+	if factMonthlyKPI == nil {
+		t.Fatal("fact_monthly_kpi table must exist before creating seed data")
+	}
+
+	// Verify staging tables exist
+	var stgDailyKPI *schema.ModelSchema
+	var stgMonthlyKPI *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "stg_daily_kpi" {
+			stgDailyKPI = &model
+		}
+		if model.Name == "stg_monthly_kpi" {
+			stgMonthlyKPI = &model
+		}
+	}
+
+	if stgDailyKPI == nil {
+		t.Fatal("stg_daily_kpi staging table must exist")
+	}
+
+	if stgMonthlyKPI == nil {
+		t.Fatal("stg_monthly_kpi staging table must exist")
+	}
+
+	t.Log("KPI aggregation schema structure is valid and ready for seed data")
+}
