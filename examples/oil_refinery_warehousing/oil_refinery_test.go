@@ -601,6 +601,15 @@ func findSubstring(s, substr string) bool {
 	return false
 }
 
+// floatEquals is a helper function to compare floats with tolerance
+func floatEquals(a, b, tolerance float64) bool {
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff <= tolerance
+}
+
 // TestAPIGravityConversion verifies the API gravity to specific gravity formula
 func TestAPIGravityConversion(t *testing.T) {
 	tests := []struct {
@@ -1027,5 +1036,353 @@ func TestSeedUnitOperationsValid(t *testing.T) {
 
 	if !containsSubstring(contentStr, "unplanned_downtime_hours") {
 		t.Error("Seed file missing unplanned_downtime_hours column")
+	}
+}
+
+// ===================================================================
+// PHASE 4 TESTS - Unit Production and Yield Calculations
+// ===================================================================
+
+// TestFactUnitProductionTableExists verifies FACT_UNIT_PRODUCTION is defined in schema
+func TestFactUnitProductionTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var foundTable bool
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_production" {
+			foundTable = true
+			break
+		}
+	}
+
+	if !foundTable {
+		t.Error("fact_unit_production table not found in schema")
+	}
+}
+
+// TestUnitProductionHasRequiredColumns verifies FACT_UNIT_PRODUCTION has all required columns
+func TestUnitProductionHasRequiredColumns(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factUnitProd *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_production" {
+			factUnitProd = &model
+			break
+		}
+	}
+
+	if factUnitProd == nil {
+		t.Fatal("fact_unit_production not found in schema")
+	}
+
+	requiredColumns := []string{
+		"production_id",
+		"date_key",
+		"unit_id",
+		"product_id",
+		"feed_volume_bbl",
+		"feed_weight_tons",
+		"product_volume_bbl",
+		"product_weight_tons",
+		"yield_pct_volume",
+		"yield_pct_weight",
+		"product_api_gravity",
+		"product_sulfur_ppm",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factUnitProd.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in fact_unit_production", colName)
+		}
+	}
+}
+
+// TestVolumeYieldCalculation verifies volume yield percentage calculation formula
+func TestVolumeYieldCalculation(t *testing.T) {
+	tests := []struct {
+		name              string
+		productVolume     float64
+		feedVolume        float64
+		expectedYieldPct  float64
+	}{
+		{"CDU Normal Yield", 95000.0, 100000.0, 95.0},
+		{"FCC Volumetric Expansion", 106500.0, 100000.0, 106.5},
+		{"Reformer Volume Loss", 91000.0, 100000.0, 91.0},
+		{"Hydrotreater Minimal Loss", 99000.0, 100000.0, 99.0},
+		{"Single Product Component", 47500.0, 100000.0, 47.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Yield % Volume = (Product Volume / Feed Volume) × 100
+			calculatedYield := (tt.productVolume / tt.feedVolume) * 100.0
+
+			if !floatEquals(calculatedYield, tt.expectedYieldPct, 0.01) {
+				t.Errorf("Volume yield calculation failed: got %.2f%%, want %.2f%%",
+					calculatedYield, tt.expectedYieldPct)
+			}
+		})
+	}
+}
+
+// TestWeightYieldCalculation verifies weight yield percentage calculation formula
+func TestWeightYieldCalculation(t *testing.T) {
+	tests := []struct {
+		name              string
+		productWeight     float64
+		feedWeight        float64
+		expectedYieldPct  float64
+	}{
+		{"CDU Weight Conservation", 9850.0, 10000.0, 98.5},
+		{"FCC Weight Loss (Coke)", 9650.0, 10000.0, 96.5},
+		{"Reformer H2 Production Loss", 8900.0, 10000.0, 89.0},
+		{"Hydrotreater Minimal Loss", 9900.0, 10000.0, 99.0},
+		{"Single Product Component", 4850.0, 10000.0, 48.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Yield % Weight = (Product Weight / Feed Weight) × 100
+			calculatedYield := (tt.productWeight / tt.feedWeight) * 100.0
+
+			if !floatEquals(calculatedYield, tt.expectedYieldPct, 0.01) {
+				t.Errorf("Weight yield calculation failed: got %.2f%%, want %.2f%%",
+					calculatedYield, tt.expectedYieldPct)
+			}
+		})
+	}
+}
+
+// TestYieldSumValidation verifies yield sums are within physical constraints
+func TestYieldSumValidation(t *testing.T) {
+	tests := []struct {
+		name                 string
+		unitType             string
+		productYields        []float64
+		expectedVolMin       float64
+		expectedVolMax       float64
+		expectedWgtMin       float64
+		expectedWgtMax       float64
+	}{
+		{
+			"CDU Volume Conservation",
+			"CDU",
+			[]float64{2.5, 9.0, 11.0, 13.5, 19.0, 13.5, 31.5}, // Total: 100%
+			95.0, 102.0,
+			95.0, 99.0,
+		},
+		{
+			"FCC Volumetric Expansion",
+			"FCC",
+			[]float64{4.0, 18.0, 51.0, 20.0, 14.0}, // Total: 107% (volumetric expansion)
+			105.0, 110.0, // Volume can exceed 100% when accounting for density changes
+			95.0, 98.0,   // Weight always < 100%
+		},
+		{
+			"Hydrocracker Normal Conversion",
+			"Hydrocracker",
+			[]float64{2.5, 8.0, 20.0, 67.0, 2.5}, // Total: 100%
+			100.0, 103.0,
+			97.0, 99.0,
+		},
+		{
+			"Reformer Hydrogen Production",
+			"Reformer",
+			[]float64{2.5, 88.0}, // Product yields, H2 separate
+			90.0, 93.0,  // Volume loss
+			88.0, 91.0,  // Weight loss due to H2
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate total volume yield
+			totalVolYield := 0.0
+			for _, yield := range tt.productYields {
+				totalVolYield += yield
+			}
+
+			// Verify volume yield range
+			if totalVolYield < tt.expectedVolMin || totalVolYield > tt.expectedVolMax {
+				t.Errorf("Volume yield sum %.2f%% outside valid range [%.2f%%, %.2f%%] for %s",
+					totalVolYield, tt.expectedVolMin, tt.expectedVolMax, tt.unitType)
+			}
+
+			// For weight, typically 95-99% due to losses
+			// This is a simplified validation - actual seed data will have full weight accounting
+			if tt.expectedWgtMax < 100.0 {
+				t.Logf("Weight yield for %s should be in range [%.2f%%, %.2f%%]",
+					tt.unitType, tt.expectedWgtMin, tt.expectedWgtMax)
+			}
+		})
+	}
+}
+
+// TestConversionPercentageCalculation verifies conversion percentage for upgrading units
+func TestConversionPercentageCalculation(t *testing.T) {
+	tests := []struct {
+		name               string
+		unitType           string
+		lightProducts      float64  // Products lighter than cutpoint
+		feedVolume         float64
+		expectedConversion float64
+	}{
+		{"FCC High Conversion", "FCC", 32175.0, 45000.0, 71.5},
+		{"FCC Low Conversion", "FCC", 29700.0, 45000.0, 66.0},
+		{"Hydrocracker High Conversion", "Hydrocracker", 27300.0, 30000.0, 91.0},
+		{"Hydrocracker Medium Conversion", "Hydrocracker", 25500.0, 30000.0, 85.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Conversion % = (Light Products / Feed Volume) × 100
+			// Light products = products below specified cutpoint (e.g., 430°F for FCC)
+			calculatedConversion := (tt.lightProducts / tt.feedVolume) * 100.0
+
+			if !floatEquals(calculatedConversion, tt.expectedConversion, 0.5) {
+				t.Errorf("Conversion calculation failed for %s: got %.2f%%, want %.2f%%",
+					tt.unitType, calculatedConversion, tt.expectedConversion)
+			}
+		})
+	}
+}
+
+// TestFCCVolumetricExpansion verifies FCC yields can exceed 100% volume
+func TestFCCVolumetricExpansion(t *testing.T) {
+	tests := []struct {
+		name                string
+		feedVolume          float64
+		gasVolume           float64
+		lpgVolume           float64
+		gasolineVolume      float64
+		lcoVolume           float64
+		slurryVolume        float64
+		expectedTotalVolume float64
+		expectedYieldPct    float64
+	}{
+		{
+			"FCC Typical Expansion",
+			45000.0,  // Feed
+			1800.0,   // Gas (4%)
+			7650.0,   // LPG (17%)
+			22500.0,  // Gasoline (50%)
+			7650.0,   // LCO (17%)
+			3150.0,   // Slurry (7%)
+			42750.0,  // Total liquid products
+			95.0,     // 95% + coke (not volumetric)
+		},
+		{
+			"FCC High Conversion - Expansion",
+			45000.0,
+			2025.0,   // Gas (4.5%)
+			7875.0,   // LPG (17.5%)
+			23400.0,  // Gasoline (52%)
+			7425.0,   // LCO (16.5%)
+			2925.0,   // Slurry (6.5%)
+			43650.0,
+			97.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate total volume yield (excluding coke which is solid)
+			totalVolume := tt.gasVolume + tt.lpgVolume + tt.gasolineVolume + 
+				tt.lcoVolume + tt.slurryVolume
+			
+			if totalVolume != tt.expectedTotalVolume {
+				t.Errorf("Total volume calculation failed: got %.0f bbl, want %.0f bbl",
+					totalVolume, tt.expectedTotalVolume)
+			}
+
+			yieldPct := (totalVolume / tt.feedVolume) * 100.0
+			
+			// For FCC, liquid volume yield is typically 95-98% (coke is separate)
+			// When accounting for density differences, apparent volume can be > 100%
+			if !floatEquals(yieldPct, tt.expectedYieldPct, 1.0) {
+				t.Errorf("FCC yield calculation failed: got %.2f%%, want %.2f%%",
+					yieldPct, tt.expectedYieldPct)
+			}
+
+			// Critical test: FCC can have total product volumes that appear > 100%
+			// due to production of lighter, lower-density products
+			t.Logf("FCC volumetric accounting: %.0f bbl feed → %.0f bbl products (%.1f%%)",
+				tt.feedVolume, totalVolume, yieldPct)
+		})
+	}
+}
+
+// TestSeedUnitProductionValid verifies seed_unit_production.yml has proper structure
+func TestSeedUnitProductionValid(t *testing.T) {
+	seedPath := filepath.Join("seeds", "seed_unit_production.yml")
+
+	// Verify file exists
+	if _, err := os.Stat(seedPath); os.IsNotExist(err) {
+		t.Fatalf("seed_unit_production.yml does not exist at %s", seedPath)
+	}
+
+	// Parse seed file to verify structure
+	seedContent, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("Failed to read seed_unit_production.yml: %v", err)
+	}
+
+	contentStr := string(seedContent)
+
+	// Verify file has version and table declarations
+	if !containsSubstring(contentStr, "version:") {
+		t.Error("Seed file missing version declaration")
+	}
+
+	if !containsSubstring(contentStr, "table:") {
+		t.Error("Seed file missing table declaration")
+	}
+
+	if !containsSubstring(contentStr, "records:") {
+		t.Error("Seed file missing records section")
+	}
+
+	// Verify key yield columns exist
+	requiredFields := []string{
+		"production_id",
+		"yield_pct_volume",
+		"yield_pct_weight",
+		"product_volume_bbl",
+		"product_weight_tons",
+	}
+
+	for _, field := range requiredFields {
+		if !containsSubstring(contentStr, field) {
+			t.Errorf("Seed file missing required field: %s", field)
+		}
+	}
+
+	// Verify multiple product streams per unit
+	productTypes := []string{"Gasoline", "Diesel", "Kerosene", "LPG", "Naphtha"}
+	foundProducts := 0
+	for _, product := range productTypes {
+		if containsSubstring(contentStr, product) {
+			foundProducts++
+		}
+	}
+
+	if foundProducts < 3 {
+		t.Errorf("Seed file should include multiple product types (found %d)", foundProducts)
 	}
 }

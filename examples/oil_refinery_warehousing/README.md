@@ -722,6 +722,172 @@ go test -v -run "TestFactCrudeReceipts|TestAPIGravity|TestVolumeToWeight|TestBSW
 - **docs/MEASUREMENT_STANDARDS.md**: Petroleum measurement formulas (Phase 1)
 - Inline SQL documentation in transformation files
 
+## Phase 3 Deliverables (✅ COMPLETE)
+
+### Unit Operations Tracking
+
+**Implementation Date**: February 12, 2026  
+**Status**: ✅ Complete with full TDD validation
+
+Phase 3 implements daily unit operations tracking with capacity utilization, downtime analysis, and performance metrics.
+
+#### fact_unit_feed
+Tracks feed streams to process units:
+- **Primary Key**: feed_id
+- **Foreign Keys**: date_key → dim_date, unit_id → dim_unit, feed_stream_id → dim_stream
+- **Measurements**: feed_volume_bbl, feed_weight_tons, feed_api_gravity, feed_sulfur_ppm, feed_temperature_f
+
+#### fact_unit_operations
+Tracks daily unit operations and performance:
+- **Primary Key**: operation_id
+- **Foreign Keys**: date_key → dim_date, unit_id → dim_unit, catalyst_cycle_id → dim_catalyst_cycle
+- **Operational Metrics**:
+  - operating_hours, planned_downtime_hours, unplanned_downtime_hours
+  - throughput_bbl, capacity_bbl_day, capacity_utilization_pct
+  - conversion_pct (for upgrading units)
+- **Energy & Conditions**: energy_consumed_mmbtu, reactor_temperature_f, reactor_pressure_psig
+
+#### stg_unit_feed and stg_unit_operations
+Staging tables for ETL processing.
+
+### Key Calculations Implemented
+
+**1. Capacity Utilization**
+```
+Utilization % = (Throughput / Capacity) × 100
+```
+
+**2. Downtime Aggregation**
+```
+Total Downtime = Planned Downtime + Unplanned Downtime
+Operating Hours = 24 - Total Downtime
+```
+
+### Seed Data
+
+**File**: `seeds/seed_unit_operations.yml`
+- **80 operation records** over 10 days for 8 major units
+- **Units**: CDU, VDU, FCC, Hydrocracker, Reformer, Naphtha HT, Diesel HT, Alkylation
+- **Realistic operations**: 88-95% capacity utilization, planned maintenance events, unplanned upsets
+- **Catalyst tracking**: Correlated with dim_catalyst_cycle for FCC, Hydrocracker, Reformer
+
+### Testing
+
+**8 new test functions** validating:
+- ✓ fact_unit_feed and fact_unit_operations table structures
+- ✓ Capacity utilization calculations (5 test cases)
+- ✓ Downtime aggregation (5 test cases)
+- ✓ Unit hierarchy rollup (3 test cases)
+- ✓ Seed data validation
+
+**Test Results**: 28/28 tests passing (100%)
+
+### Documentation
+
+- **PHASE_3_SUMMARY.md**: Detailed implementation report with operational metrics
+- Transformation SQL with formula documentation
+
+## Phase 4 Deliverables (✅ COMPLETE)
+
+### Unit Production and Yield Calculations
+
+**Implementation Date**: February 12, 2026  
+**Status**: ✅ Complete with full TDD validation
+
+Phase 4 implements unit production tracking with volume and weight yield calculations, handling volumetric expansion for cracking units and material balance validation.
+
+#### fact_unit_production
+Tracks daily production yields by product:
+- **Primary Key**: production_id
+- **Foreign Keys**: date_key → dim_date, unit_id → dim_unit, product_id → dim_product
+- **Feed Data**: feed_volume_bbl, feed_weight_tons (from fact_unit_feed)
+- **Product Data**: product_volume_bbl, product_weight_tons
+- **Yield Metrics**:
+  - yield_pct_volume: (Product Volume / Feed Volume) × 100 (can exceed 100% for FCC)
+  - yield_pct_weight: (Product Weight / Feed Weight) × 100 (always < 100%)
+- **Product Quality**: product_api_gravity, product_sulfur_ppm, product_octane_ron, product_cetane
+
+#### stg_unit_production
+Staging table for production data.
+
+### Yield Formulas Implemented
+
+**1. Volume Yield**
+```
+yield_pct_volume = (product_volume_bbl / feed_volume_bbl) × 100
+
+Physical Ranges:
+- CDU/VDU: ~100% (volume conservation)
+- FCC: 105-110% (volumetric expansion from cracking)
+- Hydrocracker: 100-103% (slight expansion)
+- Reformer: 90-93% (volume loss from H₂ production)
+```
+
+**2. Weight Yield**
+```
+yield_pct_weight = (product_weight_tons / feed_weight_tons) × 100
+
+Physical Constraint: Always < 100% due to conservation of mass
+- CDU/VDU: 98-99% (minimal losses)
+- FCC: 96-97% (coke formation)
+- Reformer: 88-90% (H₂ production)
+```
+
+**3. Conversion Percentage**
+```
+conversion_pct = (light_products_volume / feed_volume) × 100
+
+For FCC: Light products < 430°F (Gas + LPG + Gasoline)
+For Hydrocracker: Products excluding unconverted oil
+```
+
+### Seed Data
+
+**File**: `seeds/seed_unit_production.yml`
+- **37 production records** for Day 1 complete data
+- **Multiple products per unit**: CDU (7), VDU (3), FCC (6), Hydrocracker (5), Reformer (3), Hydrotreaters (2 each)
+- **Realistic yields**:
+  - FCC volumetric expansion: 95-98% liquid products (density effects can make apparent yield >100%)
+  - Weight conservation: All units 95-99% with proper loss accounting
+  - Conversion tracking: FCC 71%, Hydrocracker 97%
+
+### Transformations
+
+**File**: `transformations/yield_calculations.sql` (458 lines)
+- Volume and weight yield calculations with validation
+- Yield sum validation by unit (95-110% volume, 95-99% weight)
+- Unit-specific pattern validation
+- Conversion percentage calculations for upgrading units
+- FCC volumetric expansion analysis
+- Product quality tracking
+- Material balance summary reports
+
+### Testing
+
+**8 new test functions** validating:
+- ✓ fact_unit_production table structure (14 columns)
+- ✓ Volume yield calculation (5 test cases)
+- ✓ Weight yield calculation (5 test cases)
+- ✓ Yield sum validation (4 unit types with physical constraints)
+- ✓ Conversion percentage (4 test cases for FCC and Hydrocracker)
+- ✓ FCC volumetric expansion (2 test cases validating yield > 100%)
+- ✓ Seed data validation
+
+**Test Results**: 36/36 tests passing (100%)
+
+### Key Design Decisions
+
+**Volume > 100% Allowed for FCC**: Cracking units produce lighter, less dense products. Same mass occupies more volume at lower density, so apparent volume yield can exceed 100%.
+
+**Weight Always < 100%**: Conservation of mass is a fundamental physical law. All units show weight losses due to coke formation, gas losses, or light end losses.
+
+**Multiple Products Per Unit**: Real refineries produce many product streams simultaneously. CDU produces 7 streams (light gases through atmospheric residue), FCC produces 6 (including coke).
+
+### Documentation
+
+- **PHASE_4_SUMMARY.md**: Comprehensive implementation report with yield formulas, examples, and physical constraints
+- **transformations/yield_calculations.sql**: 7 sections of SQL with extensive comments and formula documentation
+
 ## Next Phases
 
 ### Phase 3: Crude Distillation Unit (CDU) Production

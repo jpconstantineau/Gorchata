@@ -1031,3 +1031,231 @@ models:
           - accepted_range:
               min_value: 0
               max_value: 3000
+
+  # ===================================================================
+  # STAGING TABLE - Unit Production (Phase 4)
+  # ===================================================================
+
+  - name: stg_unit_production
+    description: "Staging table for unit production yields before transformation"
+    columns:
+      - name: production_id
+        description: "Unique identifier for unit production record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: product_id
+        description: "Foreign key to dim_product for output product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: feed_volume_bbl
+        description: "Feed volume in barrels (from FACT_UNIT_FEED)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: feed_weight_tons
+        description: "Feed weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: product_volume_bbl
+        description: "Product volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: product_weight_tons
+        description: "Product weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: yield_pct_volume
+        description: "Volume yield percentage = (Product Volume / Feed Volume) × 100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 120
+      
+      - name: yield_pct_weight
+        description: "Weight yield percentage = (Product Weight / Feed Weight) × 100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 110
+      
+      - name: product_api_gravity
+        description: "API gravity of product stream"
+        data_tests:
+          - accepted_range:
+              min_value: 5
+              max_value: 90
+      
+      - name: product_sulfur_ppm
+        description: "Sulfur content in parts per million"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: product_octane_ron
+        description: "Research Octane Number for gasoline streams (NULL for non-gasoline)"
+        data_tests:
+          - accepted_range:
+              min_value: 50
+              max_value: 110
+      
+      - name: product_cetane
+        description: "Cetane number for diesel streams (NULL for non-diesel)"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 70
+
+  # ===================================================================
+  # FACT TABLE - Unit Production (Phase 4)
+  # ===================================================================
+
+  - name: fact_unit_production
+    description: "Fact table tracking daily unit production yields with volume and weight accounting"
+    columns:
+      - name: production_id
+        description: "Unique identifier for unit production record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: product_id
+        description: "Foreign key to dim_product for output product"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_product
+              field: product_id
+      
+      - name: feed_volume_bbl
+        description: "Feed volume in barrels (from FACT_UNIT_FEED)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: feed_weight_tons
+        description: "Feed weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: product_volume_bbl
+        description: "Product volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: product_weight_tons
+        description: "Product weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: yield_pct_volume
+        description: "Volume yield percentage = (Product Volume / Feed Volume) × 100. Can exceed 100% for cracking units due to production of lighter products."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 120
+      
+      - name: yield_pct_weight
+        description: "Weight yield percentage = (Product Weight / Feed Weight) × 100. Always < 100% due to losses (coke, gas, etc.)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 110
+      
+      - name: product_api_gravity
+        description: "API gravity of product stream"
+        data_tests:
+          - accepted_range:
+              min_value: 5
+              max_value: 90
+      
+      - name: product_sulfur_ppm
+        description: "Sulfur content in parts per million"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: product_octane_ron
+        description: "Research Octane Number for gasoline streams (NULL for non-gasoline)"
+        data_tests:
+          - accepted_range:
+              min_value: 50
+              max_value: 110
+      
+      - name: product_cetane
+        description: "Cetane number for diesel streams (NULL for non-diesel)"
+        data_tests:
+          - accepted_range:
+              min_value: 30
+              max_value: 70
