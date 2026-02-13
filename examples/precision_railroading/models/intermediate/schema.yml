@@ -265,3 +265,213 @@ models:
         description: Sequential cycle number per railcar (1, 2, 3, ...)
         tests:
           - not_null
+
+  - name: int_velocity_vectors
+    description: |
+      Calculates velocity (miles/hour) between sequential locations for trip segments.
+      Only includes trips with actual movement (origin != destination).
+      Uses corridor distance when available, otherwise calculates from lat/long coordinates.
+      Supports minute-precision calculations for detecting slow zones and operational inefficiencies.
+    config:
+      materialized: table
+    columns:
+      - name: velocity_vector_id
+        description: Surrogate key for the velocity vector
+        tests:
+          - not_null
+          - unique
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: trip_segment_id
+        description: Foreign key to int_trip_segments
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_trip_segments')
+              field: trip_segment_id
+      
+      - name: origin_location_id
+        description: Foreign key to dim_location for origin
+        tests:
+          - not_null
+      
+      - name: destination_location_id
+        description: Foreign key to dim_location for destination
+        tests:
+          - not_null
+      
+      - name: distance_miles
+        description: Distance between origin and destination in miles (from corridor or calculated)
+        tests:
+          - not_null
+      
+      - name: duration_minutes
+        description: Duration of trip in minutes (minute precision using julianday)
+        tests:
+          - not_null
+      
+      - name: velocity_mph
+        description: Calculated velocity in miles per hour ((distance_miles / duration_minutes) * 60)
+        tests:
+          - not_null
+      
+      - name: trip_start_timestamp
+        description: Timestamp when trip started
+        tests:
+          - not_null
+      
+      - name: trip_end_timestamp
+        description: Timestamp when trip ended
+        tests:
+          - not_null
+      
+      - name: psr_period
+        description: PSR implementation period (Pre-PSR, Transition, PSR)
+        tests:
+          - not_null
+
+  - name: int_nodal_dwell
+    description: |
+      Captures dwell duration at each location for railcars.
+      Represents stops where railcar remained at same location for >= 5 minutes.
+      Derived from state intervals where start_location = end_location.
+      Supports minute-precision dwell analysis for identifying bottlenecks and shadow yards.
+    config:
+      materialized: table
+    columns:
+      - name: dwell_id
+        description: Surrogate key for the dwell event
+        tests:
+          - not_null
+          - unique
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: location_id
+        description: Foreign key to dim_location where dwell occurred
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+      
+      - name: dwell_start_timestamp
+        description: Timestamp when dwell started
+        tests:
+          - not_null
+      
+      - name: dwell_end_timestamp
+        description: Timestamp when dwell ended
+        tests:
+          - not_null
+      
+      - name: dwell_duration_minutes
+        description: Duration of dwell in minutes (minute precision using julianday, >= 5 minutes)
+        tests:
+          - not_null
+      
+      - name: event_type_at_arrival
+        description: Event type when railcar arrived at location
+        tests:
+          - not_null
+      
+      - name: event_type_at_departure
+        description: Event type when railcar departed from location
+        tests:
+          - not_null
+      
+      - name: is_loaded
+        description: Whether railcar was loaded during dwell (1=loaded, 0=empty)
+        tests:
+          - not_null
+
+  - name: int_dwell_classification
+    description: |
+      Classifies dwell events by operational signature using hierarchical business rules.
+      Detects shadow yards (locations with high risk score and 2-24 hour dwells).
+      Classifications: terminal, crew_change, mainline_hold, maintenance, shadow_yard_hold, unclassified.
+      Shadow yard detection uses location risk score > 50 AND dwell 120-1440 minutes.
+    config:
+      materialized: table
+    columns:
+      - name: dwell_id
+        description: Surrogate key for the dwell event (matches int_nodal_dwell)
+        tests:
+          - not_null
+          - unique
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: location_id
+        description: Foreign key to dim_location where dwell occurred
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+      
+      - name: dwell_start_timestamp
+        description: Timestamp when dwell started
+        tests:
+          - not_null
+      
+      - name: dwell_end_timestamp
+        description: Timestamp when dwell ended
+        tests:
+          - not_null
+      
+      - name: dwell_duration_minutes
+        description: Duration of dwell in minutes
+        tests:
+          - not_null
+      
+      - name: event_type_at_arrival
+        description: Event type when railcar arrived at location
+        tests:
+          - not_null
+      
+      - name: event_type_at_departure
+        description: Event type when railcar departed from location
+        tests:
+          - not_null
+      
+      - name: is_loaded
+        description: Whether railcar was loaded during dwell (1=loaded, 0=empty)
+        tests:
+          - not_null
+      
+      - name: dwell_classification
+        description: Operational classification (terminal, crew_change, mainline_hold, maintenance, shadow_yard_hold, unclassified)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['terminal', 'crew_change', 'mainline_hold', 'maintenance', 'shadow_yard_hold', 'unclassified']
+      
+      - name: shadow_yard_flag
+        description: Flag indicating if location is a detected shadow yard (1=yes, 0=no)
+        tests:
+          - not_null
+      
+      - name: facility_type
+        description: Facility type from dim_location (terminal, interchange, yard, customer_site, siding)
+        tests:
+          - not_null
