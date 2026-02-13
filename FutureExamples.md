@@ -19,6 +19,7 @@ _(No projects currently in progress)_
 - [] Oil Refinery Data Transformation and Warehousing
 - [] API 584 IOW Data Warehouse
 - [] Statistical Process Control (SPC) in manufacturing
+- [] Garbage Truck Waste Operations
 
 ## Example Design Prompts
 
@@ -58,3 +59,7 @@ Design a data engineering project to implement a Risk-Based Integrity Operating 
 
 ### Statistical Process Control (SPC) in manufacturing 
 Develop a data engineering project for the UniCo Bearington manufacturing plant that implements Statistical Process Control (SPC) to safeguard the throughput of the critical NCX-10 bottleneck. The pipeline must transform raw machine telemetry—capturing part dimensions, cycle times, and heat signatures—into a robust analytical layer that calculates rolling averages and three-sigma Upper and Lower Control Limits (UCL/LCL) in accordance with ISO 7870 standards. This project should specifically model the "Theory of Constraints" by using incremental models and tests to detect "assignable causes" of variance that threaten to starve the bottleneck or cause downstream inventory accumulation. By the end, the system should provide the data visibility required to distinguish between normal statistical fluctuations and systemic failures, enabling a flow-oriented "Bottleneck Health" dashboard that prioritizes total plant throughput over misleading local efficiencies.
+
+
+### Garbage Truck Waste Operations
+Design a data engineering pipeline for a city of 500,000 residents that transforms raw fleet telematics, fuel consumption logs, crew schedules, and collection weights into an operational intelligence suite. The project must model the logistical constraints of a fleet where all trucks terminate at a single disposal site in the South West, requiring transformations that calculate the "distance penalty" and increased overhead for North East routes. Using staging, intermediate, and mart layers, the models should derive key performance indicators such as fuel utilization efficiency (\(\text{liters per kg collected}\)), collection density (\(\text{kg/km}\)), and labor productivity across different crew sizes. The final output must provide actionable reports to optimize fleet sizing, rebalance routes based on geographic travel time, and forecast seasonal staffing and fuel requirements to maintain cost-effective municipal waste operations.
