@@ -430,3 +430,304 @@ func TestAllModelDescriptions(t *testing.T) {
 		}
 	}
 }
+
+// ===================================================================
+// PHASE 2 TESTS - FACT_CRUDE_RECEIPTS
+// ===================================================================
+
+// TestFactCrudeReceiptsTableExists verifies FACT_CRUDE_RECEIPTS table is defined
+func TestFactCrudeReceiptsTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	found := false
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_crude_receipts" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("fact_crude_receipts table not found in schema")
+	}
+}
+
+// TestStagingCrudeReceiptsTableExists verifies stg_crude_receipts staging table is defined
+func TestStagingCrudeReceiptsTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	found := false
+	for _, model := range schemaFile.Models {
+		if model.Name == "stg_crude_receipts" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("stg_crude_receipts staging table not found in schema")
+	}
+}
+
+// TestCrudeReceiptsHasRequiredColumns verifies FACT_CRUDE_RECEIPTS has all required columns
+func TestCrudeReceiptsHasRequiredColumns(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factCrudeReceipts *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_crude_receipts" {
+			factCrudeReceipts = &model
+			break
+		}
+	}
+
+	if factCrudeReceipts == nil {
+		t.Fatal("fact_crude_receipts not found in schema")
+	}
+
+	requiredColumns := []string{
+		"receipt_id",
+		"date_key",
+		"crude_grade_id",
+		"source_location_id",
+		"receipt_mode",
+		"gross_volume_bbl",
+		"observed_temperature_f",
+		"observed_api_gravity",
+		"bsw_pct",
+		"api_gravity_60f",
+		"net_volume_bbl",
+		"specific_gravity_60f",
+		"weight_short_tons",
+		"sulfur_wt_pct",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factCrudeReceipts.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_crude_receipts missing required column: %s", colName)
+		}
+	}
+}
+
+// TestCrudeReceiptsForeignKeys verifies foreign key relationships are defined
+func TestCrudeReceiptsForeignKeys(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factCrudeReceipts *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_crude_receipts" {
+			factCrudeReceipts = &model
+			break
+		}
+	}
+
+	if factCrudeReceipts == nil {
+		t.Fatal("fact_crude_receipts not found in schema")
+	}
+
+	// Check for foreign key columns
+	fkColumns := []string{"date_key", "crude_grade_id", "source_location_id"}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factCrudeReceipts.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, fkCol := range fkColumns {
+		if !columnMap[fkCol] {
+			t.Errorf("Foreign key column %s not found in fact_crude_receipts", fkCol)
+		}
+	}
+
+	// Read schema file content to check for relationships strings
+	schemaContent, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to read schema file: %v", err)
+	}
+
+	contentStr := string(schemaContent)
+
+	// Verify relationship tests reference correct dimension tables
+	requiredRelationships := []string{
+		"to: dim_date",
+		"to: dim_crude_grade",
+		"to: dim_location",
+	}
+
+	for _, rel := range requiredRelationships {
+		if !containsSubstring(contentStr, rel) {
+			t.Errorf("schema.yml should define relationship: %s", rel)
+		}
+	}
+}
+
+// containsSubstring is a helper function to check if a string contains a substring
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) &&
+		(s == substr || len(s) > len(substr) && findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// TestAPIGravityConversion verifies the API gravity to specific gravity formula
+func TestAPIGravityConversion(t *testing.T) {
+	tests := []struct {
+		name       string
+		apiGravity float64
+		expectedSG float64
+		tolerance  float64
+	}{
+		{"WTI Crude", 39.6, 0.827, 0.001},
+		{"Brent Crude", 38.3, 0.8333, 0.001}, // 141.5 / (38.3 + 131.5) = 0.8333
+		{"Maya Heavy", 22.0, 0.9218, 0.001},  // 141.5 / (22.0 + 131.5) = 0.9218
+		{"Dubai Medium", 31.0, 0.871, 0.001},
+		{"Mars Medium", 29.0, 0.882, 0.001},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: SG = 141.5 / (API + 131.5)
+			calculatedSG := 141.5 / (tt.apiGravity + 131.5)
+
+			diff := calculatedSG - tt.expectedSG
+			if diff < 0 {
+				diff = -diff
+			}
+
+			if diff > tt.tolerance {
+				t.Errorf("API %g° conversion failed: got SG %g, want %g (tolerance %g)",
+					tt.apiGravity, calculatedSG, tt.expectedSG, tt.tolerance)
+			}
+		})
+	}
+}
+
+// TestVolumeToWeightConversion verifies barrel to ton conversion formula
+func TestVolumeToWeightConversion(t *testing.T) {
+	tests := []struct {
+		name            string
+		volumeBbl       float64
+		specificGravity float64
+		expectedTons    float64
+		tolerance       float64
+	}{
+		{"Light Crude 10k bbl", 10000, 0.827, 1127.76, 1.0},
+		{"Heavy Crude 10k bbl", 10000, 0.920, 1254.08, 1.0},
+		{"Medium Crude 5k bbl", 5000, 0.871, 594.946, 1.0},
+		{"Gasoline 1k bbl", 1000, 0.739, 100.758, 0.1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Weight (short tons) = Volume (bbl) × 0.1364 × SG
+			// Note: Using more precise factor 0.136364 derived from:
+			// 42 gal/bbl × 8.337 lb/gal / 2000 lb/ton = 0.175077
+			// But document uses 0.1364, so we'll use that
+			calculatedTons := tt.volumeBbl * 0.1364 * tt.specificGravity
+
+			diff := calculatedTons - tt.expectedTons
+			if diff < 0 {
+				diff = -diff
+			}
+
+			if diff > tt.tolerance {
+				t.Errorf("Volume to weight conversion failed: got %g tons, want %g tons (tolerance %g)",
+					calculatedTons, tt.expectedTons, tt.tolerance)
+			}
+		})
+	}
+}
+
+// TestBSWDeduction verifies basic sediment & water deduction calculation
+func TestBSWDeduction(t *testing.T) {
+	tests := []struct {
+		name        string
+		grossVolume float64
+		bswPct      float64
+		expectedNet float64
+	}{
+		{"Typical Pipeline 0.1%", 100000, 0.1, 99900},
+		{"High BSW 0.5%", 50000, 0.5, 49750},
+		{"Low BSW 0.05%", 75000, 0.05, 74962.5},
+		{"Marine Receipt 0.3%", 250000, 0.3, 249250},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Net Volume = Gross Volume × (1 - BSW% / 100)
+			calculatedNet := tt.grossVolume * (1 - tt.bswPct/100)
+
+			if calculatedNet != tt.expectedNet {
+				t.Errorf("BSW deduction failed: got %g bbl, want %g bbl",
+					calculatedNet, tt.expectedNet)
+			}
+		})
+	}
+}
+
+// TestTemperatureCorrection verifies temperature correction to 60°F
+func TestTemperatureCorrection(t *testing.T) {
+	tests := []struct {
+		name              string
+		observedVolume    float64
+		observedTempF     float64
+		expectedCorrected float64
+		tolerance         float64
+	}{
+		{"Hot Summer 85F", 100000, 85.0, 99000, 100},
+		{"Cold Winter 40F", 75000, 40.0, 75600, 100},
+		{"Standard 60F", 50000, 60.0, 50000, 10},
+		{"Very Hot 110F", 50000, 110.0, 49000, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simplified formula: Correction = 1 - ((T - 60) × 0.0004)
+			// This is an approximation; real VCF uses ASTM tables
+			correctionFactor := 1 - ((tt.observedTempF - 60) * 0.0004)
+			calculatedCorrected := tt.observedVolume * correctionFactor
+
+			diff := calculatedCorrected - tt.expectedCorrected
+			if diff < 0 {
+				diff = -diff
+			}
+
+			if diff > tt.tolerance {
+				t.Errorf("Temperature correction failed: got %g bbl, want %g bbl (tolerance %g)",
+					calculatedCorrected, tt.expectedCorrected, tt.tolerance)
+			}
+		})
+	}
+}

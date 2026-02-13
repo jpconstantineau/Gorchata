@@ -433,3 +433,231 @@ models:
           - not_null
           - accepted_values:
               values: [0, 1]
+  # ===================================================================
+  # STAGING TABLES - Crude Oil Receipts
+  # ===================================================================
+
+  - name: stg_crude_receipts
+    description: "Staging table for crude oil receipt transactions before transformation"
+    columns:
+      - name: receipt_id
+        description: "Unique identifier for crude oil receipt transaction"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: crude_grade_id
+        description: "Foreign key to dim_crude_grade"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_crude_grade
+              field: crude_grade_id
+      
+      - name: source_location_id
+        description: "Foreign key to dim_location - source of crude receipt"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: receipt_mode
+        description: "Mode of crude receipt (Pipeline, Marine, Truck, Rail)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pipeline', 'Marine', 'Truck', 'Rail']
+      
+      - name: gross_volume_bbl
+        description: "Gross received volume in barrels (before BS&W deduction)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5000000
+      
+      - name: observed_temperature_f
+        description: "Observed temperature at receipt in Fahrenheit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+      
+      - name: observed_api_gravity
+        description: "Observed API gravity at receipt temperature"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 50
+      
+      - name: bsw_pct
+        description: "Basic Sediment and Water percentage (typically 0.05-0.5%)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+      
+      - name: api_gravity_60f
+        description: "API gravity corrected to standard 60°F"
+        data_tests:
+          - accepted_range:
+              min_value: 10
+              max_value: 50
+      
+      - name: net_volume_bbl
+        description: "Net volume after BS&W deduction in barrels"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 5000000
+      
+      - name: specific_gravity_60f
+        description: "Specific gravity at 60°F calculated from API gravity"
+        data_tests:
+          - accepted_range:
+              min_value: 0.7
+              max_value: 1.1
+      
+      - name: weight_short_tons
+        description: "Weight in short tons calculated from net volume and specific gravity"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 1000000
+      
+      - name: sulfur_wt_pct
+        description: "Sulfur content in weight percent"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+
+  # ===================================================================
+  # FACT TABLES - Crude Oil Receipts
+  # ===================================================================
+
+  - name: fact_crude_receipts
+    description: "Fact table tracking crude oil receipts with volume/weight conversions and quality metrics"
+    columns:
+      - name: receipt_id
+        description: "Unique identifier for crude oil receipt transaction"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: crude_grade_id
+        description: "Foreign key to dim_crude_grade"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_crude_grade
+              field: crude_grade_id
+      
+      - name: source_location_id
+        description: "Foreign key to dim_location - source of crude receipt"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_location
+              field: location_id
+      
+      - name: receipt_mode
+        description: "Mode of crude receipt (Pipeline, Marine, Truck, Rail)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pipeline', 'Marine', 'Truck', 'Rail']
+      
+      - name: gross_volume_bbl
+        description: "Gross received volume in barrels (before BS&W deduction)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5000000
+      
+      - name: observed_temperature_f
+        description: "Observed temperature at receipt in Fahrenheit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 30
+              max_value: 150
+      
+      - name: observed_api_gravity
+        description: "Observed API gravity at receipt temperature"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 50
+      
+      - name: bsw_pct
+        description: "Basic Sediment and Water percentage (typically 0.05-0.5%)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5
+      
+      - name: api_gravity_60f
+        description: "API gravity corrected to standard 60°F"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 10
+              max_value: 50
+      
+      - name: net_volume_bbl
+        description: "Net volume after BS&W deduction in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5000000
+      
+      - name: specific_gravity_60f
+        description: "Specific gravity at 60°F calculated from API gravity (SG = 141.5 / (API + 131.5))"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0.7
+              max_value: 1.1
+      
+      - name: weight_short_tons
+        description: "Weight in short tons calculated from net volume and specific gravity (Weight = Volume × 0.1364 × SG)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 1000000
+      
+      - name: sulfur_wt_pct
+        description: "Sulfur content in weight percent"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 5

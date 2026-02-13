@@ -1,0 +1,481 @@
+# ==============================================================================
+# Crude Oil Receipts Seed Data
+# ==============================================================================
+# 
+# This seed file contains realistic crude oil receipt transactions demonstrating:
+# - Multiple crude grades (WTI, Brent, Maya, Dubai, Mars)
+# - Various receipt modes (Pipeline, Marine, Truck)
+# - Volume/weight conversions with API gravity
+# - Temperature corrections
+# - BS&W (Basic Sediment & Water) deductions
+#
+# Formulas Applied:
+# - Specific Gravity: SG = 141.5 / (API + 131.5)
+# - Weight (tons): Weight = Net Volume (bbl) × 0.1364 × SG
+# - Net Volume: Net = Gross × (1 - BSW% / 100)
+# - Temperature correction: Applied via VCF tables (simplified here)
+# ==============================================================================
+
+version: 1
+table: fact_crude_receipts
+
+records:
+  # ==========================================================================
+  # Day 1 (20260201) - Multiple Pipeline Receipts + Large Marine Arrival
+  # ==========================================================================
+  
+  - receipt_id: "CR-20260201-001"
+    date_key: 20260201
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12500
+    observed_temperature_f: 68.0
+    observed_api_gravity: 39.8
+    bsw_pct: 0.08
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12490.0
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1409.02
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260201-002"
+    date_key: 20260201
+    crude_grade_id: "BRENT"
+    source_location_id: "MARINE-001"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 350000
+    observed_temperature_f: 55.0
+    observed_api_gravity: 38.5
+    bsw_pct: 0.25
+    api_gravity_60f: 38.3
+    net_volume_bbl: 349125.0
+    specific_gravity_60f: 0.8333
+    weight_short_tons: 39674.66
+    sulfur_wt_pct: 0.37
+
+  - receipt_id: "CR-20260201-003"
+    date_key: 20260201
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 11800
+    observed_temperature_f: 72.0
+    observed_api_gravity: 39.9
+    bsw_pct: 0.10
+    api_gravity_60f: 39.6
+    net_volume_bbl: 11788.2
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1329.88
+    sulfur_wt_pct: 0.24
+
+  # ==========================================================================
+  # Day 2 (20260202) - Heavy Sour Crude Marine Receipt
+  # ==========================================================================
+
+  - receipt_id: "CR-20260202-001"
+    date_key: 20260202
+    crude_grade_id: "MAYA"
+    source_location_id: "MARINE-002"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 500000
+    observed_temperature_f: 85.0
+    observed_api_gravity: 22.2
+    bsw_pct: 0.40
+    api_gravity_60f: 22.0
+    net_volume_bbl: 498000.0
+    specific_gravity_60f: 0.9218
+    weight_short_tons: 62583.23
+    sulfur_wt_pct: 3.30
+
+  - receipt_id: "CR-20260202-002"
+    date_key: 20260202
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 13100
+    observed_temperature_f: 65.0
+    observed_api_gravity: 39.7
+    bsw_pct: 0.09
+    api_gravity_60f: 39.6
+    net_volume_bbl: 13088.21
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1476.73
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260202-003"
+    date_key: 20260202
+    crude_grade_id: "MARS"
+    source_location_id: "PIPE-GOM-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 8500
+    observed_temperature_f: 78.0
+    observed_api_gravity: 29.3
+    bsw_pct: 0.15
+    api_gravity_60f: 29.0
+    net_volume_bbl: 8487.25
+    specific_gravity_60f: 0.882
+    weight_short_tons: 1021.13
+    sulfur_wt_pct: 1.94
+
+  # ==========================================================================
+  # Day 3 (20260203) - Mixed Sources
+  # ==========================================================================
+
+  - receipt_id: "CR-20260203-001"
+    date_key: 20260203
+    crude_grade_id: "WTI"
+    source_location_id: "TRUCK-001"
+    receipt_mode: "Truck"
+    gross_volume_bbl: 750
+    observed_temperature_f: 60.0
+    observed_api_gravity: 39.6
+    bsw_pct: 0.05
+    api_gravity_60f: 39.6
+    net_volume_bbl: 749.63
+    specific_gravity_60f: 0.827
+    weight_short_tons: 84.57
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260203-002"
+    date_key: 20260203
+    crude_grade_id: "DUBAI"
+    source_location_id: "MARINE-003"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 280000
+    observed_temperature_f: 70.0
+    observed_api_gravity: 31.2
+    bsw_pct: 0.30
+    api_gravity_60f: 31.0
+    net_volume_bbl: 279160.0
+    specific_gravity_60f: 0.871
+    weight_short_tons: 33164.74
+    sulfur_wt_pct: 2.00
+
+  - receipt_id: "CR-20260203-003"
+    date_key: 20260203
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12200
+    observed_temperature_f: 69.0
+    observed_api_gravity: 39.7
+    bsw_pct: 0.07
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12191.46
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1375.59
+    sulfur_wt_pct: 0.24
+
+  # ==========================================================================
+  # Day 4 (20260204) - Mars and Mixed Operations
+  # ==========================================================================
+
+  - receipt_id: "CR-20260204-001"
+    date_key: 20260204
+    crude_grade_id: "MARS"
+    source_location_id: "MARINE-004"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 320000
+    observed_temperature_f: 62.0
+    observed_api_gravity: 29.1
+    bsw_pct: 0.35
+    api_gravity_60f: 29.0
+    net_volume_bbl: 318880.0
+    specific_gravity_60f: 0.882
+    weight_short_tons: 38376.65
+    sulfur_wt_pct: 1.94
+
+  - receipt_id: "CR-20260204-002"
+    date_key: 20260204
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12800
+    observed_temperature_f: 71.0
+    observed_api_gravity: 39.8
+    bsw_pct: 0.11
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12785.92
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1442.34
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260204-003"
+    date_key: 20260204
+    crude_grade_id: "WTI"
+    source_location_id: "TRUCK-002"
+    receipt_mode: "Truck"
+    gross_volume_bbl: 850
+    observed_temperature_f: 58.0
+    observed_api_gravity: 39.5
+    bsw_pct: 0.06
+    api_gravity_60f: 39.6
+    net_volume_bbl: 849.49
+    specific_gravity_60f: 0.827
+    weight_short_tons: 95.84
+    sulfur_wt_pct: 0.24
+
+  # ==========================================================================
+  # Day 5 (20260205) - Dubai and Pipeline Mix
+  # ==========================================================================
+
+  - receipt_id: "CR-20260205-001"
+    date_key: 20260205
+    crude_grade_id: "DUBAI"
+    source_location_id: "PIPE-UAE-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 15000
+    observed_temperature_f: 75.0
+    observed_api_gravity: 31.3
+    bsw_pct: 0.20
+    api_gravity_60f: 31.0
+    net_volume_bbl: 14970.0
+    specific_gravity_60f: 0.871
+    weight_short_tons: 1777.90
+    sulfur_wt_pct: 2.00
+
+  - receipt_id: "CR-20260205-002"
+    date_key: 20260205
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 13500
+    observed_temperature_f: 67.0
+    observed_api_gravity: 39.9
+    bsw_pct: 0.08
+    api_gravity_60f: 39.6
+    net_volume_bbl: 13489.2
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1521.99
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260205-003"
+    date_key: 20260205
+    crude_grade_id: "MARS"
+    source_location_id: "PIPE-GOM-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 9200
+    observed_temperature_f: 80.0
+    observed_api_gravity: 29.4
+    bsw_pct: 0.18
+    api_gravity_60f: 29.0
+    net_volume_bbl: 9183.44
+    specific_gravity_60f: 0.882
+    weight_short_tons: 1104.95
+    sulfur_wt_pct: 1.94
+
+  # ==========================================================================
+  # Day 6 (20260206) - Large Brent Marine + Domestic Pipeline
+  # ==========================================================================
+
+  - receipt_id: "CR-20260206-001"
+    date_key: 20260206
+    crude_grade_id: "BRENT"
+    source_location_id: "MARINE-005"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 450000
+    observed_temperature_f: 52.0
+    observed_api_gravity: 38.4
+    bsw_pct: 0.28
+    api_gravity_60f: 38.3
+    net_volume_bbl: 448740.0
+    specific_gravity_60f: 0.8333
+    weight_short_tons: 50995.31
+    sulfur_wt_pct: 0.37
+
+  - receipt_id: "CR-20260206-002"
+    date_key: 20260206
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12300
+    observed_temperature_f: 66.0
+    observed_api_gravity: 39.7
+    bsw_pct: 0.09
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12288.93
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1386.59
+    sulfur_wt_pct: 0.24
+
+  # ==========================================================================
+  # Day 7 (20260207) - Maya Heavy + Mixed Receipts
+  # ==========================================================================
+
+  - receipt_id: "CR-20260207-001"
+    date_key: 20260207
+    crude_grade_id: "MAYA"
+    source_location_id: "MARINE-006"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 420000
+    observed_temperature_f: 82.0
+    observed_api_gravity: 22.3
+    bsw_pct: 0.45
+    api_gravity_60f: 22.0
+    net_volume_bbl: 418110.0
+    specific_gravity_60f: 0.9218
+    weight_short_tons: 52542.25
+    sulfur_wt_pct: 3.30
+
+  - receipt_id: "CR-20260207-002"
+    date_key: 20260207
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 13200
+    observed_temperature_f: 70.0
+    observed_api_gravity: 39.8
+    bsw_pct: 0.10
+    api_gravity_60f: 39.6
+    net_volume_bbl: 13186.8
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1487.88
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260207-003"
+    date_key: 20260207
+    crude_grade_id: "DUBAI"
+    source_location_id: "TRUCK-003"
+    receipt_mode: "Truck"
+    gross_volume_bbl: 950
+    observed_temperature_f: 62.0
+    observed_api_gravity: 31.1
+    bsw_pct: 0.12
+    api_gravity_60f: 31.0
+    net_volume_bbl: 948.86
+    specific_gravity_60f: 0.871
+    weight_short_tons: 112.67
+    sulfur_wt_pct: 2.00
+
+  # ==========================================================================
+  # Day 8 (20260208) - Mars Marine + WTI Pipeline
+  # ==========================================================================
+
+  - receipt_id: "CR-20260208-001"
+    date_key: 20260208
+    crude_grade_id: "MARS"
+    source_location_id: "MARINE-007"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 380000
+    observed_temperature_f: 64.0
+    observed_api_gravity: 29.2
+    bsw_pct: 0.32
+    api_gravity_60f: 29.0
+    net_volume_bbl: 378784.0
+    specific_gravity_60f: 0.882
+    weight_short_tons: 45585.03
+    sulfur_wt_pct: 1.94
+
+  - receipt_id: "CR-20260208-002"
+    date_key: 20260208
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12900
+    observed_temperature_f: 68.0
+    observed_api_gravity: 39.7
+    bsw_pct: 0.08
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12889.68
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1453.99
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260208-003"
+    date_key: 20260208
+    crude_grade_id: "BRENT"
+    source_location_id: "PIPE-UK-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 18000
+    observed_temperature_f: 56.0
+    observed_api_gravity: 38.2
+    bsw_pct: 0.15
+    api_gravity_60f: 38.3
+    net_volume_bbl: 17973.0
+    specific_gravity_60f: 0.8333
+    weight_short_tons: 2042.79
+    sulfur_wt_pct: 0.37
+
+  # ==========================================================================
+  # Day 9 (20260209) - Mixed Operations
+  # ==========================================================================
+
+  - receipt_id: "CR-20260209-001"
+    date_key: 20260209
+    crude_grade_id: "DUBAI"
+    source_location_id: "MARINE-008"
+    receipt_mode: "Marine"
+    gross_volume_bbl: 310000
+    observed_temperature_f: 72.0
+    observed_api_gravity: 31.4
+    bsw_pct: 0.27
+    api_gravity_60f: 31.0
+    net_volume_bbl: 309163.0
+    specific_gravity_60f: 0.871
+    weight_short_tons: 36701.69
+    sulfur_wt_pct: 2.00
+
+  - receipt_id: "CR-20260209-002"
+    date_key: 20260209
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 13400
+    observed_temperature_f: 69.0
+    observed_api_gravity: 39.9
+    bsw_pct: 0.09
+    api_gravity_60f: 39.6
+    net_volume_bbl: 13387.94
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1510.57
+    sulfur_wt_pct: 0.24
+
+  # ==========================================================================
+  # Day 10 (20260210) - Final Day Mixed Receipts
+  # ==========================================================================
+
+  - receipt_id: "CR-20260210-001"
+    date_key: 20260210
+    crude_grade_id: "MAYA"
+    source_location_id: "PIPE-MEX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 25000
+    observed_temperature_f: 88.0
+    observed_api_gravity: 22.4
+    bsw_pct: 0.35
+    api_gravity_60f: 22.0
+    net_volume_bbl: 24912.5
+    specific_gravity_60f: 0.9218
+    weight_short_tons: 3131.55
+    sulfur_wt_pct: 3.30
+
+  - receipt_id: "CR-20260210-002"
+    date_key: 20260210
+    crude_grade_id: "WTI"
+    source_location_id: "PIPE-TX-001"
+    receipt_mode: "Pipeline"
+    gross_volume_bbl: 12600
+    observed_temperature_f: 70.0
+    observed_api_gravity: 39.8
+    bsw_pct: 0.10
+    api_gravity_60f: 39.6
+    net_volume_bbl: 12587.4
+    specific_gravity_60f: 0.827
+    weight_short_tons: 1420.11
+    sulfur_wt_pct: 0.24
+
+  - receipt_id: "CR-20260210-003"
+    date_key: 20260210
+    crude_grade_id: "MARS"
+    source_location_id: "TRUCK-004"
+    receipt_mode: "Truck"
+    gross_volume_bbl: 1000
+    observed_temperature_f: 60.0
+    observed_api_gravity: 29.0
+    bsw_pct: 0.08
+    api_gravity_60f: 29.0
+    net_volume_bbl: 999.2
+    specific_gravity_60f: 0.882
+    weight_short_tons: 120.27
+    sulfur_wt_pct: 1.94

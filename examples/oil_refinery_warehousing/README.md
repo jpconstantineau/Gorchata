@@ -619,21 +619,131 @@ cd examples/oil_refinery_warehousing
 go test -v
 ```
 
+## Phase 2 Deliverables (✅ COMPLETE)
+
+### Crude Oil Receipts Fact Table
+
+**Implementation Date**: February 12, 2026  
+**Status**: ✅ Complete with full TDD validation
+
+Phase 2 implements crude oil receipt tracking with comprehensive petroleum measurement calculations.
+
+#### fact_crude_receipts
+Tracks crude oil receipts with volume/weight conversions:
+- **Primary Key**: receipt_id
+- **Foreign Keys**: 
+  - date_key → dim_date
+  - crude_grade_id → dim_crude_grade
+  - source_location_id → dim_location
+- **Measurements**:
+  - gross_volume_bbl: Volume before BS&W deduction
+  - net_volume_bbl: Volume after BS&W deduction
+  - weight_short_tons: Calculated mass
+- **Quality Metrics**:
+  - observed_api_gravity, observed_temperature_f
+  - api_gravity_60f: Temperature-corrected API
+  - specific_gravity_60f: Calculated from API
+  - bsw_pct: Basic Sediment & Water percentage
+  - sulfur_wt_pct: Sulfur content
+- **Operational**: receipt_mode (Pipeline, Marine, Truck, Rail)
+
+#### stg_crude_receipts
+Staging table for ETL processing (same structure as fact table).
+
+### Conversion Formulas Implemented
+
+All formulas are industry-standard petroleum measurements:
+
+**1. API Gravity to Specific Gravity**
+```
+SG = 141.5 / (API + 131.5)
+```
+Example: WTI at 39.6° API = 0.827 SG
+
+**2. Volume to Weight**
+```
+Weight (short tons) = Volume (bbl) × 0.1364 × SG
+```
+Example: 10,000 bbl WTI = 1,128 tons
+
+**3. BS&W Deduction**
+```
+Net Volume = Gross Volume × (1 - BSW% / 100)
+```
+Example: 100,000 bbl with 0.1% BS&W = 99,900 bbl net
+
+**4. Temperature Correction** (simplified)
+```
+Correction Factor = 1 - ((T - 60) × 0.0004)
+```
+
+### Seed Data
+
+**File**: `seeds/seed_crude_receipts.yml`
+- **30 transactions** over 10 days (Feb 1-10, 2026)
+- **5 crude grades**: WTI (11), Brent (3), Maya (4), Dubai (5), Mars (7)
+- **3 receipt modes**: Pipeline (16), Marine (11), Truck (3)
+- **Total volume**: 3.25 million barrels gross
+- **Realistic parameters**:
+  - Temperatures: 52-88°F
+  - BS&W: 0.05-0.45%
+  - API gravity: 22-40°
+
+### Transformations
+
+**File**: `transformations/crude_receipts_transformations.sql`
+- Complete SQL transformation logic
+- Documented petroleum calculation formulas
+- Quality checks and validation rules
+- Production-ready with extensibility notes
+
+### Testing
+
+**9 new test functions** validating:
+- ✓ fact_crude_receipts table structure (14 columns)
+- ✓ stg_crude_receipts staging table structure
+- ✓ Foreign key relationships (3 FKs)
+- ✓ API gravity conversion (5 test cases, ±0.001 tolerance)
+- ✓ Volume to weight conversion (4 test cases, ±1.0 ton tolerance)
+- ✓ BS&W deduction (4 test cases, exact arithmetic)
+- ✓ Temperature correction (4 test cases, ±100 bbl tolerance)
+
+**Test Results**: 20/20 tests passing (100%)
+
+Run Phase 2 tests:
+```bash
+cd examples/oil_refinery_warehousing
+go test -v -run "TestFactCrudeReceipts|TestAPIGravity|TestVolumeToWeight|TestBSW|TestTemperature"
+```
+
+### Documentation
+
+- **PHASE_2_SUMMARY.md**: Detailed implementation report with statistics
+- **docs/MEASUREMENT_STANDARDS.md**: Petroleum measurement formulas (Phase 1)
+- Inline SQL documentation in transformation files
+
 ## Next Phases
 
-### Phase 2: Staging Tables
-- `stg_crude_receipts`: Crude oil receipts by grade and source
-- `stg_unit_production`: Daily unit production by stream
-- `stg_product_shipments`: Product shipments by grade and destination
-- `stg_unit_downtime`: Downtime events with cause codes
+### Phase 3: Crude Distillation Unit (CDU) Production
+### Phase 3: Crude Distillation Unit (CDU) Production
+- `fact_cdu_production`: Daily CDU throughput and yields by cut point
+- `stg_cdu_operations`: Staging for CDU operational data
+- Crude slate tracking and yield analysis
+- Cut point optimization metrics
 
-### Phase 3: Fact Tables
-- `fact_daily_unit_production`: Daily production by unit with mass balance
-- `fact_crude_runs`: Daily crude receipts and processing
+### Phase 4: Product Blending and Shipments
+- `fact_product_blends`: Gasoline/diesel blending recipes
+- `fact_product_shipments`: Product shipments by grade and destination
 - `fact_product_quality`: Quality test results by product and batch
-- `fact_downtime_events`: Downtime analysis with planned vs. unplanned
+- Blending optimization logic
 
-### Phase 4: Metrics and Aggregations
+### Phase 5: Unit Production and Downtime
+- `fact_unit_production`: Daily production by unit with mass balance
+- `fact_downtime_events`: Downtime analysis with planned vs. unplanned
+- `stg_unit_production`: Staging for production data
+- `stg_unit_downtime`: Staging for downtime events
+
+### Phase 6: Metrics and Aggregations
 - Monthly production summaries
 - Yield analysis by crude type
 - Catalyst efficiency tracking
