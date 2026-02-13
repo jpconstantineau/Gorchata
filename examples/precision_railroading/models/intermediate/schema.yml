@@ -1,0 +1,267 @@
+version: 2
+
+models:
+  - name: int_state_intervals
+    description: |
+      Transforms discrete CLM events into continuous time intervals by pairing sequential events.
+      Each interval represents the state of a railcar from one event to the next.
+      Supports minute-precision duration calculations for downstream analytics.
+    config:
+      materialized: table
+    columns:
+      - name: interval_id
+        description: Surrogate key for the interval
+        tests:
+          - not_null
+          - unique
+      
+      - name: car_number
+        description: Railcar identification number
+        tests:
+          - not_null
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: start_event_id
+        description: Event ID marking the start of this interval
+        tests:
+          - not_null
+      
+      - name: start_timestamp
+        description: Timestamp when the interval begins
+        tests:
+          - not_null
+      
+      - name: start_event_type
+        description: Type of event at interval start (PLAC, DEPA, ARRI, PULL)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['PLAC', 'DEPA', 'ARRI', 'PULL']
+      
+      - name: start_location_id
+        description: Foreign key to dim_location for start location
+        tests:
+          - not_null
+      
+      - name: start_splc_code
+        description: SPLC code of start location
+        tests:
+          - not_null
+      
+      - name: start_location_name
+        description: Name of start location
+      
+      - name: end_event_id
+        description: Event ID marking the end of this interval (NULL for terminal intervals)
+      
+      - name: end_timestamp
+        description: Timestamp when the interval ends (NULL for terminal intervals)
+      
+      - name: end_event_type
+        description: Type of event at interval end (NULL for terminal intervals)
+      
+      - name: end_location_id
+        description: Foreign key to dim_location for end location
+      
+      - name: end_splc_code
+        description: SPLC code of end location
+      
+      - name: end_location_name
+        description: Name of end location
+      
+      - name: duration_minutes
+        description: Duration of the interval in minutes (NULL for terminal intervals)
+      
+      - name: train_id
+        description: Associated train ID if applicable
+      
+      - name: psr_period
+        description: PSR implementation period (Pre-PSR, Transition, PSR)
+        tests:
+          - not_null
+
+  - name: int_trip_segments
+    description: |
+      Groups state intervals into meaningful origin-destination trip segments.
+      Each trip represents either a loaded movement (PLAC→PULL) or empty return (PULL→PLAC).
+      Provides foundation for cycle analysis and performance metrics.
+    config:
+      materialized: table
+    columns:
+      - name: trip_segment_id
+        description: Surrogate key for the trip segment
+        tests:
+          - not_null
+          - unique
+      
+      - name: car_number
+        description: Railcar identification number
+        tests:
+          - not_null
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: trip_start_timestamp
+        description: Timestamp when trip begins
+        tests:
+          - not_null
+      
+      - name: trip_end_timestamp
+        description: Timestamp when trip ends
+        tests:
+          - not_null
+      
+      - name: trip_duration_minutes
+        description: Total trip duration in minutes
+        tests:
+          - not_null
+      
+      - name: origin_location_id
+        description: Foreign key to dim_location for trip origin
+        tests:
+          - not_null
+      
+      - name: origin_splc_code
+        description: SPLC code of origin location
+        tests:
+          - not_null
+      
+      - name: destination_location_id
+        description: Foreign key to dim_location for trip destination
+        tests:
+          - not_null
+      
+      - name: destination_splc_code
+        description: SPLC code of destination location
+        tests:
+          - not_null
+      
+      - name: distance_miles
+        description: Trip distance in miles (from dim_corridor if available)
+      
+      - name: is_loaded_trip
+        description: TRUE if loaded trip (starts with PLAC), FALSE if empty (starts with PULL)
+        tests:
+          - not_null
+      
+      - name: train_id
+        description: Associated train ID
+      
+      - name: psr_period
+        description: PSR implementation period
+        tests:
+          - not_null
+
+  - name: int_cycle_classification
+    description: |
+      Pairs loaded and empty trip segments into complete railcar cycles.
+      A cycle consists of a loaded trip followed by an empty return, representing
+      the full operational loop of a railcar. Critical for asset utilization analysis.
+    config:
+      materialized: table
+    columns:
+      - name: cycle_id
+        description: Surrogate key for the cycle
+        tests:
+          - not_null
+          - unique
+      
+      - name: car_number
+        description: Railcar identification number
+        tests:
+          - not_null
+      
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+      
+      - name: cycle_start_timestamp
+        description: Timestamp when cycle begins (start of loaded trip)
+        tests:
+          - not_null
+      
+      - name: cycle_end_timestamp
+        description: Timestamp when cycle ends (end of empty return)
+        tests:
+          - not_null
+      
+      - name: cycle_duration_days
+        description: Total cycle duration in days (decimal)
+        tests:
+          - not_null
+      
+      - name: loaded_trip_segment_id
+        description: Foreign key to int_trip_segments for loaded trip
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_trip_segments')
+              field: trip_segment_id
+      
+      - name: empty_trip_segment_id
+        description: Foreign key to int_trip_segments for empty trip
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_trip_segments')
+              field: trip_segment_id
+      
+      - name: loaded_origin_splc
+        description: SPLC code where loaded trip originated
+        tests:
+          - not_null
+      
+      - name: loaded_destination_splc
+        description: SPLC code where loaded trip ended
+        tests:
+          - not_null
+      
+      - name: empty_origin_splc
+        description: SPLC code where empty return originated
+        tests:
+          - not_null
+      
+      - name: empty_destination_splc
+        description: SPLC code where empty return ended
+        tests:
+          - not_null
+      
+      - name: loaded_duration_minutes
+        description: Duration of loaded trip in minutes
+        tests:
+          - not_null
+      
+      - name: empty_duration_minutes
+        description: Duration of empty return in minutes
+        tests:
+          - not_null
+      
+      - name: total_distance_miles
+        description: Combined distance of loaded and empty trips (if available)
+      
+      - name: psr_period
+        description: PSR implementation period
+        tests:
+          - not_null
+      
+      - name: cycle_number
+        description: Sequential cycle number per railcar (1, 2, 3, ...)
+        tests:
+          - not_null
