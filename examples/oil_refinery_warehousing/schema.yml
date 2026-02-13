@@ -661,3 +661,373 @@ models:
           - accepted_range:
               min_value: 0
               max_value: 5
+
+  # ===================================================================
+  # STAGING TABLES - Unit Operations (Phase 3)
+  # ===================================================================
+
+  - name: stg_unit_feed
+    description: "Staging table for unit feed tracking before transformation"
+    columns:
+      - name: feed_id
+        description: "Unique identifier for unit feed record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: feed_stream_id
+        description: "Foreign key to dim_stream for feed material"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_stream
+              field: stream_id
+      
+      - name: feed_volume_bbl
+        description: "Feed volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: feed_weight_tons
+        description: "Feed weight in short tons"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: feed_api_gravity
+        description: "API gravity of feed stream"
+        data_tests:
+          - accepted_range:
+              min_value: 5
+              max_value: 70
+      
+      - name: feed_sulfur_ppm
+        description: "Sulfur content in parts per million"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: feed_temperature_f
+        description: "Feed temperature in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: 50
+              max_value: 800
+
+  - name: stg_unit_operations
+    description: "Staging table for daily unit operations before transformation"
+    columns:
+      - name: operation_id
+        description: "Unique identifier for unit operation record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: catalyst_cycle_id
+        description: "Foreign key to dim_catalyst_cycle (NULL for non-catalytic units)"
+        data_tests:
+          - relationships:
+              to: dim_catalyst_cycle
+              field: catalyst_cycle_id
+      
+      - name: operating_hours
+        description: "Hours unit operated during the day (0-24)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: planned_downtime_hours
+        description: "Hours of planned/scheduled downtime for maintenance"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: unplanned_downtime_hours
+        description: "Hours of unplanned downtime due to trips/upsets"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: throughput_bbl
+        description: "Daily throughput in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: capacity_bbl_day
+        description: "Nominal unit capacity in barrels per day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: capacity_utilization_pct
+        description: "Capacity utilization percentage (Throughput / Capacity × 100)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 105
+      
+      - name: conversion_pct
+        description: "Conversion percentage for upgrading units (FCC, HCU)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: energy_consumed_mmbtu
+        description: "Energy consumed in MMBtu (Million British Thermal Units)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 100000
+      
+      - name: reactor_temperature_f
+        description: "Average reactor temperature in Fahrenheit"
+        data_tests:
+          - accepted_range:
+              min_value: 300
+              max_value: 1100
+      
+      - name: reactor_pressure_psig
+        description: "Average reactor pressure in psig"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 3000
+
+  # ===================================================================
+  # FACT TABLES - Unit Operations (Phase 3)
+  # ===================================================================
+
+  - name: fact_unit_feed
+    description: "Fact table tracking daily feed to process units with quality metrics"
+    columns:
+      - name: feed_id
+        description: "Unique identifier for unit feed record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: feed_stream_id
+        description: "Foreign key to dim_stream for feed material"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_stream
+              field: stream_id
+      
+      - name: feed_volume_bbl
+        description: "Feed volume in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: feed_weight_tons
+        description: "Feed weight in short tons"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: feed_api_gravity
+        description: "API gravity of feed stream"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 5
+              max_value: 70
+      
+      - name: feed_sulfur_ppm
+        description: "Sulfur content in parts per million"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: feed_temperature_f
+        description: "Feed temperature in Fahrenheit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 50
+              max_value: 800
+
+  - name: fact_unit_operations
+    description: "Fact table tracking daily unit operations with capacity utilization, downtime, and performance metrics"
+    columns:
+      - name: operation_id
+        description: "Unique identifier for unit operation record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: unit_id
+        description: "Foreign key to dim_unit"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_unit
+              field: unit_id
+      
+      - name: catalyst_cycle_id
+        description: "Foreign key to dim_catalyst_cycle (NULL for non-catalytic units like CDU, VDU, Hydrotreater)"
+        data_tests:
+          - relationships:
+              to: dim_catalyst_cycle
+              field: catalyst_cycle_id
+      
+      - name: operating_hours
+        description: "Hours unit operated during the day (0-24), calculated as 24 - total_downtime"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: planned_downtime_hours
+        description: "Hours of planned/scheduled downtime for maintenance (separate tracking requirement)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: unplanned_downtime_hours
+        description: "Hours of unplanned downtime due to trips/upsets (separate tracking requirement)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 24
+      
+      - name: throughput_bbl
+        description: "Daily throughput in barrels"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: capacity_bbl_day
+        description: "Nominal unit capacity in barrels per day"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 200000
+      
+      - name: capacity_utilization_pct
+        description: "Capacity utilization percentage calculated as (Throughput / Capacity) × 100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 105
+      
+      - name: conversion_pct
+        description: "Conversion percentage for upgrading units (FCC, Hydrocracker, Coker) - NULL for other units"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: energy_consumed_mmbtu
+        description: "Energy consumed in MMBtu (Million British Thermal Units)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100000
+      
+      - name: reactor_temperature_f
+        description: "Average reactor temperature in Fahrenheit (NULL for non-reactor units)"
+        data_tests:
+          - accepted_range:
+              min_value: 300
+              max_value: 1100
+      
+      - name: reactor_pressure_psig
+        description: "Average reactor pressure in psig (NULL for atmospheric units)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 3000

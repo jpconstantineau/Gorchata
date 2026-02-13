@@ -1,0 +1,1269 @@
+# ==============================================================================
+# Unit Operations Seed Data - Phase 3
+# ==============================================================================
+# 
+# This seed file contains realistic daily unit operations demonstrating:
+# - 8 major refinery process units over 10 days (80 total records)
+# - Separate tracking of planned and unplanned downtime
+# - Capacity utilization calculations
+# - Catalyst cycle correlation (FCC, Hydrocracker, Reformer)
+# - Energy consumption by unit type
+# - Planned maintenance events (3-4 events)
+# - Unplanned process upsets (4-6 events)
+#
+# Unit Hierarchy:
+# - Crude Unit Complex: CDU, VDU
+# - Conversion Complex: FCC, Hydrocracker
+# - Clean Fuels Complex: Naphtha Hydrotreater, Diesel Hydrotreater
+# - Gasoline Production Complex: Reformer, Alkylation
+#
+# Formulas Applied:
+# - Capacity Utilization % = (Throughput / Capacity) × 100
+# - Total Downtime = Planned Downtime + Unplanned Downtime
+# - Operating Hours = 24 - Total Downtime
+# - Energy Intensity = Energy Consumed / Throughput
+# ==============================================================================
+
+version: 1
+table: fact_unit_operations
+
+records:
+  # ==========================================================================
+  # Day 1 (20260201) - Normal Operations
+  # ==========================================================================
+  
+  - operation_id: "OP-CDU-20260201"
+    date_key: 20260201
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null  # CDU is non-catalytic
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142500
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.0
+    conversion_pct: null  # CDU is separation, not conversion
+    energy_consumed_mmbtu: 21375.0  # 0.15 MMBtu/bbl
+    reactor_temperature_f: null  # Atmospheric distillation
+    reactor_pressure_psig: null  # Atmospheric unit
+
+  - operation_id: "OP-VDU-20260201"
+    date_key: 20260201
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54000
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 10800.0  # 0.20 MMBtu/bbl
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260201"
+    date_key: 20260201
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"  # Mid-cycle 85-90% efficiency
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41400
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.0
+    conversion_pct: 73.5
+    energy_consumed_mmbtu: 10350.0  # 0.25 MMBtu/bbl
+    reactor_temperature_f: 985.0
+    reactor_pressure_psig: 25.0
+
+  - operation_id: "OP-HCU-20260201"
+    date_key: 20260201
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"  # Fresh catalyst 100% efficiency
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26400
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 88.0
+    conversion_pct: 91.5
+    energy_consumed_mmbtu: 9240.0  # 0.35 MMBtu/bbl
+    reactor_temperature_f: 725.0
+    reactor_pressure_psig: 1850.0
+
+  - operation_id: "OP-REF-20260201"
+    date_key: 20260201
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"  # End-of-run 80-82% efficiency
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 22500
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 90.0
+    conversion_pct: null  # Reforming is octane enhancement, not conversion
+    energy_consumed_mmbtu: 4950.0  # 0.22 MMBtu/bbl
+    reactor_temperature_f: 950.0
+    reactor_pressure_psig: 380.0
+
+  - operation_id: "OP-NHT-20260201"
+    date_key: 20260201
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null  # Hydrotreater catalyst life is multi-year
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32550
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.0
+    conversion_pct: null  # Hydrotreating is quality improvement
+    energy_consumed_mmbtu: 3906.0  # 0.12 MMBtu/bbl
+    reactor_temperature_f: 610.0
+    reactor_pressure_psig: 550.0
+
+  - operation_id: "OP-DHT-20260201"
+    date_key: 20260201
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36400
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 5096.0  # 0.14 MMBtu/bbl
+    reactor_temperature_f: 640.0
+    reactor_pressure_psig: 620.0
+
+  - operation_id: "OP-ALK-20260201"
+    date_key: 20260201
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null  # Alkylation uses sulfuric acid, not catalyst
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12750
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 85.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 2295.0  # 0.18 MMBtu/bbl
+    reactor_temperature_f: 45.0
+    reactor_pressure_psig: 95.0
+
+  # ==========================================================================
+  # Day 2 (20260202) - Normal Operations with Minor Variations
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260202"
+    date_key: 20260202
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 143250
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 21487.5
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260202"
+    date_key: 20260202
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54300
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 10860.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260202"
+    date_key: 20260202
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41850
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 93.0
+    conversion_pct: 73.8
+    energy_consumed_mmbtu: 10462.5
+    reactor_temperature_f: 987.0
+    reactor_pressure_psig: 25.5
+
+  - operation_id: "OP-HCU-20260202"
+    date_key: 20260202
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26700
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 89.0
+    conversion_pct: 91.8
+    energy_consumed_mmbtu: 9345.0
+    reactor_temperature_f: 728.0
+    reactor_pressure_psig: 1860.0
+
+  - operation_id: "OP-REF-20260202"
+    date_key: 20260202
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 22750
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 91.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 5005.0
+    reactor_temperature_f: 952.0
+    reactor_pressure_psig: 385.0
+
+  - operation_id: "OP-NHT-20260202"
+    date_key: 20260202
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32900
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 94.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 3948.0
+    reactor_temperature_f: 612.0
+    reactor_pressure_psig: 555.0
+
+  - operation_id: "OP-DHT-20260202"
+    date_key: 20260202
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36800
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 92.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 5152.0
+    reactor_temperature_f: 642.0
+    reactor_pressure_psig: 625.0
+
+  - operation_id: "OP-ALK-20260202"
+    date_key: 20260202
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12900
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 86.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 2322.0
+    reactor_temperature_f: 46.0
+    reactor_pressure_psig: 96.0
+
+  # ==========================================================================
+  # Day 3 (20260203) - Reformer Unplanned Trip (4.5 hrs downtime)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260203"
+    date_key: 20260203
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142800
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.2
+    conversion_pct: null
+    energy_consumed_mmbtu: 21420.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260203"
+    date_key: 20260203
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54150
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.25
+    conversion_pct: null
+    energy_consumed_mmbtu: 10830.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260203"
+    date_key: 20260203
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41625
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.5
+    conversion_pct: 73.6
+    energy_consumed_mmbtu: 10406.25
+    reactor_temperature_f: 986.0
+    reactor_pressure_psig: 25.2
+
+  - operation_id: "OP-HCU-20260203"
+    date_key: 20260203
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26550
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 88.5
+    conversion_pct: 91.6
+    energy_consumed_mmbtu: 9292.5
+    reactor_temperature_f: 726.5
+    reactor_pressure_psig: 1855.0
+
+  - operation_id: "OP-REF-20260203"
+    date_key: 20260203
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 19.5
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 4.5  # Process upset - catalyst activity drop
+    throughput_bbl: 18281
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 73.1
+    conversion_pct: null
+    energy_consumed_mmbtu: 4022.0
+    reactor_temperature_f: 935.0
+    reactor_pressure_psig: 375.0
+
+  - operation_id: "OP-NHT-20260203"
+    date_key: 20260203
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32725
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 3927.0
+    reactor_temperature_f: 611.0
+    reactor_pressure_psig: 552.0
+
+  - operation_id: "OP-DHT-20260203"
+    date_key: 20260203
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36600
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 5124.0
+    reactor_temperature_f: 641.0
+    reactor_pressure_psig: 622.0
+
+  - operation_id: "OP-ALK-20260203"
+    date_key: 20260203
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12825
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 85.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 2308.5
+    reactor_temperature_f: 45.5
+    reactor_pressure_psig: 95.5
+
+  # ==========================================================================
+  # Day 4 (20260204) - FCC Planned Maintenance (Full Day Turnaround)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260204"
+    date_key: 20260204
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142200
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 94.8
+    conversion_pct: null
+    energy_consumed_mmbtu: 21330.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260204"
+    date_key: 20260204
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 53850
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 89.75
+    conversion_pct: null
+    energy_consumed_mmbtu: 10770.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260204"
+    date_key: 20260204
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 0
+    planned_downtime_hours: 24.0  # Planned catalyst addition and inspection
+    unplanned_downtime_hours: 0
+    throughput_bbl: 0
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 0
+    conversion_pct: null
+    energy_consumed_mmbtu: 0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-HCU-20260204"
+    date_key: 20260204
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26850
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 89.5
+    conversion_pct: 92.0
+    energy_consumed_mmbtu: 9397.5
+    reactor_temperature_f: 729.0
+    reactor_pressure_psig: 1865.0
+
+  - operation_id: "OP-REF-20260204"
+    date_key: 20260204
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 22625
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 90.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 4977.5
+    reactor_temperature_f: 951.0
+    reactor_pressure_psig: 383.0
+
+  - operation_id: "OP-NHT-20260204"
+    date_key: 20260204
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32650
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.3
+    conversion_pct: null
+    energy_consumed_mmbtu: 3918.0
+    reactor_temperature_f: 610.5
+    reactor_pressure_psig: 551.0
+
+  - operation_id: "OP-DHT-20260204"
+    date_key: 20260204
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36500
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.25
+    conversion_pct: null
+    energy_consumed_mmbtu: 5110.0
+    reactor_temperature_f: 640.5
+    reactor_pressure_psig: 621.0
+
+  - operation_id: "OP-ALK-20260204"
+    date_key: 20260204
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12700
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 84.67
+    conversion_pct: null
+    energy_consumed_mmbtu: 2286.0
+    reactor_temperature_f: 45.0
+    reactor_pressure_psig: 95.0
+
+  # ==========================================================================
+  # Day 5 (20260205) - Hydrocracker Minor Trip (2.5 hrs)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260205"
+    date_key: 20260205
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 143100
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.4
+    conversion_pct: null
+    energy_consumed_mmbtu: 21465.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260205"
+    date_key: 20260205
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54200
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.33
+    conversion_pct: null
+    energy_consumed_mmbtu: 10840.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260205"
+    date_key: 20260205
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41700
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.67
+    conversion_pct: 73.7
+    energy_consumed_mmbtu: 10425.0
+    reactor_temperature_f: 987.0
+    reactor_pressure_psig: 25.3
+
+  - operation_id: "OP-HCU-20260205"
+    date_key: 20260205
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 21.5
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 2.5  # Hydrogen compressor trip
+    throughput_bbl: 23719
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 79.06
+    conversion_pct: 90.8
+    energy_consumed_mmbtu: 8302.0
+    reactor_temperature_f: 718.0
+    reactor_pressure_psig: 1840.0
+
+  - operation_id: "OP-REF-20260205"
+    date_key: 20260205
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 22800
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 91.2
+    conversion_pct: null
+    energy_consumed_mmbtu: 5016.0
+    reactor_temperature_f: 953.0
+    reactor_pressure_psig: 386.0
+
+  - operation_id: "OP-NHT-20260205"
+    date_key: 20260205
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32800
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.71
+    conversion_pct: null
+    energy_consumed_mmbtu: 3936.0
+    reactor_temperature_f: 611.5
+    reactor_pressure_psig: 553.0
+
+  - operation_id: "OP-DHT-20260205"
+    date_key: 20260205
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36700
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.75
+    conversion_pct: null
+    energy_consumed_mmbtu: 5138.0
+    reactor_temperature_f: 641.5
+    reactor_pressure_psig: 623.0
+
+  - operation_id: "OP-ALK-20260205"
+    date_key: 20260205
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12850
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 85.67
+    conversion_pct: null
+    energy_consumed_mmbtu: 2313.0
+    reactor_temperature_f: 45.8
+    reactor_pressure_psig: 95.8
+
+  # ==========================================================================
+  # Day 6 (20260206) - Alkylation Planned Maintenance (12 hrs)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260206"
+    date_key: 20260206
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142650
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.1
+    conversion_pct: null
+    energy_consumed_mmbtu: 21397.5
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260206"
+    date_key: 20260206
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54100
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.17
+    conversion_pct: null
+    energy_consumed_mmbtu: 10820.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260206"
+    date_key: 20260206
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41550
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.33
+    conversion_pct: 73.4
+    energy_consumed_mmbtu: 10387.5
+    reactor_temperature_f: 985.5
+    reactor_pressure_psig: 25.1
+
+  - operation_id: "OP-HCU-20260206"
+    date_key: 20260206
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26600
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 88.67
+    conversion_pct: 91.7
+    energy_consumed_mmbtu: 9310.0
+    reactor_temperature_f: 727.0
+    reactor_pressure_psig: 1857.0
+
+  - operation_id: "OP-REF-20260206"
+    date_key: 20260206
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 22650
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 90.6
+    conversion_pct: null
+    energy_consumed_mmbtu: 4983.0
+    reactor_temperature_f: 951.5
+    reactor_pressure_psig: 384.0
+
+  - operation_id: "OP-NHT-20260206"
+    date_key: 20260206
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32700
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.43
+    conversion_pct: null
+    energy_consumed_mmbtu: 3924.0
+    reactor_temperature_f: 611.0
+    reactor_pressure_psig: 552.0
+
+  - operation_id: "OP-DHT-20260206"
+    date_key: 20260206
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36550
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.38
+    conversion_pct: null
+    energy_consumed_mmbtu: 5117.0
+    reactor_temperature_f: 640.8
+    reactor_pressure_psig: 621.5
+
+  - operation_id: "OP-ALK-20260206"
+    date_key: 20260206
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 12.0
+    planned_downtime_hours: 12.0  # Planned acid regeneration
+    unplanned_downtime_hours: 0
+    throughput_bbl: 6375
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 42.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 1147.5
+    reactor_temperature_f: 45.2
+    reactor_pressure_psig: 95.2
+
+  # ==========================================================================
+  # Day 7 (20260207) - Reformer Planned Catalyst Regeneration (Full Day)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260207"
+    date_key: 20260207
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142350
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 94.9
+    conversion_pct: null
+    energy_consumed_mmbtu: 21352.5
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260207"
+    date_key: 20260207
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 53950
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 89.92
+    conversion_pct: null
+    energy_consumed_mmbtu: 10790.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260207"
+    date_key: 20260207
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41500
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.22
+    conversion_pct: 73.3
+    energy_consumed_mmbtu: 10375.0
+    reactor_temperature_f: 985.0
+    reactor_pressure_psig: 25.0
+
+  - operation_id: "OP-HCU-20260207"
+    date_key: 20260207
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26500
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 88.33
+    conversion_pct: 91.5
+    energy_consumed_mmbtu: 9275.0
+    reactor_temperature_f: 726.0
+    reactor_pressure_psig: 1854.0
+
+  - operation_id: "OP-REF-20260207"
+    date_key: 20260207
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-EOR"
+    operating_hours: 0
+    planned_downtime_hours: 24.0  # Planned catalyst regeneration
+    unplanned_downtime_hours: 0
+    throughput_bbl: 0
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 0
+    conversion_pct: null
+    energy_consumed_mmbtu: 0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-NHT-20260207"
+    date_key: 20260207
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32600
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.14
+    conversion_pct: null
+    energy_consumed_mmbtu: 3912.0
+    reactor_temperature_f: 610.0
+    reactor_pressure_psig: 551.0
+
+  - operation_id: "OP-DHT-20260207"
+    date_key: 20260207
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36450
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 91.13
+    conversion_pct: null
+    energy_consumed_mmbtu: 5103.0
+    reactor_temperature_f: 640.5
+    reactor_pressure_psig: 621.0
+
+  - operation_id: "OP-ALK-20260207"
+    date_key: 20260207
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12780
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 85.2
+    conversion_pct: null
+    energy_consumed_mmbtu: 2300.4
+    reactor_temperature_f: 45.5
+    reactor_pressure_psig: 95.3
+
+  # ==========================================================================
+  # Day 8 (20260208) - VDU Unplanned Trip (6 hrs)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260208"
+    date_key: 20260208
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 143400
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.6
+    conversion_pct: null
+    energy_consumed_mmbtu: 21510.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260208"
+    date_key: 20260208
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 18.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 6.0  # Furnace tube leak - emergency shutdown
+    throughput_bbl: 40500
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 67.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 8100.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260208"
+    date_key: 20260208
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41900
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 93.11
+    conversion_pct: 73.9
+    energy_consumed_mmbtu: 10475.0
+    reactor_temperature_f: 988.0
+    reactor_pressure_psig: 25.5
+
+  - operation_id: "OP-HCU-20260208"
+    date_key: 20260208
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26750
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 89.17
+    conversion_pct: 91.9
+    energy_consumed_mmbtu: 9362.5
+    reactor_temperature_f: 728.5
+    reactor_pressure_psig: 1862.0
+
+  - operation_id: "OP-REF-20260208"
+    date_key: 20260208
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-FRESH"  # Fresh catalyst after regeneration
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 23250
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 93.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 5115.0
+    reactor_temperature_f: 960.0
+    reactor_pressure_psig: 390.0
+
+  - operation_id: "OP-NHT-20260208"
+    date_key: 20260208
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32950
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 94.14
+    conversion_pct: null
+    energy_consumed_mmbtu: 3954.0
+    reactor_temperature_f: 612.5
+    reactor_pressure_psig: 555.0
+
+  - operation_id: "OP-DHT-20260208"
+    date_key: 20260208
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36850
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 92.13
+    conversion_pct: null
+    energy_consumed_mmbtu: 5159.0
+    reactor_temperature_f: 642.5
+    reactor_pressure_psig: 625.0
+
+  - operation_id: "OP-ALK-20260208"
+    date_key: 20260208
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12900
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 86.0
+    conversion_pct: null
+    energy_consumed_mmbtu: 2322.0
+    reactor_temperature_f: 46.0
+    reactor_pressure_psig: 96.0
+
+  # ==========================================================================
+  # Day 9 (20260209) - DHT Minor Unplanned Trip (3 hrs)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260209"
+    date_key: 20260209
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 142950
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.3
+    conversion_pct: null
+    energy_consumed_mmbtu: 21442.5
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260209"
+    date_key: 20260209
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54250
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.42
+    conversion_pct: null
+    energy_consumed_mmbtu: 10850.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260209"
+    date_key: 20260209
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41750
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 92.78
+    conversion_pct: 73.8
+    energy_consumed_mmbtu: 10437.5
+    reactor_temperature_f: 987.5
+    reactor_pressure_psig: 25.4
+
+  - operation_id: "OP-HCU-20260209"
+    date_key: 20260209
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26650
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 88.83
+    conversion_pct: 91.7
+    energy_consumed_mmbtu: 9327.5
+    reactor_temperature_f: 727.5
+    reactor_pressure_psig: 1858.0
+
+  - operation_id: "OP-REF-20260209"
+    date_key: 20260209
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 23125
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 92.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 5087.5
+    reactor_temperature_f: 958.0
+    reactor_pressure_psig: 388.0
+
+  - operation_id: "OP-NHT-20260209"
+    date_key: 20260209
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 32850
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 93.86
+    conversion_pct: null
+    energy_consumed_mmbtu: 3942.0
+    reactor_temperature_f: 612.0
+    reactor_pressure_psig: 554.0
+
+  - operation_id: "OP-DHT-20260209"
+    date_key: 20260209
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 21.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 3.0  # Feed pump failure
+    throughput_bbl: 32025
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 80.06
+    conversion_pct: null
+    energy_consumed_mmbtu: 4483.5
+    reactor_temperature_f: 635.0
+    reactor_pressure_psig: 615.0
+
+  - operation_id: "OP-ALK-20260209"
+    date_key: 20260209
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12825
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 85.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 2308.5
+    reactor_temperature_f: 45.6
+    reactor_pressure_psig: 95.6
+
+  # ==========================================================================
+  # Day 10 (20260210) - NHT Planned Maintenance (8 hrs)
+  # ==========================================================================
+
+  - operation_id: "OP-CDU-20260210"
+    date_key: 20260210
+    unit_id: "CDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 143550
+    capacity_bbl_day: 150000
+    capacity_utilization_pct: 95.7
+    conversion_pct: null
+    energy_consumed_mmbtu: 21532.5
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-VDU-20260210"
+    date_key: 20260210
+    unit_id: "VDU-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 54400
+    capacity_bbl_day: 60000
+    capacity_utilization_pct: 90.67
+    conversion_pct: null
+    energy_consumed_mmbtu: 10880.0
+    reactor_temperature_f: null
+    reactor_pressure_psig: null
+
+  - operation_id: "OP-FCC-20260210"
+    date_key: 20260210
+    unit_id: "FCC-1"
+    catalyst_cycle_id: "CAT-FCC-MID"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 41950
+    capacity_bbl_day: 45000
+    capacity_utilization_pct: 93.22
+    conversion_pct: 74.1
+    energy_consumed_mmbtu: 10487.5
+    reactor_temperature_f: 988.5
+    reactor_pressure_psig: 25.6
+
+  - operation_id: "OP-HCU-20260210"
+    date_key: 20260210
+    unit_id: "HCU-1"
+    catalyst_cycle_id: "CAT-HCU-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 26900
+    capacity_bbl_day: 30000
+    capacity_utilization_pct: 89.67
+    conversion_pct: 92.2
+    energy_consumed_mmbtu: 9415.0
+    reactor_temperature_f: 730.0
+    reactor_pressure_psig: 1868.0
+
+  - operation_id: "OP-REF-20260210"
+    date_key: 20260210
+    unit_id: "REF-1"
+    catalyst_cycle_id: "CAT-REF-FRESH"
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 23375
+    capacity_bbl_day: 25000
+    capacity_utilization_pct: 93.5
+    conversion_pct: null
+    energy_consumed_mmbtu: 5142.5
+    reactor_temperature_f: 961.0
+    reactor_pressure_psig: 391.0
+
+  - operation_id: "OP-NHT-20260210"
+    date_key: 20260210
+    unit_id: "NHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 16.0
+    planned_downtime_hours: 8.0  # Planned filter cleaning and inspection
+    unplanned_downtime_hours: 0
+    throughput_bbl: 21867
+    capacity_bbl_day: 35000
+    capacity_utilization_pct: 62.48
+    conversion_pct: null
+    energy_consumed_mmbtu: 2624.0
+    reactor_temperature_f: 610.0
+    reactor_pressure_psig: 550.0
+
+  - operation_id: "OP-DHT-20260210"
+    date_key: 20260210
+    unit_id: "DHT-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 36900
+    capacity_bbl_day: 40000
+    capacity_utilization_pct: 92.25
+    conversion_pct: null
+    energy_consumed_mmbtu: 5166.0
+    reactor_temperature_f: 643.0
+    reactor_pressure_psig: 626.0
+
+  - operation_id: "OP-ALK-20260210"
+    date_key: 20260210
+    unit_id: "ALK-1"
+    catalyst_cycle_id: null
+    operating_hours: 24.0
+    planned_downtime_hours: 0
+    unplanned_downtime_hours: 0
+    throughput_bbl: 12950
+    capacity_bbl_day: 15000
+    capacity_utilization_pct: 86.33
+    conversion_pct: null
+    energy_consumed_mmbtu: 2331.0
+    reactor_temperature_f: 46.2
+    reactor_pressure_psig: 96.2

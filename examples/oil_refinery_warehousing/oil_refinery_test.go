@@ -731,3 +731,301 @@ func TestTemperatureCorrection(t *testing.T) {
 		})
 	}
 }
+
+// ===================================================================
+// PHASE 3 TESTS - Unit Operations and Feed Tracking
+// ===================================================================
+
+// TestFactUnitFeedTableExists verifies FACT_UNIT_FEED table is defined
+func TestFactUnitFeedTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	found := false
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_feed" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("FACT_UNIT_FEED table not found in schema")
+	}
+}
+
+// TestFactUnitOperationsTableExists verifies FACT_UNIT_OPERATIONS table is defined
+func TestFactUnitOperationsTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	found := false
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_operations" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("FACT_UNIT_OPERATIONS table not found in schema")
+	}
+}
+
+// TestUnitFeedHasRequiredColumns verifies FACT_UNIT_FEED has all required columns
+func TestUnitFeedHasRequiredColumns(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factUnitFeed *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_feed" {
+			factUnitFeed = &model
+			break
+		}
+	}
+
+	if factUnitFeed == nil {
+		t.Fatal("fact_unit_feed not found in schema")
+	}
+
+	requiredColumns := []string{
+		"feed_id",
+		"date_key",
+		"unit_id",
+		"feed_stream_id",
+		"feed_volume_bbl",
+		"feed_weight_tons",
+		"feed_api_gravity",
+		"feed_sulfur_ppm",
+		"feed_temperature_f",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factUnitFeed.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_unit_feed missing required column: %s", colName)
+		}
+	}
+}
+
+// TestUnitOperationsHasRequiredColumns verifies FACT_UNIT_OPERATIONS has all required columns including downtime
+func TestUnitOperationsHasRequiredColumns(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factUnitOps *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_unit_operations" {
+			factUnitOps = &model
+			break
+		}
+	}
+
+	if factUnitOps == nil {
+		t.Fatal("fact_unit_operations not found in schema")
+	}
+
+	requiredColumns := []string{
+		"operation_id",
+		"date_key",
+		"unit_id",
+		"catalyst_cycle_id",
+		"operating_hours",
+		"planned_downtime_hours",
+		"unplanned_downtime_hours",
+		"throughput_bbl",
+		"capacity_bbl_day",
+		"capacity_utilization_pct",
+		"conversion_pct",
+		"energy_consumed_mmbtu",
+		"reactor_temperature_f",
+		"reactor_pressure_psig",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factUnitOps.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_unit_operations missing required column: %s", colName)
+		}
+	}
+}
+
+// TestCapacityUtilizationCalculation verifies capacity utilization formula
+func TestCapacityUtilizationCalculation(t *testing.T) {
+	tests := []struct {
+		name         string
+		throughput   float64
+		capacity     float64
+		expectedUtil float64
+	}{
+		{"CDU High Utilization", 142500, 150000, 95.0},
+		{"FCC Normal Operation", 41400, 45000, 92.0},
+		{"Hydrocracker Reduced", 26400, 30000, 88.0},
+		{"Reformer Typical", 22500, 25000, 90.0},
+		{"Alkylation Low", 12750, 15000, 85.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Capacity Utilization % = (Throughput / Capacity) × 100
+			calculatedUtil := (tt.throughput / tt.capacity) * 100
+
+			if calculatedUtil != tt.expectedUtil {
+				t.Errorf("Capacity utilization calculation failed: got %g%%, want %g%%",
+					calculatedUtil, tt.expectedUtil)
+			}
+		})
+	}
+}
+
+// TestDowntimeAggregation verifies planned and unplanned downtime tracking
+func TestDowntimeAggregation(t *testing.T) {
+	tests := []struct {
+		name              string
+		plannedDowntime   float64
+		unplannedDowntime float64
+		expectedTotal     float64
+		expectedOperating float64
+	}{
+		{"Normal Operation", 0, 0, 0, 24.0},
+		{"Planned Maintenance", 12.0, 0, 12.0, 12.0},
+		{"Unplanned Trip", 0, 4.5, 4.5, 19.5},
+		{"Both Types", 8.0, 3.0, 11.0, 13.0},
+		{"Full Day Shutdown", 24.0, 0, 24.0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Total Downtime = Planned + Unplanned
+			calculatedTotal := tt.plannedDowntime + tt.unplannedDowntime
+			if calculatedTotal != tt.expectedTotal {
+				t.Errorf("Total downtime calculation failed: got %g hrs, want %g hrs",
+					calculatedTotal, tt.expectedTotal)
+			}
+
+			// Formula: Operating Hours = 24 - Total Downtime
+			calculatedOperating := 24.0 - calculatedTotal
+			if calculatedOperating != tt.expectedOperating {
+				t.Errorf("Operating hours calculation failed: got %g hrs, want %g hrs",
+					calculatedOperating, tt.expectedOperating)
+			}
+		})
+	}
+}
+
+// TestUnitHierarchyRollup verifies complex-level aggregation
+func TestUnitHierarchyRollup(t *testing.T) {
+	tests := []struct {
+		name                 string
+		complexName          string
+		unitThroughputs      []float64
+		expectedComplexTotal float64
+	}{
+		{
+			"Crude Unit Complex",
+			"Crude Unit Complex",
+			[]float64{142500, 54000}, // CDU + VDU
+			196500,
+		},
+		{
+			"Conversion Complex",
+			"Conversion Complex",
+			[]float64{41400, 26400}, // FCC + HCU
+			67800,
+		},
+		{
+			"Clean Fuels Complex",
+			"Clean Fuels Complex",
+			[]float64{32550, 36400}, // Naphtha HT + Diesel HT
+			68950,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Formula: Complex Throughput = SUM(Unit Throughputs)
+			total := 0.0
+			for _, throughput := range tt.unitThroughputs {
+				total += throughput
+			}
+
+			if total != tt.expectedComplexTotal {
+				t.Errorf("Complex rollup failed: got %g bbl, want %g bbl",
+					total, tt.expectedComplexTotal)
+			}
+		})
+	}
+}
+
+// TestSeedUnitOperationsValid verifies seed_unit_operations.yml has proper structure
+func TestSeedUnitOperationsValid(t *testing.T) {
+	seedPath := filepath.Join("seeds", "seed_unit_operations.yml")
+
+	// Verify file exists
+	if _, err := os.Stat(seedPath); os.IsNotExist(err) {
+		t.Fatalf("seed_unit_operations.yml does not exist at %s", seedPath)
+	}
+
+	// Parse seed file to verify structure
+	seedContent, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("Failed to read seed_unit_operations.yml: %v", err)
+	}
+
+	contentStr := string(seedContent)
+
+	// Verify file has version and table declarations
+	if !containsSubstring(contentStr, "version:") {
+		t.Error("Seed file missing version declaration")
+	}
+
+	if !containsSubstring(contentStr, "table:") {
+		t.Error("Seed file missing table declaration")
+	}
+
+	if !containsSubstring(contentStr, "records:") {
+		t.Error("Seed file missing records section")
+	}
+
+	// Verify key operational units are referenced
+	requiredUnits := []string{"CDU", "FCC", "Hydrocracker", "Reformer"}
+	for _, unit := range requiredUnits {
+		if !containsSubstring(contentStr, unit) {
+			t.Errorf("Seed file should include %s operations", unit)
+		}
+	}
+
+	// Verify downtime tracking exists
+	if !containsSubstring(contentStr, "planned_downtime_hours") {
+		t.Error("Seed file missing planned_downtime_hours column")
+	}
+
+	if !containsSubstring(contentStr, "unplanned_downtime_hours") {
+		t.Error("Seed file missing unplanned_downtime_hours column")
+	}
+}
