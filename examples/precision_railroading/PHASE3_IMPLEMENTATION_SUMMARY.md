@@ -16,11 +16,11 @@ Phase 3 of the Precision Scheduled Railroading (PSR) example has been successful
 - **test_stg_clm_enriched.sql** - 15 data quality tests for enriched staging
 - **Result: 25/25 tests passing (100% success rate)**
 
-### 3. Build Infrastructure (Python)
-Created Python-based build/test infrastructure as workaround for gorchata model loading issues:
-- **build_phase3.py** - Model builder with template processing
-- **test_phase3.py** - Test runner with violation reporting
-- **verify_phase3.py** - Data quality verification report
+### 3. Build Infrastructure (PowerShell + Go)
+Created PowerShell and Go-based build/test infrastructure following project requirements:
+- **build_phase3.ps1** - PowerShell model builder with template processing
+- **test_phase3.ps1** - PowerShell test runner with violation reporting
+- **verify_phase3.go** - Go program for data quality verification
 
 ### 4. Test Data
 - **raw_clm_events.csv** - 50 test events across 10 railcars over 3 days
@@ -101,11 +101,11 @@ Locations Used:
 
 ### 3. Gorchata Model Loading
 **Problem:** "no models found in model paths" despite valid SQL files
-**Solution:** Created Python build script that processes gorchata templates manually
+**Solution:** Created PowerShell build script that processes gorchata templates manually
 
 ### 4. LEAST/GREATEST Functions
 **Problem:** SQLite doesn't have LEAST/GREATEST functions (used in dim_location)
-**Solution:** Registered custom Python functions in build script
+**Solution:** Used SQLite's built-in MIN/MAX functions instead of custom LEAST/GREATEST
 
 ## Files Created
 
@@ -120,9 +120,9 @@ examples/precision_railroading/
 │   └── test_stg_clm_enriched.sql   (NEW - 167 lines)
 ├── seeds/
 │   └── raw_clm_events.csv          (NEW - 51 lines, test data)
-├── build_phase3.py                 (NEW - 137 lines)
-├── test_phase3.py                  (NEW - 95 lines)
-├── verify_phase3.py                (NEW - 130 lines)
+├── build_phase3.ps1                (NEW - PowerShell build script)
+├── test_phase3.ps1                 (NEW - PowerShell test runner)
+├── verify_phase3.go                (NEW - Go verification program)
 ├── PHASE3_COMPLETE.md              (NEW - 380 lines, comprehensive docs)
 └── README.md                       (UPDATED - added Phase 3 status)
 
@@ -138,13 +138,13 @@ cd examples/precision_railroading
 ..\..\bin\gorchata.exe seed
 
 # 2. Build staging models
-python build_phase3.py
+.\build_phase3.ps1
 
 # 3. Run all tests (25 tests)
-python test_phase3.py
+.\test_phase3.ps1
 
 # 4. Generate data quality report
-python verify_phase3.py
+go run verify_phase3.go
 ```
 
 Expected output:
@@ -199,7 +199,7 @@ Phase 4 will implement:
 
 1. **Models are production-ready:** All SQL models are syntactically correct, logically sound, and fully tested.
 
-2. **Gorchata infrastructure issue:** The gorchata CLI reports "no models found" despite valid model files. Python workaround scripts successfully process the same SQL with proper template handling.
+2. **Gorchata infrastructure issue:** The gorchata CLI reports "no models found" despite valid model files. PowerShell workaround scripts successfully process the same SQL with proper template handling.
 
 3. **Train dimension mismatch:** Phase 2's dim_train generates numeric IDs (1,2,3...) instead of using actual train_id strings (T-M100, T-M200...). This doesn't break Phase 3 but should be addressed in Phase 2 revision.
 

@@ -13,6 +13,7 @@ These instructions define **non-negotiable project rules** for all future work i
    - Go version: **1.25+** (`go.mod` must declare `go 1.25` or higher).
    - **No CGO**. All dependencies must work with `CGO_ENABLED=0`.
    - Target OS: cross-platform; build scripts run on Windows via **PowerShell**.
+   - NEVER user python, node, or any other runtime for build/test tasks. All scripts must be PowerShell or golang-based.
 
 
 2. **Development Process**

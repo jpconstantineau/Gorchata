@@ -118,13 +118,13 @@ All tests follow strict TDD principles and must pass before data generation.
 ..\..\bin\gorchata.exe seed
 
 # Build staging models
-python build_phase3.py
+.\build_phase3.ps1
 
 # Run tests (25 tests)
-python test_phase3.py
+.\test_phase3.ps1
 
 # Data quality report
-python verify_phase3.py
+go run verify_phase3.go
 ```
 
 **Deliverables:**

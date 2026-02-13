@@ -16,9 +16,9 @@ Phase 3 of the Precision Scheduled Railroading (PSR) example has been successful
 - **test_stg_clm_enriched.sql** - 15 data quality tests for enriched staging (all passing)
 
 ### 3. Build Infrastructure
-- **build_phase3.py** - Python build script (workaround for gorchata infrastructure issues)
-- **test_phase3.py** - Python test runner
-- **verify_phase3.py** - Data quality verification report
+- **build_phase3.ps1** - PowerShell build script
+- **test_phase3.ps1** - PowerShell test runner
+- **verify_phase3.go** - Go program for data quality verification
 - **raw_clm_events.csv** - Test seed data (50 events, 10 cars, 3 days)
 
 ## Implementation Details
@@ -118,7 +118,7 @@ Event Sequencing:
 ### SQLite-Specific Considerations
 1. **Timestamp Storage:** SQLite stores timestamps as TEXT. Used native string format 'YYYY-MM-DD HH:MM:SS' instead of CAST AS TIMESTAMP which truncates to year.
 2. **Date Casting:** Used DATE() function instead of CAST(... AS DATE) for proper date extraction.
-3. **Custom Functions:** Registered LEAST/GREATEST functions in Python for dim_location shadow yard risk calculation.
+3. **Custom Functions:** Shadow yard risk calculation uses SQLite's built-in MIN/MAX functions.
 
 ### TDD Workflow Followed
 1. ✅ Created test directory structure
@@ -137,10 +137,10 @@ Event Sequencing:
 ## Infrastructure Workaround
 
 **Issue:** Gorchata's model loading appears to have infrastructure issues ("no models found").
-**Solution:** Created Python-based build/test scripts using built-in sqlite3:
-- `build_phase3.py` - Processes templates and executes SQL
-- `test_phase3.py` - Runs test queries and reports violations
-- `verify_phase3.py` - Generates data quality report
+**Solution:** Created PowerShell and Go-based build/test scripts:
+- `build_phase3.ps1` - Processes templates and executes SQL
+- `test_phase3.ps1` - Runs test queries and reports violations
+- `verify_phase3.go` - Go program that generates data quality report
 
 These scripts faithfully implement gorchata's template syntax processing:
 - `{{ config "materialized" "table|view" }}` → (removed, handled by CREATE TABLE AS)
@@ -181,9 +181,9 @@ examples/precision_railroading/
 │       └── test_stg_clm_enriched.sql   (NEW)
 ├── seeds/
 │   └── raw_clm_events.csv              (NEW - test data)
-├── build_phase3.py                     (NEW - build script)
-├── test_phase3.py                      (NEW - test runner)
-└── verify_phase3.py                    (NEW - QA report)
+├── build_phase3.ps1                    (NEW - PowerShell build script)
+├── test_phase3.ps1                     (NEW - PowerShell test runner)
+└── verify_phase3.go                    (NEW - Go QA report)
 ```
 
 ---
