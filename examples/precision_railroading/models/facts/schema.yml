@@ -1,0 +1,391 @@
+version: 2
+
+models:
+  - name: fact_trip
+    description: |
+      Trip fact table - core grain-level fact capturing railcar trips from origin to destination.
+      Each row represents one trip segment, either loaded or empty.
+    columns:
+      - name: trip_segment_id
+        description: Surrogate key for the trip (from int_trip_segments)
+        tests:
+          - not_null
+          - unique
+
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+
+      - name: train_id
+        description: Foreign key to dim_train (surrogate key)
+        tests:
+          - relationships:
+              to: ref('dim_train')
+              field: train_id
+
+      - name: corridor_id
+        description: Foreign key to dim_corridor (NULL if no corridor match)
+        tests:
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+
+      - name: origin_location_id
+        description: Foreign key to dim_location for trip origin
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+
+      - name: destination_location_id
+        description: Foreign key to dim_location for trip destination
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+
+      - name: trip_start_date_id
+        description: Foreign key to dim_date (YYYYMMDD format)
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+
+      - name: trip_start_timestamp
+        description: Trip start timestamp (minute precision)
+        tests:
+          - not_null
+
+      - name: trip_end_timestamp
+        description: Trip end timestamp (minute precision)
+        tests:
+          - not_null
+
+      - name: distance_miles
+        description: Trip distance in miles (from velocity vectors, NULL if no match)
+
+      - name: duration_minutes
+        description: Trip duration in minutes (end - start)
+        tests:
+          - not_null
+
+      - name: average_velocity_mph
+        description: Average velocity in miles per hour (NULL if no velocity data)
+
+      - name: trip_type
+        description: Trip classification - 'loaded' or 'empty'
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['loaded', 'empty']
+
+      - name: dwell_count
+        description: Number of dwell events during this trip
+        tests:
+          - not_null
+
+      - name: stop_count
+        description: Synonym for dwell_count (distinct stop locations)
+        tests:
+          - not_null
+
+      - name: psr_period
+        description: PSR implementation period - 'pre-PSR', 'transition', or 'mature'
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['pre-PSR', 'transition', 'mature']
+
+    meta:
+      grain: One row per trip segment (origin to destination movement)
+      business_logic: |
+        - Joins int_trip_segments with dimensions for FKs
+        - Enriches with velocity metrics from int_velocity_vectors
+        - Counts dwells occurring during trip time window
+        - Matches corridors via origin/destination SPLC codes
+        - Normalizes trip_type from is_loaded_trip boolean
+        - Normalizes psr_period from source ('mature_psr' -> 'mature')
+
+  - name: fact_dwell
+    description: |
+      Dwell fact table - grain-level fact capturing stop events with shadow yard classifications.
+      Each row represents one dwell (stop) at a location.
+    columns:
+      - name: dwell_id
+        description: Surrogate key for the dwell event
+        tests:
+          - not_null
+          - unique
+
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+
+      - name: location_id
+        description: Foreign key to dim_location
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+
+      - name: dwell_start_date_id
+        description: Foreign key to dim_date (YYYYMMDD format)
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+
+      - name: dwell_start_timestamp
+        description: Dwell start timestamp (minute precision)
+        tests:
+          - not_null
+
+      - name: dwell_end_timestamp
+        description: Dwell end timestamp (minute precision)
+        tests:
+          - not_null
+
+      - name: dwell_duration_minutes
+        description: Dwell duration in minutes
+        tests:
+          - not_null
+
+      - name: facility_type
+        description: Type of facility (from dim_location)
+        tests:
+          - not_null
+
+      - name: dwell_classification
+        description: Operational classification of the dwell
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['shadow_yard_hold', 'crew_change', 'terminal', 'maintenance', 'mainline_hold', 'unclassified']
+
+      - name: shadow_yard_flag
+        description: Shadow yard indicator (1 = shadow yard, 0 = not)
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+      - name: is_loaded
+        description: Car loaded flag (1 = loaded, 0 = empty)
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+      - name: event_type_at_arrival
+        description: CLM event type at dwell arrival
+        tests:
+          - not_null
+
+      - name: event_type_at_departure
+        description: CLM event type at dwell departure
+        tests:
+          - not_null
+
+      - name: psr_period
+        description: PSR implementation period derived from timestamp
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['pre-PSR', 'transition', 'mature']
+
+    meta:
+      grain: One row per dwell event (stop at a location)
+      business_logic: |
+        - Sources data from int_dwell_classification
+        - Preserves all classification logic (shadow yard detection)
+        - Derives psr_period from dwell_start_timestamp
+        - 2016-2017: 'pre-PSR'
+        - 2018-2020: 'transition'
+        - 2021-2025: 'mature'
+        - Shadow yard flag and classification must be consistent
+
+  - name: fact_stop_classification
+    description: |
+      Stop classification fact table - aggregates dwell events by trip and classification type.
+      Each row represents one trip with counts of each stop type encountered.
+    columns:
+      - name: trip_segment_id
+        description: Foreign key to fact_trip
+        tests:
+          - not_null
+          - relationships:
+              to: ref('fact_trip')
+              field: trip_segment_id
+
+      - name: railcar_id
+        description: Foreign key to dim_railcar
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_railcar')
+              field: railcar_id
+
+      - name: trip_start_timestamp
+        description: Trip start timestamp
+        tests:
+          - not_null
+
+      - name: trip_end_timestamp
+        description: Trip end timestamp
+        tests:
+          - not_null
+
+      - name: total_stops
+        description: Total number of stops during trip
+        tests:
+          - not_null
+
+      - name: shadow_yard_stops
+        description: Count of shadow yard stops
+        tests:
+          - not_null
+
+      - name: crew_change_stops
+        description: Count of crew change stops
+        tests:
+          - not_null
+
+      - name: terminal_stops
+        description: Count of terminal stops
+        tests:
+          - not_null
+
+      - name: mainline_stops
+        description: Count of mainline hold stops
+        tests:
+          - not_null
+
+      - name: maintenance_stops
+        description: Count of maintenance stops
+        tests:
+          - not_null
+
+      - name: unclassified_stops
+        description: Count of unclassified stops
+        tests:
+          - not_null
+
+      - name: total_dwell_minutes
+        description: Total dwell time during trip in minutes
+        tests:
+          - not_null
+
+      - name: psr_period
+        description: PSR implementation period
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['pre-PSR', 'transition', 'mature']
+
+    meta:
+      grain: One row per trip (aggregated stop metrics)
+      business_logic: |
+        - Joins fact_trip to fact_dwell on railcar and time window
+        - Dwells matched where: dwell_start >= trip_start AND dwell_end <= trip_end
+        - Aggregates counts by dwell_classification
+        - Total_stops must equal sum of individual stop type counts
+        - Handles trips with zero stops (LEFT JOIN ensures trip appears)
+
+  - name: fact_corridor_transit
+    description: |
+      Corridor transit fact table - aggregates trip metrics by corridor and time period.
+      Each row represents one corridor in one week with traffic statistics.
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+
+      - name: time_period
+        description: Time period identifier (YYYY-WWW format, e.g., '2024-W01')
+        tests:
+          - not_null
+
+      - name: year
+        description: Year portion of time period
+        tests:
+          - not_null
+
+      - name: week_number
+        description: Week number within year
+        tests:
+          - not_null
+
+      - name: car_count
+        description: Distinct number of railcars in period
+        tests:
+          - not_null
+
+      - name: trip_count
+        description: Total number of trips in period
+        tests:
+          - not_null
+
+      - name: loaded_trip_count
+        description: Number of loaded trips
+        tests:
+          - not_null
+
+      - name: empty_trip_count
+        description: Number of empty trips
+        tests:
+          - not_null
+
+      - name: total_distance_miles
+        description: Sum of trip distances in miles
+        tests:
+          - not_null
+
+      - name: total_duration_minutes
+        description: Sum of trip durations in minutes
+        tests:
+          - not_null
+
+      - name: average_velocity_mph
+        description: Average velocity across all trips (total_distance / total_duration * 60)
+
+      - name: average_trip_duration_minutes
+        description: Average trip duration in minutes
+        tests:
+          - not_null
+
+      - name: average_dwell_count
+        description: Average number of dwells per trip
+        tests:
+          - not_null
+
+      - name: psr_period
+        description: Dominant PSR period in the time window
+        tests:
+          - not_null
+
+    meta:
+      grain: One row per corridor per week
+      business_logic: |
+        - Sources from fact_trip
+        - Groups by corridor_id and weekly time period (STRFTIME('%Y-W%W', ...))
+        - Excludes trips with NULL corridor_id
+        - Aggregates: car count (distinct), trip counts by type, distance, duration
+        - Calculates average velocity from totals (distance/duration * 60)
+        - If no trips have corridor assignments, table will be empty
