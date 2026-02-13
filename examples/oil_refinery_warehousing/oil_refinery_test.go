@@ -1116,10 +1116,10 @@ func TestUnitProductionHasRequiredColumns(t *testing.T) {
 // TestVolumeYieldCalculation verifies volume yield percentage calculation formula
 func TestVolumeYieldCalculation(t *testing.T) {
 	tests := []struct {
-		name              string
-		productVolume     float64
-		feedVolume        float64
-		expectedYieldPct  float64
+		name             string
+		productVolume    float64
+		feedVolume       float64
+		expectedYieldPct float64
 	}{
 		{"CDU Normal Yield", 95000.0, 100000.0, 95.0},
 		{"FCC Volumetric Expansion", 106500.0, 100000.0, 106.5},
@@ -1144,10 +1144,10 @@ func TestVolumeYieldCalculation(t *testing.T) {
 // TestWeightYieldCalculation verifies weight yield percentage calculation formula
 func TestWeightYieldCalculation(t *testing.T) {
 	tests := []struct {
-		name              string
-		productWeight     float64
-		feedWeight        float64
-		expectedYieldPct  float64
+		name             string
+		productWeight    float64
+		feedWeight       float64
+		expectedYieldPct float64
 	}{
 		{"CDU Weight Conservation", 9850.0, 10000.0, 98.5},
 		{"FCC Weight Loss (Coke)", 9650.0, 10000.0, 96.5},
@@ -1172,13 +1172,13 @@ func TestWeightYieldCalculation(t *testing.T) {
 // TestYieldSumValidation verifies yield sums are within physical constraints
 func TestYieldSumValidation(t *testing.T) {
 	tests := []struct {
-		name                 string
-		unitType             string
-		productYields        []float64
-		expectedVolMin       float64
-		expectedVolMax       float64
-		expectedWgtMin       float64
-		expectedWgtMax       float64
+		name           string
+		unitType       string
+		productYields  []float64
+		expectedVolMin float64
+		expectedVolMax float64
+		expectedWgtMin float64
+		expectedWgtMax float64
 	}{
 		{
 			"CDU Volume Conservation",
@@ -1191,8 +1191,8 @@ func TestYieldSumValidation(t *testing.T) {
 			"FCC Volumetric Expansion",
 			"FCC",
 			[]float64{4.0, 18.0, 51.0, 20.0, 14.0}, // Total: 107% (volumetric expansion)
-			105.0, 110.0, // Volume can exceed 100% when accounting for density changes
-			95.0, 98.0,   // Weight always < 100%
+			105.0, 110.0,                           // Volume can exceed 100% when accounting for density changes
+			95.0, 98.0, // Weight always < 100%
 		},
 		{
 			"Hydrocracker Normal Conversion",
@@ -1205,8 +1205,8 @@ func TestYieldSumValidation(t *testing.T) {
 			"Reformer Hydrogen Production",
 			"Reformer",
 			[]float64{2.5, 88.0}, // Product yields, H2 separate
-			90.0, 93.0,  // Volume loss
-			88.0, 91.0,  // Weight loss due to H2
+			90.0, 93.0,           // Volume loss
+			88.0, 91.0, // Weight loss due to H2
 		},
 	}
 
@@ -1239,7 +1239,7 @@ func TestConversionPercentageCalculation(t *testing.T) {
 	tests := []struct {
 		name               string
 		unitType           string
-		lightProducts      float64  // Products lighter than cutpoint
+		lightProducts      float64 // Products lighter than cutpoint
 		feedVolume         float64
 		expectedConversion float64
 	}{
@@ -1278,23 +1278,23 @@ func TestFCCVolumetricExpansion(t *testing.T) {
 	}{
 		{
 			"FCC Typical Expansion",
-			45000.0,  // Feed
-			1800.0,   // Gas (4%)
-			7650.0,   // LPG (17%)
-			22500.0,  // Gasoline (50%)
-			7650.0,   // LCO (17%)
-			3150.0,   // Slurry (7%)
-			42750.0,  // Total liquid products
-			95.0,     // 95% + coke (not volumetric)
+			45000.0, // Feed
+			1800.0,  // Gas (4%)
+			7650.0,  // LPG (17%)
+			22500.0, // Gasoline (50%)
+			7650.0,  // LCO (17%)
+			3150.0,  // Slurry (7%)
+			42750.0, // Total liquid products
+			95.0,    // 95% + coke (not volumetric)
 		},
 		{
 			"FCC High Conversion - Expansion",
 			45000.0,
-			2025.0,   // Gas (4.5%)
-			7875.0,   // LPG (17.5%)
-			23400.0,  // Gasoline (52%)
-			7425.0,   // LCO (16.5%)
-			2925.0,   // Slurry (6.5%)
+			2025.0,  // Gas (4.5%)
+			7875.0,  // LPG (17.5%)
+			23400.0, // Gasoline (52%)
+			7425.0,  // LCO (16.5%)
+			2925.0,  // Slurry (6.5%)
 			43650.0,
 			97.0,
 		},
@@ -1303,16 +1303,16 @@ func TestFCCVolumetricExpansion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Calculate total volume yield (excluding coke which is solid)
-			totalVolume := tt.gasVolume + tt.lpgVolume + tt.gasolineVolume + 
+			totalVolume := tt.gasVolume + tt.lpgVolume + tt.gasolineVolume +
 				tt.lcoVolume + tt.slurryVolume
-			
+
 			if totalVolume != tt.expectedTotalVolume {
 				t.Errorf("Total volume calculation failed: got %.0f bbl, want %.0f bbl",
 					totalVolume, tt.expectedTotalVolume)
 			}
 
 			yieldPct := (totalVolume / tt.feedVolume) * 100.0
-			
+
 			// For FCC, liquid volume yield is typically 95-98% (coke is separate)
 			// When accounting for density differences, apparent volume can be > 100%
 			if !floatEquals(yieldPct, tt.expectedYieldPct, 1.0) {
