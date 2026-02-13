@@ -1,0 +1,55 @@
+# Precision Scheduled Railroading (PSR) - CLM Generation Configuration
+# Simulates 10 years (2016-2025) of railcar location data showing gradual PSR adoption
+# Fleet: 12,000 railcars across 200 locations with minute-level precision
+
+version: 1
+
+# Fleet Configuration
+fleet:
+  total_cars: 12000
+  railroads:
+    - BNSF
+    - UP
+    - CSX
+    - NS
+    - CN
+    - CP
+    - KCS
+
+# Location Configuration
+locations:
+  total_locations: 200
+  terminals: 18           # Major terminals (15-20)
+  interchanges: 35        # Interchange points (30-40)
+  yards: 45               # Classification yards (40-50)
+  customer_sites: 55      # Customer facilities (50-60)
+  sidings: 47             # Sidings and passing tracks (40-50)
+  shadow_yards:
+    count: 6              # Subtle shadow yards requiring analytical detection (5-7)
+
+# Time Window
+time_window:
+  start_date: "2016-01-01"
+  duration_days: 3653     # 10 years + 3 leap days
+
+# PSR Adoption Periods
+psr:
+  pre_psr_end: "2017-12-31"       # Pre-PSR baseline period
+  transition_end: "2020-12-31"    # PSR transition and implementation
+  mature_start: "2021-01-01"      # Mature PSR operations
+
+# Seasonal Variation
+seasonal:
+  variation_percent: 25   # 25% variation between winter and summer
+
+# Output Configuration
+output:
+  filename: "raw_clm_events.csv"
+  headers:
+    - event_id
+    - car_number
+    - timestamp
+    - event_type
+    - splc_code
+    - train_id
+    - location_name

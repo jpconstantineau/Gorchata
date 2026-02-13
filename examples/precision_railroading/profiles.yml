@@ -1,0 +1,10 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: sqlite
+      database: "target/precision_railroading.db"
+    
+    prod:
+      type: sqlite
+      database: "production/precision_railroading.db"
