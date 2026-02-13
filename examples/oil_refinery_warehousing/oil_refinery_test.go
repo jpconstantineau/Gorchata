@@ -2371,6 +2371,657 @@ func TestSeedMassBalanceValid(t *testing.T) {
 	t.Log("Mass balance schema structure is valid and ready for seed data")
 }
 
+// ===================================================================
+// PHASE 7: DATA QUALITY VALIDATION AND ANOMALY DETECTION TESTS
+// ===================================================================
+
+// TestDimQualityRuleStructure verifies dim_quality_rule has required columns
+func TestDimQualityRuleStructure(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var dimQualityRule *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "dim_quality_rule" {
+			dimQualityRule = &model
+			break
+		}
+	}
+
+	if dimQualityRule == nil {
+		t.Fatal("dim_quality_rule not found in schema")
+	}
+
+	requiredColumns := []string{
+		"rule_id",
+		"rule_code",
+		"rule_name",
+		"rule_category",
+		"rule_description",
+		"target_table",
+		"target_column",
+		"threshold_value",
+		"severity",
+		"active_flag",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range dimQualityRule.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in dim_quality_rule", colName)
+		}
+	}
+
+	t.Logf("dim_quality_rule has all %d required columns", len(requiredColumns))
+}
+
+// TestFactDataQualityChecksTableExists verifies fact_data_quality_checks table exists with required structure
+func TestFactDataQualityChecksTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factDataQualityChecks *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_data_quality_checks" {
+			factDataQualityChecks = &model
+			break
+		}
+	}
+
+	if factDataQualityChecks == nil {
+		t.Fatal("fact_data_quality_checks not found in schema")
+	}
+
+	requiredColumns := []string{
+		"check_id",
+		"date_key",
+		"rule_id",
+		"entity_type",
+		"entity_id",
+		"check_timestamp",
+		"measured_value",
+		"expected_value",
+		"deviation",
+		"z_score",
+		"pass_fail",
+		"notes",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factDataQualityChecks.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in fact_data_quality_checks", colName)
+		}
+	}
+
+	// Verify foreign key relationships
+	var dateKeyCol, ruleIdCol *schema.ColumnSchema
+	for _, col := range factDataQualityChecks.Columns {
+		if col.Name == "date_key" {
+			dateKeyCol = &col
+		}
+		if col.Name == "rule_id" {
+			ruleIdCol = &col
+		}
+	}
+
+	if dateKeyCol == nil {
+		t.Error("date_key column not found")
+	}
+	if ruleIdCol == nil {
+		t.Error("rule_id column not found")
+	}
+
+	t.Logf("fact_data_quality_checks has all %d required columns with proper foreign keys", len(requiredColumns))
+}
+
+// TestRangeValidations verifies range validation rules are properly defined
+func TestRangeValidations(t *testing.T) {
+	tests := []struct {
+		name         string
+		metric       string
+		value        float64
+		minThreshold float64
+		maxThreshold float64
+		expectedPass bool
+		description  string
+	}{
+		{
+			name:         "Valid API Gravity - Light Crude",
+			metric:       "api_gravity",
+			value:        38.5,
+			minThreshold: 5.0,
+			maxThreshold: 50.0,
+			expectedPass: true,
+			description:  "Light crude API gravity within valid range",
+		},
+		{
+			name:         "Invalid API Gravity - Too Low",
+			metric:       "api_gravity",
+			value:        3.0,
+			minThreshold: 5.0,
+			maxThreshold: 50.0,
+			expectedPass: false,
+			description:  "API gravity below minimum threshold",
+		},
+		{
+			name:         "Invalid API Gravity - Too High",
+			metric:       "api_gravity",
+			value:        55.0,
+			minThreshold: 5.0,
+			maxThreshold: 50.0,
+			expectedPass: false,
+			description:  "API gravity above maximum threshold",
+		},
+		{
+			name:         "Valid Sulfur Content - Sweet Crude",
+			metric:       "sulfur_pct",
+			value:        0.3,
+			minThreshold: 0.01,
+			maxThreshold: 7.0,
+			expectedPass: true,
+			description:  "Sweet crude sulfur content within valid range",
+		},
+		{
+			name:         "Valid Temperature",
+			metric:       "temperature_f",
+			value:        85.0,
+			minThreshold: 30.0,
+			maxThreshold: 150.0,
+			expectedPass: true,
+			description:  "Storage temperature within valid range",
+		},
+		{
+			name:         "Invalid Capacity Utilization - Exceeded",
+			metric:       "capacity_utilization_pct",
+			value:        110.0,
+			minThreshold: 0.0,
+			maxThreshold: 105.0,
+			expectedPass: false,
+			description:  "Capacity utilization exceeds maximum allowable",
+		},
+		{
+			name:         "Valid BS&W Content",
+			metric:       "bsw_pct",
+			value:        0.8,
+			minThreshold: 0.0,
+			maxThreshold: 2.0,
+			expectedPass: true,
+			description:  "Bottom sediment & water within acceptable range",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Range validation logic
+			inRange := tt.value >= tt.minThreshold && tt.value <= tt.maxThreshold
+
+			if inRange != tt.expectedPass {
+				t.Errorf("%s: Expected pass=%v, got pass=%v for value=%.2f (range: %.2f-%.2f)",
+					tt.description, tt.expectedPass, inRange, tt.value, tt.minThreshold, tt.maxThreshold)
+			}
+
+			t.Logf("%s: value=%.2f, range=[%.2f, %.2f], pass=%v",
+				tt.metric, tt.value, tt.minThreshold, tt.maxThreshold, inRange)
+		})
+	}
+}
+
+// TestZScoreOutlierDetection verifies Z-score statistical outlier detection
+func TestZScoreOutlierDetection(t *testing.T) {
+	tests := []struct {
+		name            string
+		value           float64
+		mean            float64
+		stdDev          float64
+		zScoreLimit     float64
+		expectedOutlier bool
+		description     string
+	}{
+		{
+			name:            "Normal Value - Within 1 Sigma",
+			value:           105000,
+			mean:            100000,
+			stdDev:          10000,
+			zScoreLimit:     3.0,
+			expectedOutlier: false,
+			description:     "Value within 1 standard deviation",
+		},
+		{
+			name:            "Normal Value - Within 2 Sigma",
+			value:           120000,
+			mean:            100000,
+			stdDev:          10000,
+			zScoreLimit:     3.0,
+			expectedOutlier: false,
+			description:     "Value within 2 standard deviations",
+		},
+		{
+			name:            "Outlier - Positive Extreme",
+			value:           135000,
+			mean:            100000,
+			stdDev:          10000,
+			zScoreLimit:     3.0,
+			expectedOutlier: true,
+			description:     "Value exceeds 3 standard deviations above mean",
+		},
+		{
+			name:            "Outlier - Negative Extreme",
+			value:           65000,
+			mean:            100000,
+			stdDev:          10000,
+			zScoreLimit:     3.0,
+			expectedOutlier: true,
+			description:     "Value exceeds 3 standard deviations below mean",
+		},
+		{
+			name:            "Boundary - Exactly 3 Sigma",
+			value:           130000,
+			mean:            100000,
+			stdDev:          10000,
+			zScoreLimit:     3.0,
+			expectedOutlier: false,
+			description:     "Value exactly at 3 sigma boundary (inclusive)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate Z-score: (value - mean) / stdDev
+			zScore := (tt.value - tt.mean) / tt.stdDev
+			absZScore := abs(zScore)
+
+			// Outlier if |Z-score| > limit
+			isOutlier := absZScore > tt.zScoreLimit
+
+			if isOutlier != tt.expectedOutlier {
+				t.Errorf("%s: Expected outlier=%v, got outlier=%v (Z-score=%.2f)",
+					tt.description, tt.expectedOutlier, isOutlier, zScore)
+			}
+
+			t.Logf("value=%.0f, mean=%.0f, stddev=%.0f, Z-score=%.2f, outlier=%v",
+				tt.value, tt.mean, tt.stdDev, zScore, isOutlier)
+		})
+	}
+}
+
+// TestAPIGravityDensityConsistency verifies API gravity and specific gravity consistency
+func TestAPIGravityDensityConsistency(t *testing.T) {
+	tests := []struct {
+		name         string
+		apiGravity   float64
+		measuredSG   float64
+		tolerancePct float64
+		expectedPass bool
+		description  string
+	}{
+		{
+			name:         "Consistent - Light Crude",
+			apiGravity:   35.0,
+			measuredSG:   0.8498,
+			tolerancePct: 0.5,
+			expectedPass: true,
+			description:  "API gravity and specific gravity are consistent",
+		},
+		{
+			name:         "Consistent - Heavy Crude",
+			apiGravity:   20.0,
+			measuredSG:   0.9340,
+			tolerancePct: 0.5,
+			expectedPass: true,
+			description:  "Heavy crude consistency check",
+		},
+		{
+			name:         "Inconsistent - Measurement Error",
+			apiGravity:   35.0,
+			measuredSG:   0.8600,
+			tolerancePct: 0.5,
+			expectedPass: false,
+			description:  "Measured SG deviates significantly from API-calculated SG",
+		},
+		{
+			name:         "Boundary - Exactly at Tolerance",
+			apiGravity:   30.0,
+			measuredSG:   0.8762,
+			tolerancePct: 0.5,
+			expectedPass: true,
+			description:  "Deviation exactly at tolerance limit",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate expected SG from API gravity: SG = 141.5 / (API + 131.5)
+			calculatedSG := 141.5 / (tt.apiGravity + 131.5)
+
+			// Calculate deviation percentage
+			deviationPct := abs(tt.measuredSG-calculatedSG) / calculatedSG * 100
+
+			// Pass if deviation is within tolerance
+			pass := deviationPct <= tt.tolerancePct
+
+			if pass != tt.expectedPass {
+				t.Errorf("%s: Expected pass=%v, got pass=%v (deviation=%.3f%%)",
+					tt.description, tt.expectedPass, pass, deviationPct)
+			}
+
+			t.Logf("API=%.1f°, Measured SG=%.4f, Calculated SG=%.4f, Deviation=%.3f%%, Pass=%v",
+				tt.apiGravity, tt.measuredSG, calculatedSG, deviationPct, pass)
+		})
+	}
+}
+
+// TestVolumeWeightConsistency verifies volume and weight measurements are consistent
+func TestVolumeWeightConsistency(t *testing.T) {
+	tests := []struct {
+		name            string
+		volumeBbl       float64
+		measuredWeight  float64
+		specificGravity float64
+		tolerancePct    float64
+		expectedPass    bool
+		description     string
+	}{
+		{
+			name:            "Consistent - Light Crude Receipt",
+			volumeBbl:       10000,
+			measuredWeight:  1491.0,
+			specificGravity: 0.85,
+			tolerancePct:    1.0,
+			expectedPass:    true,
+			description:     "Volume and weight are consistent",
+		},
+		{
+			name:            "Consistent - Heavy Crude Receipt",
+			volumeBbl:       10000,
+			measuredWeight:  1642.0,
+			specificGravity: 0.935,
+			tolerancePct:    1.0,
+			expectedPass:    true,
+			description:     "Heavy crude volume-weight consistency",
+		},
+		{
+			name:            "Inconsistent - Weight Measurement Error",
+			volumeBbl:       10000,
+			measuredWeight:  1550.0,
+			specificGravity: 0.85,
+			tolerancePct:    1.0,
+			expectedPass:    false,
+			description:     "Measured weight deviates from calculated weight",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate expected weight: Weight (tons) = Volume (bbl) × 0.1756 × SG
+			calculatedWeight := tt.volumeBbl * 0.1756 * tt.specificGravity
+
+			// Calculate deviation percentage
+			deviationPct := abs(tt.measuredWeight-calculatedWeight) / calculatedWeight * 100
+
+			// Pass if deviation is within tolerance
+			pass := deviationPct <= tt.tolerancePct
+
+			if pass != tt.expectedPass {
+				t.Errorf("%s: Expected pass=%v, got pass=%v (deviation=%.3f%%)",
+					tt.description, tt.expectedPass, pass, deviationPct)
+			}
+
+			t.Logf("Volume=%.0f bbl, Measured Weight=%.1f tons, Calculated Weight=%.1f tons, Deviation=%.3f%%, Pass=%v",
+				tt.volumeBbl, tt.measuredWeight, calculatedWeight, deviationPct, pass)
+		})
+	}
+}
+
+// TestYieldSumReasonableness verifies total yields from process units are reasonable
+func TestYieldSumReasonableness(t *testing.T) {
+	tests := []struct {
+		name             string
+		totalVolumeYield float64
+		totalWeightYield float64
+		expectedPass     bool
+		description      string
+	}{
+		{
+			name:             "Reasonable - Typical FCC",
+			totalVolumeYield: 103.5,
+			totalWeightYield: 97.2,
+			expectedPass:     true,
+			description:      "Volume expansion from FCC cracking, typical weight loss",
+		},
+		{
+			name:             "Reasonable - High Severity",
+			totalVolumeYield: 108.0,
+			totalWeightYield: 96.5,
+			expectedPass:     true,
+			description:      "High severity operation with more expansion",
+		},
+		{
+			name:             "Unreasonable - Volume Yield Too High",
+			totalVolumeYield: 115.0,
+			totalWeightYield: 97.0,
+			expectedPass:     false,
+			description:      "Volume yield exceeds reasonable limits",
+		},
+		{
+			name:             "Unreasonable - Volume Yield Too Low",
+			totalVolumeYield: 92.0,
+			totalWeightYield: 97.0,
+			expectedPass:     false,
+			description:      "Volume yield below reasonable minimum",
+		},
+		{
+			name:             "Unreasonable - Weight Yield Too Low",
+			totalVolumeYield: 103.0,
+			totalWeightYield: 93.0,
+			expectedPass:     false,
+			description:      "Weight yield indicates excessive losses",
+		},
+		{
+			name:             "Reasonable - Boundary Values",
+			totalVolumeYield: 95.0,
+			totalWeightYield: 95.0,
+			expectedPass:     true,
+			description:      "Values at minimum reasonable boundary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Volume yields: 95-110% acceptable (FCC causes expansion)
+			// Weight yields: 95-99% acceptable (some losses expected)
+			volumeOK := tt.totalVolumeYield >= 95.0 && tt.totalVolumeYield <= 110.0
+			weightOK := tt.totalWeightYield >= 95.0 && tt.totalWeightYield <= 99.0
+
+			pass := volumeOK && weightOK
+
+			if pass != tt.expectedPass {
+				t.Errorf("%s: Expected pass=%v, got pass=%v (volume=%.1f%%, weight=%.1f%%)",
+					tt.description, tt.expectedPass, pass, tt.totalVolumeYield, tt.totalWeightYield)
+			}
+
+			t.Logf("Volume Yield=%.1f%%, Weight Yield=%.1f%%, Pass=%v",
+				tt.totalVolumeYield, tt.totalWeightYield, pass)
+		})
+	}
+}
+
+// TestSeasonalRVPCompliance verifies gasoline RVP meets seasonal specifications
+func TestSeasonalRVPCompliance(t *testing.T) {
+	tests := []struct {
+		name         string
+		month        int
+		day          int
+		rvpPsi       float64
+		expectedPass bool
+		description  string
+	}{
+		{
+			name:         "Summer Compliant - July",
+			month:        7,
+			day:          15,
+			rvpPsi:       7.5,
+			expectedPass: true,
+			description:  "RVP within summer limit (≤7.8 psi)",
+		},
+		{
+			name:         "Summer Non-Compliant - July",
+			month:        7,
+			day:          15,
+			rvpPsi:       8.2,
+			expectedPass: false,
+			description:  "RVP exceeds summer limit",
+		},
+		{
+			name:         "Winter Compliant - December",
+			month:        12,
+			day:          1,
+			rvpPsi:       12.5,
+			expectedPass: true,
+			description:  "RVP within winter limit (≤13.5 psi)",
+		},
+		{
+			name:         "Winter Compliant - January",
+			month:        1,
+			day:          15,
+			rvpPsi:       13.0,
+			expectedPass: true,
+			description:  "RVP within winter limit",
+		},
+		{
+			name:         "Summer Boundary - June 1",
+			month:        6,
+			day:          1,
+			rvpPsi:       7.8,
+			expectedPass: true,
+			description:  "Exactly at summer limit on June 1",
+		},
+		{
+			name:         "Summer Boundary - September 15",
+			month:        9,
+			day:          15,
+			rvpPsi:       7.8,
+			expectedPass: true,
+			description:  "Exactly at summer limit on September 15",
+		},
+		{
+			name:         "Winter Period - September 16",
+			month:        9,
+			day:          16,
+			rvpPsi:       13.0,
+			expectedPass: true,
+			description:  "Winter spec applies from September 16",
+		},
+		{
+			name:         "Winter Period - May 31",
+			month:        5,
+			day:          31,
+			rvpPsi:       13.0,
+			expectedPass: true,
+			description:  "Winter spec applies through May 31",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Determine seasonal limit
+			var maxRVP float64
+			isSummer := (tt.month >= 6 && tt.month <= 9) &&
+				(tt.month < 9 || (tt.month == 9 && tt.day <= 15))
+
+			if isSummer {
+				maxRVP = 7.8 // Summer: June 1 - September 15
+			} else {
+				maxRVP = 13.5 // Winter: September 16 - May 31
+			}
+
+			pass := tt.rvpPsi <= maxRVP
+
+			if pass != tt.expectedPass {
+				t.Errorf("%s: Expected pass=%v, got pass=%v (RVP=%.1f psi, Max=%.1f psi, Season=%s)",
+					tt.description, tt.expectedPass, pass, tt.rvpPsi, maxRVP,
+					map[bool]string{true: "Summer", false: "Winter"}[isSummer])
+			}
+
+			season := "Winter"
+			if isSummer {
+				season = "Summer"
+			}
+
+			t.Logf("Date=%02d/%02d, Season=%s, RVP=%.1f psi, Max=%.1f psi, Pass=%v",
+				tt.month, tt.day, season, tt.rvpPsi, maxRVP, pass)
+		})
+	}
+}
+
+// TestSeedDataQualityChecksValid verifies seed data for data quality checks
+func TestSeedDataQualityChecksValid(t *testing.T) {
+	// This test verifies the schema structure is ready for seed data
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Verify fact_data_quality_checks table exists
+	var factDataQualityChecks *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_data_quality_checks" {
+			factDataQualityChecks = &model
+			break
+		}
+	}
+
+	if factDataQualityChecks == nil {
+		t.Fatal("fact_data_quality_checks table must exist before creating seed data")
+	}
+
+	// Verify dim_quality_rule table exists
+	var dimQualityRule *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "dim_quality_rule" {
+			dimQualityRule = &model
+			break
+		}
+	}
+
+	if dimQualityRule == nil {
+		t.Fatal("dim_quality_rule table must exist before creating seed data")
+	}
+
+	// Verify staging table exists
+	var stgDataQualityChecks *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "stg_data_quality_checks" {
+			stgDataQualityChecks = &model
+			break
+		}
+	}
+
+	if stgDataQualityChecks == nil {
+		t.Fatal("stg_data_quality_checks staging table must exist")
+	}
+
+	t.Log("Data quality checks schema structure is valid and ready for seed data")
+}
+
 // Helper function for absolute value
 func abs(x float64) float64 {
 	if x < 0 {

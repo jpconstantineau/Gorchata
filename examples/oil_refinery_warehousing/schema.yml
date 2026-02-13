@@ -433,6 +433,72 @@ models:
           - not_null
           - accepted_values:
               values: [0, 1]
+
+  - name: dim_quality_rule
+    description: "Data quality rule dimension defining validation rules for anomaly detection and compliance monitoring"
+    columns:
+      - name: rule_id
+        description: "Unique identifier for data quality rule"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: rule_code
+        description: "Unique rule code (e.g., RANGE_API_GRAVITY, ZSCORE_VOLUME, CONSISTENCY_SG_API)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: rule_name
+        description: "Human-readable name of the rule"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: rule_category
+        description: "Category of validation rule (Range, Outlier, Consistency, Seasonal, Trend)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Range', 'Outlier', 'Consistency', 'Seasonal', 'Trend']
+      
+      - name: rule_description
+        description: "Detailed description of the validation logic and purpose"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: target_table
+        description: "Target fact table to validate (e.g., fact_crude_receipts, fact_unit_operations)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: target_column
+        description: "Target column(s) to validate in the fact table"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: threshold_value
+        description: "Threshold value for the rule (e.g., max for range, sigma for Z-score, tolerance % for consistency)"
+      
+      - name: severity
+        description: "Severity level of rule violation (Critical, Warning, Info)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Warning', 'Info']
+      
+      - name: active_flag
+        description: "Flag indicating if rule is currently active (1=active, 0=inactive)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+  
   # ===================================================================
   # STAGING TABLES - Crude Oil Receipts
   # ===================================================================
@@ -1797,6 +1863,76 @@ models:
         description: "Optional notes explaining variances or investigation results"
 
   # ===================================================================
+  # FACT TABLES - Data Quality Checks (Phase 7)
+  # ===================================================================
+
+  - name: fact_data_quality_checks
+    description: "Fact table recording data quality validation results including range checks, outlier detection, and consistency validations"
+    columns:
+      - name: check_id
+        description: "Unique identifier for data quality check record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: rule_id
+        description: "Foreign key to dim_quality_rule defining which rule was checked"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_quality_rule
+              field: rule_id
+      
+      - name: entity_type
+        description: "Type of entity being validated (Crude, Product, Unit, Tank, Stream, etc.)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Crude', 'Product', 'Unit', 'Tank', 'Stream', 'Balance', 'Shipment']
+      
+      - name: entity_id
+        description: "Identifier of the specific entity being validated (e.g., receipt_id, unit_id, product_id)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: check_timestamp
+        description: "Timestamp when the quality check was performed (YYYY-MM-DD HH:MM:SS)"
+        data_tests:
+          - not_null
+      
+      - name: measured_value
+        description: "Actual measured or observed value from the data"
+      
+      - name: expected_value
+        description: "Expected or calculated value for comparison (NULL for range checks)"
+      
+      - name: deviation
+        description: "Absolute or percentage deviation from expected value"
+      
+      - name: z_score
+        description: "Statistical Z-score for outlier detection (NULL for non-statistical checks)"
+      
+      - name: pass_fail
+        description: "Result of the quality check (Pass, Fail, Warning)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pass', 'Fail', 'Warning']
+      
+      - name: notes
+        description: "Optional notes explaining the check result, investigation status, or resolution"
+
+  # ===================================================================
   # STAGING TABLES - Mass Balance (Phase 6)
   # ===================================================================
 
@@ -1882,4 +2018,74 @@ models:
       
       - name: notes
         description: "Optional notes"
+
+  # ===================================================================
+  # STAGING TABLES - Data Quality Checks (Phase 7)
+  # ===================================================================
+
+  - name: stg_data_quality_checks
+    description: "Staging table for data quality check results before transformation and aggregation"
+    columns:
+      - name: check_id
+        description: "Unique identifier for data quality check record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: rule_id
+        description: "Foreign key to dim_quality_rule defining which rule was checked"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_quality_rule
+              field: rule_id
+      
+      - name: entity_type
+        description: "Type of entity being validated (Crude, Product, Unit, Tank, Stream, etc.)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Crude', 'Product', 'Unit', 'Tank', 'Stream', 'Balance', 'Shipment']
+      
+      - name: entity_id
+        description: "Identifier of the specific entity being validated"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: check_timestamp
+        description: "Timestamp when the quality check was performed"
+        data_tests:
+          - not_null
+      
+      - name: measured_value
+        description: "Actual measured or observed value from the data"
+      
+      - name: expected_value
+        description: "Expected or calculated value for comparison"
+      
+      - name: deviation
+        description: "Absolute or percentage deviation from expected value"
+      
+      - name: z_score
+        description: "Statistical Z-score for outlier detection"
+      
+      - name: pass_fail
+        description: "Result of the quality check (Pass, Fail, Warning)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pass', 'Fail', 'Warning']
+      
+      - name: notes
+        description: "Optional notes explaining the check result"
 
