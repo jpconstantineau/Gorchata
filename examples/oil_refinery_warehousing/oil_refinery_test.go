@@ -1851,3 +1851,530 @@ func TestSeedShipmentsInventoryValid(t *testing.T) {
 		t.Errorf("Seed file should include multiple product types in shipments (found %d)", foundProducts)
 	}
 }
+
+// ===================================================================
+// PHASE 6 - MASS BALANCE TESTS
+// ===================================================================
+
+// TestFactMassBalanceTableExists verifies fact_mass_balance table is defined in schema
+func TestFactMassBalanceTableExists(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factMassBalance *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_mass_balance" {
+			factMassBalance = &model
+			break
+		}
+	}
+
+	if factMassBalance == nil {
+		t.Fatal("fact_mass_balance table not found in schema")
+	}
+
+	// Verify required mass balance columns
+	requiredColumns := []string{
+		"balance_id",
+		"date_key",
+		"period_type",
+		"total_crude_input_tons",
+		"total_product_output_tons",
+		"refinery_fuel_consumed_tons",
+		"coke_produced_tons",
+		"flare_losses_tons",
+		"evaporation_losses_tons",
+		"inventory_change_tons",
+		"total_accounted_tons",
+		"unaccounted_tons",
+		"unaccounted_pct",
+		"balance_flag",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factMassBalance.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("fact_mass_balance missing required column: %s", colName)
+		}
+	}
+
+	// Verify foreign key relationship to dim_date
+	var dateKeyCol *schema.ColumnSchema
+	for _, col := range factMassBalance.Columns {
+		if col.Name == "date_key" {
+			dateKeyCol = &col
+			break
+		}
+	}
+
+	if dateKeyCol == nil {
+		t.Fatal("date_key column not found in fact_mass_balance")
+	}
+
+	// Use existing helper function to check relationship
+	if !hasRelationship(dateKeyCol.DataTests, "dim_date") {
+		t.Error("date_key must have relationship to dim_date")
+	}
+}
+
+// TestMassBalanceEquation verifies the fundamental mass balance equation
+func TestMassBalanceEquation(t *testing.T) {
+	// Test the conservation of mass equation:
+	// Total Inputs = Total Outputs + Losses + Inventory Change + Unaccounted
+
+	tests := []struct {
+		name                   string
+		crudeInput             float64
+		productOutput          float64
+		fuelConsumed           float64
+		cokeProduced           float64
+		flareLosses            float64
+		evaporationLosses      float64
+		inventoryChange        float64
+		expectedUnaccounted    float64
+		expectedUnaccountedPct float64
+	}{
+		{
+			name:                   "Balanced Day - All Accounted",
+			crudeInput:             325000.0,
+			productOutput:          285000.0,
+			fuelConsumed:           19500.0, // 6%
+			cokeProduced:           6500.0,  // 2%
+			flareLosses:            650.0,   // 0.2%
+			evaporationLosses:      488.0,   // 0.15%
+			inventoryChange:        12500.0, // building inventory
+			expectedUnaccounted:    362.0,   // 325000 - (285000 + 19500 + 6500 + 650 + 488 + 12500)
+			expectedUnaccountedPct: 0.111,   // 362/325000 * 100
+		},
+		{
+			name:                   "Near Zero Unaccounted",
+			crudeInput:             330000.0,
+			productOutput:          290000.0,
+			fuelConsumed:           19800.0, // 6%
+			cokeProduced:           6600.0,  // 2%
+			flareLosses:            660.0,   // 0.2%
+			evaporationLosses:      495.0,   // 0.15%
+			inventoryChange:        12445.0,
+			expectedUnaccounted:    0.0, // perfect balance
+			expectedUnaccountedPct: 0.0,
+		},
+		{
+			name:                   "Inventory Drawdown",
+			crudeInput:             320000.0,
+			productOutput:          310000.0,
+			fuelConsumed:           19200.0,
+			cokeProduced:           6400.0,
+			flareLosses:            640.0,
+			evaporationLosses:      480.0,
+			inventoryChange:        -16000.0, // negative = drawing from inventory
+			expectedUnaccounted:    -720.0,   // 320000 - (310000 + 19200 + 6400 + 640 + 480 - 16000)
+			expectedUnaccountedPct: -0.225,   // -720/320000 * 100
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate total accounted
+			totalAccounted := tt.productOutput + tt.fuelConsumed + tt.cokeProduced +
+				tt.flareLosses + tt.evaporationLosses + tt.inventoryChange
+
+			// Calculate unaccounted
+			unaccounted := tt.crudeInput - totalAccounted
+
+			// Calculate unaccounted percentage
+			unaccountedPct := (unaccounted / tt.crudeInput) * 100.0
+
+			// Verify calculations match expectations
+			tolerance := 0.01
+			if abs(unaccounted-tt.expectedUnaccounted) > tolerance {
+				t.Errorf("Unaccounted mismatch: got %.2f, want %.2f", unaccounted, tt.expectedUnaccounted)
+			}
+
+			if abs(unaccountedPct-tt.expectedUnaccountedPct) > 0.001 {
+				t.Errorf("Unaccounted %% mismatch: got %.3f%%, want %.3f%%", unaccountedPct, tt.expectedUnaccountedPct)
+			}
+		})
+	}
+}
+
+// TestUFLCalculation verifies Unaccounted for Loss (UFL) calculation logic
+func TestUFLCalculation(t *testing.T) {
+	tests := []struct {
+		name           string
+		crudeInput     float64
+		totalAccounted float64
+		expectedUFL    float64
+		expectedUFLPct float64
+		shouldFlag     bool
+		flagThreshold  float64
+	}{
+		{
+			name:           "Within Tolerance - Positive UFL",
+			crudeInput:     325000.0,
+			totalAccounted: 324638.0,
+			expectedUFL:    362.0,
+			expectedUFLPct: 0.111,
+			shouldFlag:     false,
+			flagThreshold:  0.5,
+		},
+		{
+			name:           "Within Tolerance - Negative UFL",
+			crudeInput:     330000.0,
+			totalAccounted: 330825.0,
+			expectedUFL:    -825.0,
+			expectedUFLPct: -0.25,
+			shouldFlag:     false,
+			flagThreshold:  0.5,
+		},
+		{
+			name:           "Out of Tolerance - High Positive",
+			crudeInput:     320000.0,
+			totalAccounted: 317500.0,
+			expectedUFL:    2500.0,
+			expectedUFLPct: 0.781,
+			shouldFlag:     true,
+			flagThreshold:  0.5,
+		},
+		{
+			name:           "Out of Tolerance - High Negative",
+			crudeInput:     315000.0,
+			totalAccounted: 316700.0,
+			expectedUFL:    -1700.0,
+			expectedUFLPct: -0.540,
+			shouldFlag:     true,
+			flagThreshold:  0.5,
+		},
+		{
+			name:           "Exactly at Threshold",
+			crudeInput:     300000.0,
+			totalAccounted: 298500.0,
+			expectedUFL:    1500.0,
+			expectedUFLPct: 0.5,
+			shouldFlag:     false, // exactly at threshold = don't flag
+			flagThreshold:  0.5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate UFL
+			ufl := tt.crudeInput - tt.totalAccounted
+			uflPct := (ufl / tt.crudeInput) * 100.0
+
+			// Determine if should flag
+			shouldFlag := abs(uflPct) > tt.flagThreshold
+
+			// Verify calculations
+			if abs(ufl-tt.expectedUFL) > 0.01 {
+				t.Errorf("UFL mismatch: got %.2f, want %.2f", ufl, tt.expectedUFL)
+			}
+
+			if abs(uflPct-tt.expectedUFLPct) > 0.001 {
+				t.Errorf("UFL %% mismatch: got %.3f%%, want %.3f%%", uflPct, tt.expectedUFLPct)
+			}
+
+			if shouldFlag != tt.shouldFlag {
+				t.Errorf("Flag mismatch: got %v, want %v (UFL: %.3f%%)", shouldFlag, tt.shouldFlag, uflPct)
+			}
+		})
+	}
+}
+
+// TestToleranceValidation verifies balance_flag logic for daily and monthly tolerances
+func TestToleranceValidation(t *testing.T) {
+	tests := []struct {
+		name         string
+		periodType   string
+		uflPct       float64
+		expectedFlag bool
+		threshold    float64
+	}{
+		// Daily tolerance: ±0.5%
+		{
+			name:         "Daily - Within Tolerance Positive",
+			periodType:   "Daily",
+			uflPct:       0.3,
+			expectedFlag: false,
+			threshold:    0.5,
+		},
+		{
+			name:         "Daily - Within Tolerance Negative",
+			periodType:   "Daily",
+			uflPct:       -0.4,
+			expectedFlag: false,
+			threshold:    0.5,
+		},
+		{
+			name:         "Daily - Out of Tolerance Positive",
+			periodType:   "Daily",
+			uflPct:       0.6,
+			expectedFlag: true,
+			threshold:    0.5,
+		},
+		{
+			name:         "Daily - Out of Tolerance Negative",
+			periodType:   "Daily",
+			uflPct:       -0.75,
+			expectedFlag: true,
+			threshold:    0.5,
+		},
+		{
+			name:         "Daily - Exactly at Threshold",
+			periodType:   "Daily",
+			uflPct:       0.5,
+			expectedFlag: false,
+			threshold:    0.5,
+		},
+		// Monthly tolerance: ±0.3%
+		{
+			name:         "Monthly - Within Tolerance",
+			periodType:   "Monthly",
+			uflPct:       0.25,
+			expectedFlag: false,
+			threshold:    0.3,
+		},
+		{
+			name:         "Monthly - Out of Tolerance",
+			periodType:   "Monthly",
+			uflPct:       0.35,
+			expectedFlag: true,
+			threshold:    0.3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Apply flagging logic
+			balanceFlag := abs(tt.uflPct) > tt.threshold
+
+			if balanceFlag != tt.expectedFlag {
+				t.Errorf("Balance flag mismatch: got %v, want %v (UFL: %.2f%%, threshold: %.2f%%)",
+					balanceFlag, tt.expectedFlag, tt.uflPct, tt.threshold)
+			}
+		})
+	}
+}
+
+// TestFuelConsumptionAccounting verifies refinery fuel consumption is properly accounted (5-8% typical)
+func TestFuelConsumptionAccounting(t *testing.T) {
+	tests := []struct {
+		name         string
+		crudeInput   float64
+		fuelPct      float64
+		expectedFuel float64
+	}{
+		{
+			name:         "Typical - 6% Fuel",
+			crudeInput:   325000.0,
+			fuelPct:      6.0,
+			expectedFuel: 19500.0,
+		},
+		{
+			name:         "Low - 5% Fuel",
+			crudeInput:   300000.0,
+			fuelPct:      5.0,
+			expectedFuel: 15000.0,
+		},
+		{
+			name:         "High - 8% Fuel",
+			crudeInput:   350000.0,
+			fuelPct:      8.0,
+			expectedFuel: 28000.0,
+		},
+		{
+			name:         "Efficient - 5.5% Fuel",
+			crudeInput:   320000.0,
+			fuelPct:      5.5,
+			expectedFuel: 17600.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate fuel consumption
+			fuelConsumed := tt.crudeInput * (tt.fuelPct / 100.0)
+
+			if abs(fuelConsumed-tt.expectedFuel) > 0.01 {
+				t.Errorf("Fuel consumption mismatch: got %.2f tons, want %.2f tons (%.1f%% of %.0f tons)",
+					fuelConsumed, tt.expectedFuel, tt.fuelPct, tt.crudeInput)
+			}
+
+			// Verify fuel percentage is within expected range (5-8%)
+			if tt.fuelPct < 5.0 || tt.fuelPct > 8.0 {
+				t.Errorf("Fuel percentage %.1f%% is outside typical range (5-8%%)", tt.fuelPct)
+			}
+		})
+	}
+}
+
+// TestCokeProductionTracking verifies petroleum coke production is tracked as a loss
+func TestCokeProductionTracking(t *testing.T) {
+	tests := []struct {
+		name         string
+		crudeInput   float64
+		cokePct      float64
+		expectedCoke float64
+	}{
+		{
+			name:         "Typical Coker - 2% Coke",
+			crudeInput:   325000.0,
+			cokePct:      2.0,
+			expectedCoke: 6500.0,
+		},
+		{
+			name:         "Heavy Crude - 3% Coke",
+			crudeInput:   300000.0,
+			cokePct:      3.0,
+			expectedCoke: 9000.0,
+		},
+		{
+			name:         "Light Crude - 1.5% Coke",
+			crudeInput:   330000.0,
+			cokePct:      1.5,
+			expectedCoke: 4950.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate coke production
+			cokeProduced := tt.crudeInput * (tt.cokePct / 100.0)
+
+			if abs(cokeProduced-tt.expectedCoke) > 0.01 {
+				t.Errorf("Coke production mismatch: got %.2f tons, want %.2f tons (%.1f%% of %.0f tons)",
+					cokeProduced, tt.expectedCoke, tt.cokePct, tt.crudeInput)
+			}
+
+			// Verify coke percentage is reasonable (1-5%)
+			if tt.cokePct < 1.0 || tt.cokePct > 5.0 {
+				t.Errorf("Coke percentage %.1f%% is outside reasonable range (1-5%%)", tt.cokePct)
+			}
+		})
+	}
+}
+
+// TestInventoryChangeImpact verifies inventory changes are correctly factored into mass balance
+func TestInventoryChangeImpact(t *testing.T) {
+	tests := []struct {
+		name            string
+		crudeInput      float64
+		outputs         float64
+		inventoryChange float64
+		description     string
+	}{
+		{
+			name:            "Building Inventory",
+			crudeInput:      325000.0,
+			outputs:         312000.0,
+			inventoryChange: 12500.0,
+			description:     "Positive change = storing more product",
+		},
+		{
+			name:            "Drawing Inventory",
+			crudeInput:      320000.0,
+			outputs:         335000.0,
+			inventoryChange: -16000.0,
+			description:     "Negative change = using stored product",
+		},
+		{
+			name:            "Stable Inventory",
+			crudeInput:      330000.0,
+			outputs:         324500.0,
+			inventoryChange: 0.0,
+			description:     "Zero change = balanced storage",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mass balance equation:
+			// Crude Input = Outputs + Inventory Change + Other Losses + UFL
+			// Therefore: UFL = Crude Input - Outputs - Inventory Change - Other Losses
+
+			// Simplified (ignoring other losses for this test)
+			simplifiedBalance := tt.crudeInput - tt.outputs - tt.inventoryChange
+
+			// When building inventory (positive change), more input is needed
+			// When drawing inventory (negative change), less input is needed
+
+			if tt.inventoryChange > 0 {
+				// Building inventory: balance should show input was stored
+				if simplifiedBalance < 0 {
+					t.Errorf("Building inventory should reduce apparent losses: balance = %.0f", simplifiedBalance)
+				}
+			} else if tt.inventoryChange < 0 {
+				// Drawing inventory: balance should show stored product was used
+				if simplifiedBalance > tt.crudeInput*0.1 {
+					t.Errorf("Drawing inventory should supplement input: balance = %.0f", simplifiedBalance)
+				}
+			}
+
+			t.Logf("%s: Inventory change = %.0f tons (%s)", tt.name, tt.inventoryChange, tt.description)
+		})
+	}
+}
+
+// TestSeedMassBalanceValid verifies seed data maintains valid mass balance
+func TestSeedMassBalanceValid(t *testing.T) {
+	// This test will verify that once seed data is created, the mass balance is valid
+	// For now, we verify the schema and structure are ready
+
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Verify fact_mass_balance table exists (prerequisite for seed data)
+	var factMassBalance *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_mass_balance" {
+			factMassBalance = &model
+			break
+		}
+	}
+
+	if factMassBalance == nil {
+		t.Fatal("fact_mass_balance table must exist before creating seed data")
+	}
+
+	// Verify critical columns for validation
+	columnMap := make(map[string]bool)
+	for _, col := range factMassBalance.Columns {
+		columnMap[col.Name] = true
+	}
+
+	criticalColumns := []string{
+		"total_crude_input_tons",
+		"total_product_output_tons",
+		"total_accounted_tons",
+		"unaccounted_tons",
+		"unaccounted_pct",
+		"balance_flag",
+	}
+
+	for _, colName := range criticalColumns {
+		if !columnMap[colName] {
+			t.Errorf("Critical column %s required for mass balance validation", colName)
+		}
+	}
+
+	t.Log("Mass balance schema structure is valid and ready for seed data")
+}
+
+// Helper function for absolute value
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

@@ -503,6 +503,198 @@ Distribution:
 
 The Oil Refinery Data Warehouse will use mass balance principles to:
 
+### Phase 6: Mass Balance Fact Table (IMPLEMENTED)
+
+**Implementation Date**: Phase 6
+**Tables**: `fact_mass_balance`, `stg_mass_balance`
+**Transformation**: `transformations/mass_balance.sql`
+
+#### Mass Balance Equation
+
+The fundamental conservation of mass equation implemented in Phase 6:
+
+```
+Total Inputs = Total Outputs + Total Losses + Inventory Change + UFL
+```
+
+Rearranged to calculate Unaccounted For Loss (UFL):
+
+```
+UFL = Total Inputs - (Total Outputs + Total Losses + Inventory Change)
+```
+
+#### Component Breakdown
+
+**1. Total Crude Input (Weight Basis)**
+- Source: `fact_crude_receipts.weight_short_tons`
+- Aggregation: Daily sum of all crude receipts
+- Unit: Short tons
+- Typical Range: 300,000 - 350,000 tons/day for 100k BPD refinery
+
+**2. Total Product Output (Weight Basis)**
+- Source: `fact_unit_production.product_weight_tons`
+- Aggregation: Daily sum of all product outputs
+- Exclusion: Petroleum coke (tracked separately)
+- Unit: Short tons
+- Typical Range: 280,000 - 310,000 tons/day
+
+**3. Refinery Fuel Consumed**
+- Calculation: `Total_Crude_Input × 0.06` (6% typical)
+- Range: 5.0% - 8.0% of crude input
+- Factors affecting fuel consumption:
+  - Unit complexity (more processing = more fuel)
+  - Crude quality (heavy crude = more heat required)
+  - Energy efficiency (modern units use less fuel)
+  - Climate (cold weather = higher fuel use)
+
+**4. Coke Production**
+- Calculation: `Total_Crude_Input × 0.02` (2% typical)
+- Range: 1.0% - 5.0% of crude input
+- Units: FCC, Delayed Coker
+- Factors:
+  - Heavy crude → more coke
+  - Light crude → less coke
+  - FCC severity (higher severity = more coke)
+
+**5. Flare Losses**
+- Calculation: `Total_Crude_Input × 0.002` (0.2% typical)
+- Range: 0.1% - 0.3% of crude input
+- Sources:
+  - Emergency pressure relief
+  - Startup/shutdown purging
+  - Process upsets
+  - Off-spec product disposal
+
+**6. Evaporation Losses**
+- Calculation: `Total_Crude_Input × 0.0015` (0.15% typical)
+- Range: 0.1% - 0.2% of crude input
+- Sources:
+  - Tank breathing (thermal expansion)
+  - Loading operations (displacement vapor)
+  - Fugitive emissions (valves, seals)
+
+**7. Inventory Change**
+- Source: `fact_tank_inventory`
+- Calculation: `SUM(closing_balance - opening_balance)`
+- Unit: Converted from barrels to tons using average SG 0.85
+- Interpretation:
+  - Positive: Building inventory (accumulation)
+  - Negative: Drawing inventory (depletion)
+  - Near Zero: Balanced production/shipments
+
+**8. Unaccounted For Loss (UFL)**
+- Calculation: `Total_Inputs - Total_Accounted`
+- Percentage: `(UFL / Total_Inputs) × 100`
+- Target: < 0.5% daily, < 0.3% monthly
+- Quality Indicator:
+  - Excellent: < 0.5%
+  - Good: 0.5% - 1.0%
+  - Fair: 1.0% - 2.0%
+  - Poor: > 2.0% → Investigation required
+
+#### Tolerance Validation
+
+**Daily Tolerance: ±0.5%**
+- Threshold for triggering investigation
+- More lenient due to daily measurement noise
+- Flag calculation: `ABS(UFL_Pct) > 0.5`
+
+**Monthly Tolerance: ±0.3%**
+- Tighter threshold due to averaging effect
+- Sustained monthly variance indicates systematic issue
+- Flag calculation: `ABS(UFL_Pct) > 0.3`
+
+#### Example Calculation
+
+**Typical Day - Balanced Operations**
+
+```
+Date: 2025-01-15
+Crude Input: 325,000 tons
+
+Outputs and Losses:
+  Product Output:         285,000 tons (87.7%)
+  Fuel Consumed:           19,500 tons (6.0%)
+  Coke Produced:            6,500 tons (2.0%)
+  Flare Losses:               650 tons (0.2%)
+  Evaporation Losses:         488 tons (0.15%)
+  Inventory Change:        12,500 tons (building)
+  -------------------------------
+  Total Accounted:        324,638 tons (99.89%)
+
+Unaccounted:
+  UFL:                        362 tons
+  UFL %:                    0.111%  ✓ (within ±0.5%)
+  Balance Flag:             FALSE
+  Status:                   OK - Within tolerance
+```
+
+**Out-of-Tolerance Day - Investigation Required**
+
+```
+Date: 2025-01-22
+Crude Input: 330,000 tons
+
+Outputs and Losses:
+  Product Output:         290,000 tons (87.9%)
+  Fuel Consumed:           19,800 tons (6.0%)
+  Coke Produced:            6,600 tons (2.0%)
+  Flare Losses:               660 tons (0.2%)
+  Evaporation Losses:         495 tons (0.15%)
+  Inventory Change:        10,000 tons (building)
+  -------------------------------
+  Total Accounted:        327,555 tons (99.26%)
+
+Unaccounted:
+  UFL:                      2,445 tons
+  UFL %:                    0.741%  ⚠️ (exceeds ±0.5%)
+  Balance Flag:             TRUE
+  Status:                   INVESTIGATE
+
+Investigation Notes:
+- Check crude receipt meters (calibration due)
+- Review product shipment records for missing entries
+- Verify tank inventory corrections (temperature discrepancy noted)
+```
+
+#### Data Quality Rules
+
+**Schema Tests** (Implemented in `schema.yml`):
+
+1. **not_null**: All columns required
+2. **accepted_range**: Realistic bounds on all quantities
+3. **accepted_values**: Valid period types (Daily, Weekly, Monthly)
+4. **relationships**: Foreign key to `dim_date`
+
+**Business Rules**:
+
+1. **Total Accounted Validation**:
+   ```sql
+   total_accounted_tons = 
+       total_product_output_tons +
+       refinery_fuel_consumed_tons +
+       coke_produced_tons +
+       flare_losses_tons +
+       evaporation_losses_tons +
+       inventory_change_tons
+   ```
+
+2. **UFL Calculation Validation**:
+   ```sql
+   unaccounted_tons = total_crude_input_tons - total_accounted_tons
+   ```
+
+3. **Percentage Calculation Validation**:
+   ```sql
+   unaccounted_pct = (unaccounted_tons / total_crude_input_tons) × 100
+   ```
+
+4. **Flag Logic Validation**:
+   ```sql
+   balance_flag = ABS(unaccounted_pct) > 0.5  -- Daily
+   balance_flag = ABS(unaccounted_pct) > 0.3  -- Monthly
+   ```
+
 ### Phase 2-3: Fact Tables
 - **fact_daily_unit_production**: Record inputs, outputs, inventory changes by unit
 - **fact_crude_runs**: Crude receipts with blend ratios

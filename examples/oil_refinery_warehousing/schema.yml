@@ -1677,3 +1677,209 @@ models:
               min_value: 30
               max_value: 150
 
+  # ===================================================================
+  # FACT TABLES - Mass Balance (Phase 6)
+  # ===================================================================
+
+  - name: fact_mass_balance
+    description: "Daily refinery-wide mass balance tracking input/output reconciliation with conservation of mass validation"
+    columns:
+      - name: balance_id
+        description: "Unique identifier for mass balance record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: period_type
+        description: "Balance period type (Daily, Weekly, Monthly)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Daily', 'Weekly', 'Monthly']
+      
+      - name: total_crude_input_tons
+        description: "Total crude oil input in short tons (sum of all crude receipts)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500000
+      
+      - name: total_product_output_tons
+        description: "Total product output in short tons shipped (sum of all products from unit production)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 500000
+      
+      - name: refinery_fuel_consumed_tons
+        description: "Refinery fuel gas consumed for process heat in short tons (typical 5-8% of crude input)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 50000
+      
+      - name: coke_produced_tons
+        description: "Petroleum coke produced from coker/FCC units in short tons (typical 1-3% of crude input)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 20000
+      
+      - name: flare_losses_tons
+        description: "Flare losses from safety relief and venting in short tons (typical 0.1-0.3% of crude input)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000
+      
+      - name: evaporation_losses_tons
+        description: "Evaporation losses from tank breathing and loading in short tons (typical 0.1-0.2% of crude input)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 2000
+      
+      - name: inventory_change_tons
+        description: "Net inventory change in short tons (closing - opening balance, positive = building inventory)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -100000
+              max_value: 100000
+      
+      - name: total_accounted_tons
+        description: "Total accounted mass: Product Output + Fuel Consumed + Coke + Flare + Evaporation + Inventory Change"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 600000
+      
+      - name: unaccounted_tons
+        description: "Unaccounted for loss (UFL): Total Input - Total Accounted (should be near zero)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -10000
+              max_value: 10000
+      
+      - name: unaccounted_pct
+        description: "UFL as percentage of crude input: (Unaccounted / Total Input) × 100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: -2.0
+              max_value: 2.0
+      
+      - name: balance_flag
+        description: "TRUE if |unaccounted_pct| exceeds tolerance (Daily: ±0.5%, Monthly: ±0.3%), FALSE otherwise"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, true, false]
+      
+      - name: notes
+        description: "Optional notes explaining variances or investigation results"
+
+  # ===================================================================
+  # STAGING TABLES - Mass Balance (Phase 6)
+  # ===================================================================
+
+  - name: stg_mass_balance
+    description: "Staging table for daily mass balance before transformation and validation"
+    columns:
+      - name: balance_id
+        description: "Unique identifier for mass balance record"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: date_key
+        description: "Foreign key to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: dim_date
+              field: date_key
+      
+      - name: period_type
+        description: "Balance period type (Daily, Weekly, Monthly)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Daily', 'Weekly', 'Monthly']
+      
+      - name: total_crude_input_tons
+        description: "Total crude oil input in short tons"
+        data_tests:
+          - not_null
+      
+      - name: total_product_output_tons
+        description: "Total product output in short tons"
+        data_tests:
+          - not_null
+      
+      - name: refinery_fuel_consumed_tons
+        description: "Refinery fuel consumed in short tons"
+        data_tests:
+          - not_null
+      
+      - name: coke_produced_tons
+        description: "Petroleum coke produced in short tons"
+        data_tests:
+          - not_null
+      
+      - name: flare_losses_tons
+        description: "Flare losses in short tons"
+        data_tests:
+          - not_null
+      
+      - name: evaporation_losses_tons
+        description: "Evaporation losses in short tons"
+        data_tests:
+          - not_null
+      
+      - name: inventory_change_tons
+        description: "Net inventory change in short tons"
+        data_tests:
+          - not_null
+      
+      - name: total_accounted_tons
+        description: "Total accounted mass"
+        data_tests:
+          - not_null
+      
+      - name: unaccounted_tons
+        description: "Unaccounted for loss (UFL)"
+        data_tests:
+          - not_null
+      
+      - name: unaccounted_pct
+        description: "UFL as percentage"
+        data_tests:
+          - not_null
+      
+      - name: balance_flag
+        description: "TRUE if exceeds tolerance"
+        data_tests:
+          - not_null
+      
+      - name: notes
+        description: "Optional notes"
+
