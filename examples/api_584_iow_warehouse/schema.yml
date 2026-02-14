@@ -265,3 +265,74 @@ models:
           - accepted_range:
               min_value: 1
               max_value: 168
+
+  # ===================================================================
+  # STAGING LAYER - Raw Sensor Telemetry (Phase 2)
+  # ===================================================================
+  
+  - name: stg_sensor_readings
+    description: "Staging table for raw sensor telemetry data with 5-minute intervals (filtered for quality)"
+    columns:
+      - name: reading_id
+        description: "Surrogate key for sensor reading (unique identifier)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: timestamp
+        description: "Timestamp when reading was taken (5-minute intervals)"
+        data_tests:
+          - not_null
+      
+      - name: tag_id
+        description: "FK to dim_asset.tag_id (sensor tag identifier)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: tag_id
+      
+      - name: parameter_type
+        description: "Type of process parameter measured (Pressure, Temperature, pH, Flow)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+          - relationships:
+              to: ref('dim_parameter_type')
+              field: parameter_type
+      
+      - name: measured_value
+        description: "Actual sensor measurement value"
+        data_tests:
+          - not_null
+      
+      - name: data_quality_flag
+        description: "Data quality indicator (Good, Questionable, Bad, Substituted) - Bad readings filtered out"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Questionable', 'Substituted']
+      
+      - name: reading_date_key
+        description: "Date key for joining to dim_date (YYYYMMDD format)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      
+      - name: hour_of_day
+        description: "Hour of day (0-23) extracted from timestamp"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 23
+      
+      - name: is_excursion_candidate
+        description: "Boolean flag indicating value approaches or exceeds IOW limits (1=candidate, 0=normal)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
