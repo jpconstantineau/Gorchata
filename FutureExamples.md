@@ -11,9 +11,9 @@
 - [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Complete ✅*
 - [x] [Oil Refinery Data Transformation and Warehousing](examples/oil_refinery_warehousing/README.md) - *Complete ✅*
 - [x] [Precision Scheduled Railroading (PSR) Analytics](examples/precision_railroading/README.md) - *Complete ✅ (223+ tests, 110M events, Phase 1-10)*
+- [x] [API 584 IOW Data Warehouse](examples/api_584_iow_warehouse/README.md) - *Complete ✅ (44+ tests, 1.3M sensors, Feb 2026)* - Risk-Based Integrity Operating Window monitoring for refinery static equipment. 8-phase implementation: 5 dimensions, 18 models, 4 alert types, 6 analytical queries. 100 assets across 4 units (CDU/VDU/FCC/HCU) tracking 11 damage mechanisms with Area Under Curve damage calculation, health indices 0-100 scale, bad actor identification, and automated inspection scheduling. [Architecture](examples/api_584_iow_warehouse/ARCHITECTURE.md) | [Metrics](examples/api_584_iow_warehouse/METRICS.md)
 
 ### Future Examples 🔮
-- [-] **API 584 IOW Data Warehouse** - *Planning Complete ✅ ([Plan](plans/api-584-iow-warehouse-plan.md))* - 8-phase implementation: 100 assets, 5-year history, 5-min telemetry, damage metrics, automated alerts
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
 
