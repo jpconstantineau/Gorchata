@@ -13,7 +13,7 @@
 - [x] [Precision Scheduled Railroading (PSR) Analytics](examples/precision_railroading/README.md) - *Complete ✅ (223+ tests, 110M events, Phase 1-10)*
 
 ### Future Examples 🔮
-- [] API 584 IOW Data Warehouse
+- [-] **API 584 IOW Data Warehouse** - *Planning Complete ✅ ([Plan](plans/api-584-iow-warehouse-plan.md))* - 8-phase implementation: 100 assets, 5-year history, 5-min telemetry, damage metrics, automated alerts
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
 
