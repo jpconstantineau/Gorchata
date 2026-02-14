@@ -1,0 +1,5 @@
+parameter_type_key,parameter_type,units,normal_range_min,normal_range_max
+1,Pressure,psig,50,750
+2,Temperature,°F,300,950
+3,pH,pH units,5.0,9.0
+4,Flow,bbl/day,5000,85000

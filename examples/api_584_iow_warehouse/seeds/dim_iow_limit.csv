@@ -1,0 +1,13 @@
+limit_key,parameter_type,criticality_level,lower_limit,upper_limit,consequence_description
+1,Pressure,Critical,25,850,Immediate integrity threat - potential vessel rupture or blowout - shutdown required
+2,Pressure,Standard,40,800,Operating outside design envelope - accelerated fatigue damage - intervention within 24h
+3,Pressure,Informational,50,750,Advisory - approaching normal operating limits - increased monitoring recommended
+4,Temperature,Critical,250,1000,Critical overheat or subcooling - metallurgical damage imminent - emergency shutdown
+5,Temperature,Standard,275,975,Temperature excursion - creep damage or thermal shock likely - corrective action required
+6,Temperature,Informational,300,950,Temperature at edge of optimal range - verify heat balance and monitor trends
+7,pH,Critical,4.0,10.0,Severe corrosion environment - rapid material loss possible - immediate neutralization required
+8,pH,Standard,4.5,9.5,Corrosive conditions present - integrity at risk if sustained - adjust chemical treatment
+9,pH,Informational,5.0,9.0,pH drifting from optimal range - review injection systems and adjust as needed
+10,Flow,Critical,2500,95000,Critical flow deviation - potential operational upset or hydraulic damage - immediate action
+11,Flow,Standard,4000,90000,Flow outside recommended range - efficiency loss and equipment stress - restore normal flow
+12,Flow,Informational,5000,85000,Flow at boundaries - verify pump performance and system capacity

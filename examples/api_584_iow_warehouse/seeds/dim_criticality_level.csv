@@ -1,0 +1,4 @@
+criticality_key,criticality_level,description,response_time_hours
+1,Critical,Immediate integrity threat requiring urgent intervention - potential for equipment failure or safety incident within hours,1
+2,Standard,Operating outside best practice limits - integrity degradation likely if sustained - intervention required within shift,24
+3,Informational,Advisory level - equipment operating at edge of optimal range - monitor for trends and plan corrective action,168

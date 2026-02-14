@@ -1,0 +1,267 @@
+version: 2
+
+models:
+  # ===================================================================
+  # DIMENSION TABLES - API 584 IOW Data Warehouse
+  # Risk-Based Integrity Operating Window (IOW) Monitoring System
+  # ===================================================================
+  
+  - name: dim_date
+    description: "Date dimension for 5-year time series (2021-2025) with refinery-specific flags"
+    columns:
+      - name: date_key
+        description: "Surrogate key for date (YYYYMMDD format)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: full_date
+        description: "Full date value (YYYY-MM-DD)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Calendar year (2021-2025)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 2021
+              max_value: 2025
+      
+      - name: quarter
+        description: "Calendar quarter (1-4)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: month
+        description: "Calendar month (1-12)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      
+      - name: day_of_month
+        description: "Day of month (1-31)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 31
+      
+      - name: day_of_week
+        description: "Day of week (1=Monday, 7=Sunday)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      
+      - name: day_name
+        description: "Full day name (Monday, Tuesday, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: month_name
+        description: "Full month name (January, February, etc.)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: is_turnaround
+        description: "Flag indicating quarterly turnaround maintenance period (1=turnaround, 0=normal)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: is_summer_spec
+        description: "Flag indicating summer fuel specification period May-Sept (1=summer, 0=not summer)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: is_winter_spec
+        description: "Flag indicating winter fuel specification period Nov-March (1=winter, 0=not winter)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: dim_asset
+    description: "Static equipment asset dimension tracking 100 refinery assets across 4 process units"
+    columns:
+      - name: asset_key
+        description: "Surrogate key for asset (1-100)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 100
+      
+      - name: tag_id
+        description: "Unique sensor tag identifier (e.g., CDU-001-PT, VDU-015-TT)"
+        data_tests:
+          - unique
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_name
+        description: "Full equipment name (e.g., Atmospheric Column C-101)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: system_name
+        description: "Process system name (e.g., Crude Distillation System)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Parent unit name (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: design_life_years
+        description: "Design life in years (typically 20-40 years)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 15
+              max_value: 50
+      
+      - name: install_date
+        description: "Installation date (between 2000-2015)"
+        data_tests:
+          - not_null
+      
+      - name: material_grade
+        description: "Material specification (e.g., CS A106 Gr B, SS 316L, 9Cr-1Mo)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: damage_mechanism_primary
+        description: "Primary damage mechanism per API 571 (e.g., Sulfidation, Naphthenic Acid Corrosion, Hydrogen Attack)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: damage_mechanism_secondary
+        description: "Secondary damage mechanism (nullable)"
+
+  - name: dim_parameter_type
+    description: "Process parameter types with normal operating ranges"
+    columns:
+      - name: parameter_type_key
+        description: "Surrogate key for parameter type (1-4)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 4
+      
+      - name: parameter_type
+        description: "Type of process parameter (Pressure, Temperature, pH, Flow)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+      
+      - name: units
+        description: "Measurement units (psig, °F, pH units, bbl/day)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: normal_range_min
+        description: "Minimum normal operating range value"
+        data_tests:
+          - not_null
+      
+      - name: normal_range_max
+        description: "Maximum normal operating range value"
+        data_tests:
+          - not_null
+
+  - name: dim_iow_limit
+    description: "Three-tier Integrity Operating Window limits (Critical/Standard/Informational)"
+    columns:
+      - name: limit_key
+        description: "Surrogate key for IOW limit (1-12: 4 parameters × 3 criticality levels)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: parameter_type
+        description: "FK to dim_parameter_type.parameter_type"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_parameter_type')
+              field: parameter_type
+      
+      - name: criticality_level
+        description: "Criticality tier: Critical (most restrictive), Standard, Informational"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Standard', 'Informational']
+      
+      - name: lower_limit
+        description: "Lower bound of acceptable operating range (nullable for one-sided limits)"
+      
+      - name: upper_limit
+        description: "Upper bound of acceptable operating range (nullable for one-sided limits)"
+      
+      - name: consequence_description
+        description: "Description of consequences if limit is exceeded"
+        data_tests:
+          - not_null
+          - not_empty_string
+
+  - name: dim_criticality_level
+    description: "Criticality level reference with response time requirements"
+    columns:
+      - name: criticality_key
+        description: "Surrogate key for criticality level (1-3)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 3
+      
+      - name: criticality_level
+        description: "Criticality level name (Critical, Standard, Informational)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Standard', 'Informational']
+      
+      - name: description
+        description: "Description of criticality level and requirements"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: response_time_hours
+        description: "Required response time in hours (1=Critical, 24=Standard, 168=Informational)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 168

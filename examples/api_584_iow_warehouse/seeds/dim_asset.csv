@@ -1,0 +1,101 @@
+asset_key,tag_id,equipment_name,system_name,unit_name,design_life_years,install_date,material_grade,damage_mechanism_primary,damage_mechanism_secondary
+1,CDU-001-PT,Atmospheric Column C-101,Crude Distillation System,CDU,30,2005-03-15,CS A106 Gr B,Sulfidation,Naphthenic Acid Corrosion
+2,CDU-002-TT,Crude Preheat Exchanger E-102,Heat Exchange System,CDU,25,2006-07-20,CS A106 Gr B,Sulfidation,CUI
+3,CDU-003-PT,Overhead Receiver D-103,Separation System,CDU,30,2005-03-15,CS A516 Gr 70,Naphthenic Acid Corrosion,Sulfidation
+4,CDU-004-TT,Sidecut Stripper C-104,Fractionation System,CDU,30,2005-03-18,CS A516 Gr 70,Sulfidation,
+5,CDU-005-PT,Bottoms Pump P-105A,Crude Transfer System,CDU,20,2010-05-12,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+6,CDU-006-PT,Desalter V-106,Desalting System,CDU,25,2007-02-28,CS A516 Gr 70,Naphthenic Acid Corrosion,CUI
+7,CDU-007-TT,Furnace F-107,Fired Heater System,CDU,35,2005-03-15,9Cr-1Mo,Creep,Thermal Fatigue
+8,CDU-008-FT,Reflux Drum D-108,Overhead System,CDU,30,2005-03-15,CS A516 Gr 70,Naphthenic Acid Corrosion,
+9,CDU-009-PT,Wash Water Settler D-109,Desalting System,CDU,25,2008-11-03,CS A516 Gr 70,CUI,Naphthenic Acid Corrosion
+10,CDU-010-TT,Heavy Gas Oil Draw E-110,Heat Exchange System,CDU,25,2007-06-14,CS A106 Gr B,Sulfidation,
+11,CDU-011-PT,Light Gas Oil Stripper C-111,Stripping System,CDU,30,2005-03-18,CS A516 Gr 70,Sulfidation,
+12,CDU-012-TT,Kerosene Draw System E-112,Product Draw System,CDU,25,2006-09-22,CS A106 Gr B,Sulfidation,Naphthenic Acid Corrosion
+13,CDU-013-PT,Naphtha Stabilizer C-113,Stabilization System,CDU,30,2005-03-15,CS A516 Gr 70,Naphthenic Acid Corrosion,
+14,CDU-014-FT,Crude Charge Pump P-114A,Crude Transfer System,CDU,20,2012-04-17,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+15,CDU-015-PT,Steam Generator E-115,Heat Recovery System,CDU,25,2008-01-09,CS A106 Gr B,CUI,Erosion-Corrosion
+16,CDU-016-TT,Vacuum Tower Feed E-116,Heat Exchange System,CDU,25,2007-08-30,CS A106 Gr B,Sulfidation,
+17,CDU-017-PT,Sour Water Drum D-117,Sour Water System,CDU,25,2006-12-05,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+18,CDU-018-TT,Product Cooler E-118,Cooling System,CDU,25,2009-03-26,CS A106 Gr B,CUI,Sulfidation
+19,CDU-019-PT,Flash Drum D-119,Flash System,CDU,30,2005-03-15,CS A516 Gr 70,Sulfidation,
+20,CDU-020-FT,Slop Oil System P-120A,Slop System,CDU,20,2011-07-19,CS A106 Gr B,Erosion-Corrosion,
+21,CDU-021-PT,Reflux Pump P-121A,Overhead System,CDU,20,2010-10-08,CS A106 Gr B,Erosion-Corrosion,Naphthenic Acid Corrosion
+22,CDU-022-TT,Product Rundown E-122,Product System,CDU,25,2008-05-14,CS A106 Gr B,CUI,
+23,CDU-023-PT,Amine Contactor C-123,Gas Treating System,CDU,25,2007-11-29,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+24,CDU-024-TT,Residue Cooler E-124,Cooling System,CDU,25,2006-08-03,CS A106 Gr B,Sulfidation,CUI
+25,CDU-025-PT,Gas Compressor K-125,Compression System,CDU,20,2013-02-20,CS A106 Gr B,Erosion-Corrosion,
+26,CDU-026-FT,Feed Mix Drum D-126,Feed System,CDU,30,2005-03-15,CS A516 Gr 70,Sulfidation,
+27,CDU-027-PT,Heat Stable Salts Filter F-127,Amine System,CDU,25,2009-09-16,SS 316L,Amine Corrosion,
+28,CDU-028-TT,Sour Gas Cooler E-128,Gas Cooling System,CDU,25,2007-04-11,CS A106 Gr B,H2S Corrosion,CUI
+29,CDU-029-PT,Water Wash Tower C-129,Wash System,CDU,25,2008-07-23,CS A516 Gr 70,CUI,
+30,CDU-030-TT,Product Heater E-130,Heat Exchange System,CDU,25,2006-10-18,CS A106 Gr B,Sulfidation,
+31,VDU-001-PT,Vacuum Column C-201,Vacuum Distillation System,VDU,30,2005-06-10,CS A516 Gr 70,Sulfidation,Naphthenic Acid Corrosion
+32,VDU-002-TT,Vacuum Furnace F-202,Fired Heater System,VDU,35,2005-06-10,9Cr-1Mo,Creep,Thermal Fatigue
+33,VDU-003-PT,Ejector System E-203,Vacuum System,VDU,25,2007-09-14,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+34,VDU-004-TT,Heavy Vacuum Gas Oil Draw E-204,Product Draw System,VDU,25,2008-02-27,CS A106 Gr B,Sulfidation,
+35,VDU-005-PT,Light Vacuum Gas Oil Stripper C-205,Stripping System,VDU,30,2005-06-12,CS A516 Gr 70,Sulfidation,
+36,VDU-006-FT,Wash Oil System P-206A,Wash System,VDU,20,2011-11-08,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+37,VDU-007-PT,Steam Jet Ejector E-207,Vacuum System,VDU,25,2009-01-22,CS A106 Gr B,Erosion-Corrosion,
+38,VDU-008-TT,Barometric Condenser E-208,Condensing System,VDU,25,2007-05-17,CS A106 Gr B,CUI,Erosion-Corrosion
+39,VDU-009-PT,Vacuum Residue Cooler E-209,Cooling System,VDU,25,2006-12-13,CS A106 Gr B,Sulfidation,CUI
+40,VDU-010-TT,Quench Oil Cooler E-210,Quench System,VDU,25,2008-08-05,CS A106 Gr B,CUI,Sulfidation
+41,VDU-011-PT,Hot Well Drum D-211,Condensate System,VDU,30,2005-06-10,CS A516 Gr 70,Erosion-Corrosion,
+42,VDU-012-FT,Vacuum Column Feed Pump P-212A,Feed System,VDU,20,2010-03-19,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+43,VDU-013-PT,Seal Drum D-213,Vacuum System,VDU,30,2005-06-10,CS A516 Gr 70,Erosion-Corrosion,
+44,VDU-014-TT,Steam Generator E-214,Heat Recovery System,VDU,25,2009-06-11,CS A106 Gr B,CUI,Erosion-Corrosion
+45,VDU-015-PT,Product Stripper C-215,Stripping System,VDU,30,2005-06-12,CS A516 Gr 70,Sulfidation,
+46,VDU-016-TT,Asphalt Blending System E-216,Blending System,VDU,25,2011-09-28,CS A106 Gr B,Sulfidation,
+47,VDU-017-PT,Slop Wax Drum D-217,Slop System,VDU,30,2005-06-10,CS A516 Gr 70,Sulfidation,
+48,VDU-018-FT,Vacuum Tower Washdown P-218A,Wash System,VDU,20,2012-12-06,CS A106 Gr B,Erosion-Corrosion,
+49,VDU-019-PT,Reflux Accumulator D-219,Reflux System,VDU,30,2005-06-10,CS A516 Gr 70,Sulfidation,
+50,VDU-020-TT,Feed Preheater E-220,Heat Exchange System,VDU,25,2007-07-25,CS A106 Gr B,Sulfidation,CUI
+51,FCC-001-PT,Reactor Vessel R-301,Catalytic Cracking Reactor,FCC,35,2004-11-08,SS 316L,Creep,Thermal Fatigue
+52,FCC-002-TT,Regenerator R-302,Catalyst Regeneration System,FCC,35,2004-11-08,SS 316L,Creep,High Temperature Oxidation
+53,FCC-003-PT,Main Fractionator C-303,Fractionation System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+54,FCC-004-TT,Riser R-304,Reaction System,FCC,25,2007-04-23,SS 316L,Erosion-Corrosion,Creep
+55,FCC-005-PT,Wet Gas Compressor K-305,Compression System,FCC,20,2010-08-17,CS A106 Gr B,Erosion-Corrosion,H2S Corrosion
+56,FCC-006-FT,Slurry Settler D-306,Separation System,FCC,25,2008-11-29,CS A516 Gr 70,Erosion-Corrosion,Sulfidation
+57,FCC-007-PT,Heavy Cycle Oil Circuit E-307,Product Circuit System,FCC,25,2006-09-05,CS A106 Gr B,Sulfidation,CUI
+58,FCC-008-TT,Light Cycle Oil Stripper C-308,Stripping System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+59,FCC-009-PT,Gas Concentration Absorber C-309,Gas Recovery System,FCC,25,2009-02-18,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+60,FCC-010-TT,Feed Hydrotreater R-310,Pretreatment System,FCC,30,2005-05-14,9Cr-1Mo,Hydrogen Attack,HTHA
+61,FCC-011-PT,Flue Gas Cooler E-311,Heat Recovery System,FCC,25,2007-12-07,CS A106 Gr B,High Temperature Oxidation,CUI
+62,FCC-012-FT,Catalyst Cooler E-312,Catalyst Cooling System,FCC,25,2008-06-20,CS A106 Gr B,Erosion-Corrosion,
+63,FCC-013-PT,Air Blower K-313,Combustion Air System,FCC,20,2011-03-11,CS A106 Gr B,Erosion-Corrosion,High Temperature Oxidation
+64,FCC-014-TT,Power Recovery Turbine T-314,Energy Recovery System,FCC,25,2006-07-28,CS A106 Gr B,Erosion-Corrosion,
+65,FCC-015-PT,Main Column Overhead D-315,Overhead System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+66,FCC-016-TT,Catalyst Stripper R-316,Stripping System,FCC,30,2004-11-08,SS 316L,Erosion-Corrosion,Creep
+67,FCC-017-PT,Spent Catalyst Standpipe R-317,Catalyst Transfer System,FCC,25,2009-10-02,SS 316L,Erosion-Corrosion,
+68,FCC-018-FT,Slide Valve Control V-318,Catalyst Control System,FCC,20,2012-01-24,SS 316L,Erosion-Corrosion,Thermal Fatigue
+69,FCC-019-PT,Combustion Air Plenum R-319,Combustion System,FCC,30,2004-11-08,CS A516 Gr 70,High Temperature Oxidation,
+70,FCC-020-TT,Flue Gas Scrubber C-320,Emission Control System,FCC,25,2010-05-19,CS A516 Gr 70,Erosion-Corrosion,CUI
+71,FCC-021-PT,Rich Oil Absorber C-321,Gas Recovery System,FCC,25,2007-11-06,CS A516 Gr 70,Amine Corrosion,
+72,FCC-022-TT,Sponge Absorber C-322,Gas Treating System,FCC,25,2008-03-13,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+73,FCC-023-PT,Debutanizer C-323,Fractionation System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+74,FCC-024-FT,Depropanizer C-324,Fractionation System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+75,FCC-025-PT,Light Ends Recovery C-325,Recovery System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+76,FCC-026-TT,Gasoline Stabilizer C-326,Stabilization System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+77,FCC-027-PT,Unsaturated Gas Plant C-327,Gas Processing System,FCC,25,2009-07-30,CS A516 Gr 70,Sulfidation,
+78,FCC-028-TT,Steam Generation System E-328,Heat Recovery System,FCC,25,2006-12-21,CS A106 Gr B,CUI,Erosion-Corrosion
+79,FCC-029-PT,Feed Surge Drum D-329,Feed System,FCC,30,2004-11-10,CS A516 Gr 70,Sulfidation,
+80,FCC-030-FT,Slurry Pump P-330A,Transfer System,FCC,20,2013-04-15,CS A106 Gr B,Erosion-Corrosion,Sulfidation
+81,HCU-001-PT,Hydrotreater Reactor R-401,Hydrotreating Reactor System,HCU,30,2006-02-16,9Cr-1Mo,Hydrogen Attack,HTHA
+82,HCU-002-TT,Hydrocracker Reactor R-402,Hydrocracking Reactor System,HCU,30,2006-02-16,9Cr-1Mo,Hydrogen Attack,HTHA
+83,HCU-003-PT,High Pressure Separator D-403,HP Separation System,HCU,30,2006-02-18,9Cr-1Mo,Hydrogen Attack,H2S Corrosion
+84,HCU-004-TT,Recycle Gas Compressor K-404,Recycle Gas System,HCU,20,2010-11-24,CS A106 Gr B,Hydrogen Attack,Erosion-Corrosion
+85,HCU-005-PT,Hot Separator D-405,Hot Flash System,HCU,30,2006-02-18,9Cr-1Mo,Hydrogen Attack,Sulfidation
+86,HCU-006-FT,Cold Separator D-406,Cold Flash System,HCU,30,2006-02-18,CS A516 Gr 70,H2S Corrosion,Amine Corrosion
+87,HCU-007-PT,Amine Contactor C-407,Gas Treating System,HCU,25,2007-10-09,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+88,HCU-008-TT,Sour Water Stripper C-408,Sour Water System,HCU,25,2008-05-28,CS A516 Gr 70,H2S Corrosion,Amine Corrosion
+89,HCU-009-PT,Reactor Effluent Exchanger E-409,Heat Exchange System,HCU,25,2009-01-15,9Cr-1Mo,Hydrogen Attack,HTHA
+90,HCU-010-TT,Feed Effluent Exchanger E-410,Heat Recovery System,HCU,25,2007-08-02,9Cr-1Mo,Hydrogen Attack,Sulfidation
+91,HCU-011-PT,Reactor Feed Furnace F-411,Fired Heater System,HCU,35,2006-02-16,9Cr-1Mo,Creep,Thermal Fatigue
+92,HCU-012-FT,Makeup Gas Compressor K-412,Makeup H2 System,HCU,20,2011-06-13,CS A106 Gr B,Hydrogen Attack,Erosion-Corrosion
+93,HCU-013-PT,Fractionator C-413,Fractionation System,HCU,30,2006-02-18,CS A516 Gr 70,Sulfidation,
+94,HCU-014-TT,Naphtha Stripper C-414,Stripping System,HCU,30,2006-02-18,CS A516 Gr 70,Sulfidation,
+95,HCU-015-PT,Product Cooler E-415,Cooling System,HCU,25,2008-09-10,CS A106 Gr B,CUI,Sulfidation
+96,HCU-016-TT,Quench Hydrogen System E-416,Quench System,HCU,25,2009-12-04,9Cr-1Mo,Hydrogen Attack,
+97,HCU-017-PT,Flash Drum D-417,Flash System,HCU,30,2006-02-18,CS A516 Gr 70,H2S Corrosion,
+98,HCU-018-FT,Recycle Hydrogen Dryer D-418,H2 Purification System,HCU,25,2010-07-21,CS A516 Gr 70,Hydrogen Attack,
+99,HCU-019-PT,Wash Water Drum D-419,Wash Water System,HCU,25,2007-03-16,CS A516 Gr 70,Amine Corrosion,H2S Corrosion
+100,HCU-020-TT,Steam Generation E-420,Heat Recovery System,HCU,25,2008-11-27,CS A106 Gr B,CUI,Erosion-Corrosion
