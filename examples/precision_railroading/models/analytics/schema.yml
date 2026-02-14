@@ -1,0 +1,465 @@
+# Analytics Layer Schema Documentation
+# Comprehensive documentation for all analytics queries
+
+version: 2
+
+models:
+  - name: worst_performing_corridors
+    description: |
+      Ranks corridors by lowest fluidity index and highest dwell time to identify
+      network segments requiring operational improvement. Highlights bottlenecks in
+      the rail network where velocity is slowest and stop patterns are most problematic.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor (surrogate key)
+        tests:
+          - not_null
+      
+      - name: corridor_name
+        description: Human-readable corridor name (origin → destination)
+      
+      - name: avg_velocity_mph
+        description: |
+          Average velocity in miles per hour across all trips on this corridor.
+          Lower values indicate poor network fluidity.
+        tests:
+          - range: {min: 0, max: 80}
+      
+      - name: avg_dwell_minutes
+        description: |
+          Average dwell time per trip for railcars using this corridor (in minutes).
+          Higher values indicate excessive stopping patterns.
+        tests:
+          - range: {min: 0}
+      
+      - name: avg_duration_minutes
+        description: Total average trip duration in minutes (travel + dwell time)
+      
+      - name: trip_count
+        description: Number of trips used to calculate corridor statistics
+        tests:
+          - positive_value
+      
+      - name: fluidity_rank
+        description: |
+          Ranking by fluidity (1 = worst performing, ascending order).
+          Corridors with lowest velocity ranked first.
+    
+    meta:
+      sources:
+        - fact_trip
+        - fact_dwell
+        - dim_corridor
+      
+      business_use_cases:
+        - "Identify network bottlenecks requiring infrastructure investment"
+        - "Prioritize corridor-specific operational improvements"
+        - "Compare pre-PSR vs post-PSR corridor performance"
+      
+      expected_row_count: "0-10 rows (top 10 worst corridors, many NULL corridor_id in test data)"
+      
+      key_insights:
+        - "Corridors with fluidity_rank = 1, 2, 3 are highest priority for improvement"
+        - "avg_velocity_mph < 20 indicates severe congestion"
+        - "High avg_dwell_minutes suggests excessive intermediate handling"
+
+  - name: shadow_yard_identification
+    description: |
+      Sophisticated detection logic for subtle shadow yard patterns combining dwell
+      statistics, temporal variance, and time-of-day clustering. Shadow yards are
+      unofficial holding locations indicating hidden network capacity constraints.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: location_id
+        description: Foreign key to dim_location
+      
+      - name: location_name
+        description: Name of the location being analyzed
+      
+      - name: dwell_event_count
+        description: Number of dwell events observed at this location
+      
+      - name: avg_dwell_minutes
+        description: Average dwell duration at this location
+      
+      - name: stddev_dwell_minutes
+        description: Standard deviation of dwell durations (measure of unpredictability)
+      
+      - name: shadow_yard_percentage
+        description: |
+          Percentage of time railcars spend at this location relative to total network time.
+          Primary indicator of shadow yard behavior (>30% is suspicious).
+        tests:
+          - range: {min: 0, max: 100}
+      
+      - name: variance_score
+        description: |
+          Normalized score (0-100) based on dwell duration variance.
+          High variance indicates inconsistent usage patterns.
+        tests:
+          - range: {min: 0, max: 100}
+      
+      - name: time_clustering_score
+        description: |
+          Score (0-100) measuring clustering of arrival times by hour.
+          High clustering suggests systematic usage patterns.
+        tests:
+          - range: {min: 0, max: 100}
+      
+      - name: composite_score
+        description: |
+          Weighted composite score combining all shadow yard indicators:
+          (shadow_yard_percentage * 0.5) + (variance_score * 0.3) + (time_clustering * 0.2)
+        tests:
+          - range: {min: 0, max: 100}
+      
+      - name: shadow_yard_flag
+        description: |
+          Binary flag: 1 = confirmed shadow yard (composite_score > 60), 0 = normal location
+        tests:
+          - accepted_values: {values: [0, 1]}
+      
+      - name: ranking
+        description: Sequential ranking of locations by composite_score (1 = most suspicious)
+    
+    meta:
+      sources:
+        - fact_dwell
+        - agg_shadow_yards
+        - dim_location
+      
+      business_use_cases:
+        - "Identify unofficial holding locations impacting network velocity"
+        - "Prioritize operational changes to eliminate shadow yards"
+        - "Monitor PSR progress (shadow yard count should decrease over time)"
+      
+      expected_row_count: "3-10 locations"
+      
+      key_insights:
+        - "Locations with shadow_yard_flag = 1 require immediate investigation"
+        - "composite_score > 80 indicates high confidence shadow yard"
+        - "Reducing shadow yard count is a key PSR success metric"
+
+  - name: seasonal_performance_trends
+    description: |
+      Shows quarter-over-quarter and year-over-year performance changes to highlight
+      winter slowdowns and summer performance peaks. Analyzes temporal patterns in
+      network velocity and trip durations.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: time_period
+        description: Human-readable period label (e.g., '2023-Q1', '2024-Q3')
+      
+      - name: quarter
+        description: Quarter number (1-4)
+        tests:
+          - range: {min: 1, max: 4}
+      
+      - name: year
+        description: Calendar year (YYYY)
+      
+      - name: avg_velocity_mph
+        description: Average network velocity for this time period
+        tests:
+          - range: {min: 0, max: 80}
+      
+      - name: avg_duration_minutes
+        description: Average trip duration for this time period
+      
+      - name: trip_count
+        description: Number of trips completed during this period
+        tests:
+          - positive_value
+      
+      - name: total_distance_miles
+        description: Total miles traveled during this period
+      
+      - name: yoy_velocity_change_pct
+        description: |
+          Year-over-year velocity change percentage (vs same quarter of previous year).
+          Positive values = improvement, negative values = degradation.
+      
+      - name: qoq_velocity_change_pct
+        description: |
+          Quarter-over-quarter velocity change percentage (vs previous sequential quarter).
+          Positive values = improvement.
+      
+      - name: seasonal_pattern
+        description: |
+          Seasonal classification: 'Winter (Slower)' for Q1/Q4, 'Summer (Faster)' for Q2/Q3
+    
+    meta:
+      sources:
+        - fact_trip
+      
+      business_use_cases:
+        - "Identify seasonal velocity degradation (winter vs summer)"
+        - "Track year-over-year operational improvements"
+        - "Forecast capacity constraints based on historical trends"
+      
+      expected_row_count: "Variable (depends on date range coverage)"
+      
+      key_insights:
+        - "Winter quarters (Q1, Q4) typically show 10-20% velocity degradation"
+        - "Year-over-year velocity improvement of 5-15% indicates healthy PSR progress"
+        - "Large quarter-over-quarter swings may indicate operational instability"
+
+  - name: psr_strategy_shifts
+    description: |
+      Detects operational model changes across PSR adoption periods (pre-PSR, transition, mature).
+      Compares key performance metrics against pre-PSR baseline to quantify PSR transformation impact.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: psr_period
+        description: "PSR adoption period: 'pre-PSR', 'transition', or 'mature'"
+      
+      - name: avg_velocity_mph
+        description: Average network velocity for this PSR period
+      
+      - name: avg_duration_minutes
+        description: Average trip duration for this period
+        tests:
+          - positive_value
+      
+      - name: avg_dwell_count
+        description: Average number of stops (dwell events) per trip
+      
+      - name: trip_count
+        description: Total trips completed during this period
+        tests:
+          - positive_value
+      
+      - name: railcar_count
+        description: Total railcars active during this period (proxy: same as trip_count in 1:1 dataset)
+      
+      - name: trips_per_car
+        description: Asset utilization metric (trips per railcar)
+      
+      - name: velocity_delta_vs_pre_psr
+        description: Absolute velocity change (mph) compared to pre-PSR baseline
+      
+      - name: velocity_change_pct
+        description: |
+          Percentage velocity improvement vs pre-PSR.
+          Target: +30-40% for mature PSR.
+      
+      - name: duration_delta_vs_pre_psr
+        description: |
+          Change in trip duration (minutes) vs pre-PSR.
+          Negative values indicate faster trips (improvement).
+      
+      - name: duration_change_pct
+        description: Percentage change in trip duration vs pre-PSR
+      
+      - name: dwell_count_delta_vs_pre_psr
+        description: |
+          Change in average stops per trip vs pre-PSR.
+          Negative values indicate fewer stops (improvement).
+      
+      - name: dwell_count_change_pct
+        description: Percentage change in dwell count vs pre-PSR
+      
+      - name: utilization_delta_vs_pre_psr
+        description: Change in trips-per-car asset utilization vs pre-PSR
+      
+      - name: utilization_change_pct
+        description: Percentage change in asset utilization vs pre-PSR
+    
+    meta:
+      sources:
+        - agg_psr_evolution
+      
+      business_use_cases:
+        - "Quantify PSR transformation ROI (velocity gains, cost reductions)"
+        - "Track PSR adoption progress period-over-period"
+        - "Benchmark against industry PSR targets (+30-40% velocity)"
+      
+      expected_row_count: "1-3 rows (periods with actual trip data)"
+      
+      key_insights:
+        - "Mature PSR should show +30-40% velocity vs pre-PSR"
+        - "Dwell count should decrease by 40-50% (fewer intermediate stops)"
+        - "Asset utilization should improve by 20-30% (more trips per car)"
+
+  - name: network_congestion_hotspots
+    description: |
+      Identifies bottlenecks in the rail network by combining high dwell duration,
+      variance, and traffic volume into a composite congestion score. Ranks locations
+      by severity to prioritize capacity expansion projects.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: location_id
+        description: Foreign key to dim_location
+      
+      - name: location_name
+        description: Name of the congested location
+      
+      - name: location_type
+        description: Type of location (yard, terminal, junction, etc.)
+      
+      - name: dwell_event_count
+        description: Number of dwell events observed at this location
+        tests:
+          - positive_value
+      
+      - name: avg_dwell_minutes
+        description: Average dwell duration (higher = more congestion)
+        tests:
+          - positive_value
+      
+      - name: max_dwell_minutes
+        description: Maximum observed dwell duration
+      
+      - name: min_dwell_minutes
+        description: Minimum observed dwell duration
+      
+      - name: stddev_dwell
+        description: Standard deviation of dwell durations (measure of unpredictability)
+      
+      - name: congestion_score
+        description: |
+          Composite congestion metric (0-100, capped at 100):
+          - High avg dwell (>180 min): contributes 40% weight
+          - High variance (>60 min stddev): contributes 30% weight
+          - High traffic volume (>10 events): contributes 30% weight
+        tests:
+          - range: {min: 0, max: 100}
+      
+      - name: congestion_rank
+        description: Sequential ranking by congestion_score (1 = most congested)
+      
+      - name: congestion_severity
+        description: |
+          Classification: 'Critical' (75-100), 'High' (50-75),
+          'Moderate' (25-50), or 'Low' (0-25)
+        tests:
+          - accepted_values: {values: ['Critical', 'High', 'Moderate', 'Low']}
+    
+    meta:
+      sources:
+        - fact_dwell
+        - dim_location
+      
+      business_use_cases:
+        - "Prioritize capacity expansion projects (Critical severity locations)"
+        - "Identify operational improvement opportunities (High severity)"
+        - "Monitor congestion trends over time"
+      
+      expected_row_count: "5-15 locations"
+      
+      key_insights:
+        - "Critical severity (score 75-100) requires immediate capital investment"
+        - "High severity (score 50-75) needs operational process improvements"
+        - "Locations with high stddev_dwell have unpredictable wait times"
+
+  - name: directional_efficiency_analysis
+    description: |
+      Shows loaded vs empty trip asymmetry to identify corridors where railroad
+      prioritizes one direction over the other. Reveals imbalances in bidirectional
+      freight flows and potential empty repositioning inefficiencies.
+    
+    config:
+      materialized: table
+    
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor
+      
+      - name: corridor_name
+        description: Corridor identifier with origin → destination
+      
+      - name: loaded_velocity_mph
+        description: Average velocity for loaded trips on this corridor
+        tests:
+          - range: {min: 0, max: 80}
+      
+      - name: empty_velocity_mph
+        description: Average velocity for empty trips on this corridor
+        tests:
+          - range: {min: 0, max: 80}
+      
+      - name: loaded_duration_minutes
+        description: Average trip duration for loaded movements
+      
+      - name: empty_duration_minutes
+        description: Average trip duration for empty movements
+      
+      - name: loaded_trip_count
+        description: Number of loaded trips observed
+        tests:
+          - not_negative
+      
+      - name: empty_trip_count
+        description: Number of empty trips observed
+        tests:
+          - not_negative
+      
+      - name: loaded_distance_miles
+        description: Total miles traveled by loaded trips
+      
+      - name: empty_distance_miles
+        description: Total miles traveled by empty trips
+      
+      - name: asymmetry_ratio
+        description: |
+          Ratio of loaded velocity to empty velocity.
+          - Ratio > 1.2: Loaded prioritized (railroad favors revenue freight)
+          - Ratio 0.8-1.2: Balanced operations
+          - Ratio < 0.8: Empty prioritized (railroad favors repositioning)
+        tests:
+          - positive_value
+      
+      - name: priority_direction
+        description: |
+          Classification: 'Loaded Prioritized', 'Empty Prioritized', or 'Balanced'
+        tests:
+          - accepted_values: {values: ['Loaded Prioritized', 'Empty Prioritized', 'Balanced']}
+      
+      - name: velocity_delta_mph
+        description: Absolute difference between loaded and empty velocities (mph)
+      
+      - name: balance_score
+        description: |
+          Score (0-100) indicating directional balance.
+          100 = perfectly balanced (loaded = empty velocity),
+          0 = severe imbalance
+        tests:
+          - range: {min: 0, max: 100}
+    
+    meta:
+      sources:
+        - fact_trip
+        - dim_corridor
+      
+      business_use_cases:
+        - "Identify corridors with inefficient empty repositioning"
+        - "Detect revenue prioritization vs operational balance"
+        - "Optimize bidirectional asset utilization"
+      
+      expected_row_count: "0-20 corridors (requires both loaded and empty trips per corridor)"
+      
+      key_insights:
+        - "Asymmetry_ratio close to 1.0 indicates optimal bidirectional balance"
+        - "Ratio > 1.5 suggests empty cars being deprioritized (revenue focus)"
+        - "Ratio < 0.7 suggests loaded cars waiting excessively (capacity constraint)"
+
+# Testing
+# All analytics queries have corresponding test files in tests/analytics/
+# Run: .\test_phase8.ps1
+# Expected: 30/30 tests passing
