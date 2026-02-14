@@ -1,0 +1,9 @@
+# API 584 IOW Data Warehouse - Profile Configuration
+
+default:
+  target: dev
+  
+  outputs:
+    dev:
+      type: sqlite
+      database: ./api_584_iow_warehouse.db

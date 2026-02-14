@@ -1,0 +1,69 @@
+version: 2
+
+seeds:
+  - name: dim_date
+    description: "Date dimension seed (5-year time series 2021-2025)"
+    columns:
+      - name: date_key
+      - name: full_date
+      - name: year
+      - name: quarter
+      - name: month
+      - name: day_of_month
+      - name: day_of_week
+      - name: day_name
+      - name: month_name
+      - name: is_turnaround
+      - name: is_summer_spec
+      - name: is_winter_spec
+
+  - name: dim_asset
+    description: "Asset dimension seed (100 refinery assets)"
+    columns:
+      - name: asset_key
+      - name: tag_id
+      - name: equipment_name
+      - name: system_name
+      - name: unit_name
+      - name: design_life_years
+      - name: install_date
+      - name: material_grade
+      - name: damage_mechanism_primary
+      - name: damage_mechanism_secondary
+
+  - name: dim_iow_limit
+    description: "IOW limit seed (3-tier limits)"
+    columns:
+      - name: limit_key
+      - name: parameter_type
+      - name: criticality_level
+      - name: lower_limit
+      - name: upper_limit
+      - name: consequence_description
+
+  - name: dim_parameter_type
+    description: "Parameter type seed (4 sensor types)"
+    columns:
+      - name: parameter_type_key
+      - name: parameter_type
+      - name: units
+      - name: normal_range_min
+      - name: normal_range_max
+
+  - name: dim_criticality_level
+    description: "Criticality level seed (3 levels)"
+    columns:
+      - name: criticality_key
+      - name: criticality_level
+      - name: description
+      - name: response_time_hours
+
+  - name: raw_sensor_readings
+    description: "Raw sensor telemetry seed (1.296M readings, 30 days, 5-min intervals)"
+    columns:
+      - name: reading_id
+      - name: timestamp
+      - name: tag_id
+      - name: parameter_type
+      - name: measured_value
+      - name: data_quality_flag

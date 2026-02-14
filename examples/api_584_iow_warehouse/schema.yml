@@ -1,5 +1,8 @@
 version: 2
 
+# Reference external seed configuration
+seed_config_path: seeds/seed.yml
+
 models:
   # ===================================================================
   # DIMENSION TABLES - API 584 IOW Data Warehouse
@@ -336,3 +339,269 @@ models:
           - not_null
           - accepted_values:
               values: [0, 1]
+
+  # ===================================================================
+  # INTERMEDIATE LAYER - IOW Excursion Detection (Phase 3)
+  # ===================================================================
+  
+  - name: int_iow_excursions
+    description: "Individual sensor readings that breach IOW limits at any criticality level"
+    columns:
+      - name: excursion_id
+        description: "Surrogate key for excursion record (unique per breach)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: reading_id
+        description: "FK to stg_sensor_readings.reading_id"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sensor_readings')
+              field: reading_id
+      
+      - name: timestamp
+        description: "Timestamp when excursion occurred"
+        data_tests:
+          - not_null
+      
+      - name: tag_id
+        description: "FK to dim_asset.tag_id (sensor identifier)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: tag_id
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: parameter_type
+        description: "Type of parameter that breached (Pressure, Temperature, pH, Flow)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+      
+      - name: measured_value
+        description: "Actual sensor measurement that exceeded limit"
+        data_tests:
+          - not_null
+      
+      - name: breached_limit_value
+        description: "The IOW limit value that was exceeded"
+        data_tests:
+          - not_null
+      
+      - name: breach_type
+        description: "Direction of breach: High (above upper limit) or Low (below lower limit)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Low']
+      
+      - name: excursion_magnitude
+        description: "Absolute difference between measured value and breached limit"
+        data_tests:
+          - not_null
+      
+      - name: criticality_level
+        description: "Most restrictive criticality level breached (Critical > Standard > Informational)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Standard', 'Informational']
+      
+      - name: limit_key
+        description: "FK to dim_iow_limit.limit_key (most restrictive limit breached)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_iow_limit')
+              field: limit_key
+
+  - name: int_excursion_windows
+    description: "Consecutive excursions grouped into events with 15-minute gap tolerance"
+    columns:
+      - name: excursion_event_id
+        description: "Unique identifier for excursion event (tag_id + parameter_type + sequence)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: tag_id
+        description: "FK to dim_asset.tag_id (sensor identifier)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: tag_id
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: parameter_type
+        description: "Type of parameter (Pressure, Temperature, pH, Flow)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+      
+      - name: criticality_level
+        description: "Highest criticality level during event (Critical > Standard > Informational)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Standard', 'Informational']
+      
+      - name: excursion_start_time
+        description: "Timestamp of first excursion in event window"
+        data_tests:
+          - not_null
+      
+      - name: excursion_end_time
+        description: "Timestamp of last excursion in event window"
+        data_tests:
+          - not_null
+      
+      - name: duration_minutes
+        description: "Duration of excursion event in minutes (end_time - start_time)"
+        data_tests:
+          - not_null
+      
+      - name: reading_count
+        description: "Number of excursion readings within event window"
+        data_tests:
+          - not_null
+      
+      - name: peak_magnitude
+        description: "Maximum excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: average_magnitude
+        description: "Average excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: breach_type
+        description: "Most common breach direction during event (High or Low)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Low']
+      
+      - name: limit_key
+        description: "FK to dim_iow_limit.limit_key (most restrictive limit breached in event)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_iow_limit')
+              field: limit_key
+
+  - name: int_excursion_severity
+    description: "Excursion events with calculated severity scores for prioritization"
+    columns:
+      - name: excursion_event_id
+        description: "Unique identifier for excursion event (from int_excursion_windows)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: tag_id
+        description: "FK to dim_asset.tag_id (sensor identifier)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: tag_id
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: parameter_type
+        description: "Type of parameter (Pressure, Temperature, pH, Flow)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+      
+      - name: criticality_level
+        description: "Highest criticality level during event (Critical > Standard > Informational)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'Standard', 'Informational']
+      
+      - name: excursion_start_time
+        description: "Timestamp of first excursion in event window"
+        data_tests:
+          - not_null
+      
+      - name: excursion_end_time
+        description: "Timestamp of last excursion in event window"
+        data_tests:
+          - not_null
+      
+      - name: duration_minutes
+        description: "Duration of excursion event in minutes"
+        data_tests:
+          - not_null
+      
+      - name: reading_count
+        description: "Number of excursion readings within event window"
+        data_tests:
+          - not_null
+      
+      - name: peak_magnitude
+        description: "Maximum excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: average_magnitude
+        description: "Average excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: breach_type
+        description: "Most common breach direction during event (High or Low)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Low']
+      
+      - name: limit_key
+        description: "FK to dim_iow_limit.limit_key (most restrictive limit breached)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_iow_limit')
+              field: limit_key
+      
+      - name: severity_score
+        description: "Calculated severity score (0-10 scale): (peak_magnitude × 0.4) + (duration × 0.3) + (criticality_weight × 0.3)"
+        data_tests:
+          - not_null
+      
+      - name: severity_category
+        description: "Severity classification: Extreme (>8), High (5-8), Moderate (2-5), Low (<2)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Extreme', 'High', 'Moderate', 'Low']

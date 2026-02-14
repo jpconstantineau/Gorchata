@@ -805,3 +805,389 @@ func TestOneMonthCoverage(t *testing.T) {
 		t.Errorf("%d sensors have more readings than expected", overCount)
 	}
 }
+
+// ===================================================================
+// PHASE 3 TESTS - INTERMEDIATE LAYER (IOW Excursion Detection)
+// ===================================================================
+
+// TestIntIOWExcursionsModel validates int_iow_excursions.sql model file exists
+func TestIntIOWExcursionsModel(t *testing.T) {
+	modelPath := filepath.Join("models", "intermediate", "int_iow_excursions.sql")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("Required model file %s does not exist", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model contains expected SQL patterns
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"stg_sensor_readings",
+		"dim_iow_limit",
+		"excursion_magnitude",
+		"criticality_level",
+		"breach_type",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Model file missing required pattern: %s", pattern)
+		}
+	}
+}
+
+// TestIntIOWExcursionsSchema validates int_iow_excursions has required columns
+func TestIntIOWExcursionsSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var intIOWExcursions *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "int_iow_excursions" {
+			intIOWExcursions = &model
+			break
+		}
+	}
+
+	if intIOWExcursions == nil {
+		t.Fatal("int_iow_excursions not found in schema")
+	}
+
+	requiredColumns := []string{
+		"excursion_id",
+		"reading_id",
+		"timestamp",
+		"tag_id",
+		"asset_key",
+		"parameter_type",
+		"measured_value",
+		"breached_limit_value",
+		"breach_type",
+		"excursion_magnitude",
+		"criticality_level",
+		"limit_key",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range intIOWExcursions.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in int_iow_excursions", colName)
+		}
+	}
+
+	// Verify excursion_id has unique and not_null tests
+	var excursionIDCol *schema.ColumnSchema
+	for _, col := range intIOWExcursions.Columns {
+		if col.Name == "excursion_id" {
+			excursionIDCol = &col
+			break
+		}
+	}
+
+	if excursionIDCol != nil {
+		if !hasDataTest(excursionIDCol.DataTests, "unique") {
+			t.Error("excursion_id must have unique test")
+		}
+		if !hasDataTest(excursionIDCol.DataTests, "not_null") {
+			t.Error("excursion_id must have not_null test")
+		}
+	}
+
+	// Verify breach_type has accepted_values
+	var breachTypeCol *schema.ColumnSchema
+	for _, col := range intIOWExcursions.Columns {
+		if col.Name == "breach_type" {
+			breachTypeCol = &col
+			break
+		}
+	}
+
+	if breachTypeCol != nil {
+		if !hasDataTest(breachTypeCol.DataTests, "accepted_values") {
+			t.Error("breach_type must have accepted_values test (High, Low)")
+		}
+	}
+}
+
+// TestIntExcursionWindowsModel validates int_excursion_windows.sql model file exists
+func TestIntExcursionWindowsModel(t *testing.T) {
+	modelPath := filepath.Join("models", "intermediate", "int_excursion_windows.sql")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("Required model file %s does not exist", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model contains windowing logic
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"int_iow_excursions",
+		"LAG",
+		"PARTITION BY",
+		"excursion_event_id",
+		"duration_minutes",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Model file missing required windowing pattern: %s", pattern)
+		}
+	}
+}
+
+// TestIntExcursionWindowsSchema validates int_excursion_windows has required columns
+func TestIntExcursionWindowsSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var intExcursionWindows *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "int_excursion_windows" {
+			intExcursionWindows = &model
+			break
+		}
+	}
+
+	if intExcursionWindows == nil {
+		t.Fatal("int_excursion_windows not found in schema")
+	}
+
+	requiredColumns := []string{
+		"excursion_event_id",
+		"tag_id",
+		"asset_key",
+		"parameter_type",
+		"criticality_level",
+		"excursion_start_time",
+		"excursion_end_time",
+		"duration_minutes",
+		"reading_count",
+		"peak_magnitude",
+		"average_magnitude",
+		"breach_type",
+		"limit_key",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range intExcursionWindows.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in int_excursion_windows", colName)
+		}
+	}
+
+	// Verify excursion_event_id has unique and not_null tests
+	var eventIDCol *schema.ColumnSchema
+	for _, col := range intExcursionWindows.Columns {
+		if col.Name == "excursion_event_id" {
+			eventIDCol = &col
+			break
+		}
+	}
+
+	if eventIDCol != nil {
+		if !hasDataTest(eventIDCol.DataTests, "unique") {
+			t.Error("excursion_event_id must have unique test")
+		}
+		if !hasDataTest(eventIDCol.DataTests, "not_null") {
+			t.Error("excursion_event_id must have not_null test")
+		}
+	}
+}
+
+// TestIntExcursionSeverityModel validates int_excursion_severity.sql model file exists
+func TestIntExcursionSeverityModel(t *testing.T) {
+	modelPath := filepath.Join("models", "intermediate", "int_excursion_severity.sql")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("Required model file %s does not exist", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model contains severity calculation logic
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"int_excursion_windows",
+		"severity_score",
+		"severity_category",
+		"peak_magnitude",
+		"duration_minutes",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Model file missing required severity pattern: %s", pattern)
+		}
+	}
+}
+
+// TestIntExcursionSeveritySchema validates int_excursion_severity has required columns
+func TestIntExcursionSeveritySchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var intExcursionSeverity *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "int_excursion_severity" {
+			intExcursionSeverity = &model
+			break
+		}
+	}
+
+	if intExcursionSeverity == nil {
+		t.Fatal("int_excursion_severity not found in schema")
+	}
+
+	requiredColumns := []string{
+		"excursion_event_id",
+		"tag_id",
+		"asset_key",
+		"parameter_type",
+		"criticality_level",
+		"excursion_start_time",
+		"excursion_end_time",
+		"duration_minutes",
+		"reading_count",
+		"peak_magnitude",
+		"average_magnitude",
+		"breach_type",
+		"limit_key",
+		"severity_score",
+		"severity_category",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range intExcursionSeverity.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in int_excursion_severity", colName)
+		}
+	}
+
+	// Verify severity_category has accepted_values test
+	var severityCatCol *schema.ColumnSchema
+	for _, col := range intExcursionSeverity.Columns {
+		if col.Name == "severity_category" {
+			severityCatCol = &col
+			break
+		}
+	}
+
+	if severityCatCol != nil {
+		if !hasDataTest(severityCatCol.DataTests, "accepted_values") {
+			t.Error("severity_category must have accepted_values test (Extreme, High, Moderate, Low)")
+		}
+	}
+}
+
+// TestExcursionDetection validates excursions are detected at all 3 criticality levels
+func TestExcursionDetection(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	// For now, we just verify the test structure is in place
+	t.Log("Test placeholder: Will validate excursions detected at Critical/Standard/Informational levels after model execution")
+
+	// This test would:
+	// 1. Query int_iow_excursions table
+	// 2. Verify records exist for each criticality_level: Critical, Standard, Informational
+	// 3. Verify excursion_magnitude is calculated correctly (> 0)
+	// 4. Verify breach_type is either 'High' or 'Low'
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestExcursionCriticality validates highest criticality assigned when multiple limits breached
+func TestExcursionCriticality(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate most restrictive criticality level selected when multiple limits breached")
+
+	// This test would:
+	// 1. Find readings that breach multiple limits (e.g., both Standard AND Critical)
+	// 2. Verify only ONE excursion record created per reading
+	// 3. Verify criticality_level = 'Critical' (most restrictive)
+	// 4. Verify limit_key points to the Critical limit
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestNoFalsePositives validates in-limit readings don't create excursion records
+func TestNoFalsePositives(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate in-limit readings are excluded from int_iow_excursions")
+
+	// This test would:
+	// 1. Query stg_sensor_readings for readings within all IOW limits
+	// 2. Query int_iow_excursions for those same reading_ids
+	// 3. Verify NO records found (no false positives)
+	// 4. Calculate false positive rate = 0%
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestExcursionWindowing validates consecutive excursions grouped with 15-minute gap tolerance
+func TestExcursionWindowing(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate windowing logic groups consecutive excursions (15-min gap tolerance)")
+
+	// This test would:
+	// 1. Query int_excursion_windows to get event windows
+	// 2. For each event, verify:
+	//    - duration_minutes = excursion_end_time - excursion_start_time
+	//    - reading_count matches excursion records in window
+	//    - No gap > 15 minutes between consecutive readings within event
+	// 3. Verify events separated by > 15 minutes have different excursion_event_ids
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestSeverityCalculation validates severity scoring based on magnitude and duration
+func TestSeverityCalculation(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate severity_score calculation formula")
+
+	// This test would:
+	// 1. Query int_excursion_severity
+	// 2. For sample events, verify:
+	//    - severity_score = (peak_magnitude × 0.4) + (duration_minutes × 0.3) + (criticality_weight × 0.3)
+	//    - criticality_weight: Critical=3.0, Standard=2.0, Informational=1.0
+	//    - severity_category matches score: Extreme (>8), High (5-8), Moderate (2-5), Low (<2)
+	// 3. Verify all scores are >= 0
+
+	t.Skip("Skipping integration test - requires database execution")
+}

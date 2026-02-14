@@ -3,50 +3,50 @@
 -- Filters out 'Bad' quality readings for downstream analysis
 
 SELECT
-    reading_id,
-    timestamp,
-    tag_id,
-    parameter_type,
-    measured_value,
-    data_quality_flag,
+    raw.reading_id,
+    raw.timestamp,
+    raw.tag_id,
+    raw.parameter_type,
+    raw.measured_value,
+    raw.data_quality_flag,
     
     -- Calculated fields for analysis
-    CAST(strftime('%Y%m%d', timestamp) AS INTEGER) AS reading_date_key,
-    CAST(strftime('%H', timestamp) AS INTEGER) AS hour_of_day,
+    CAST(strftime('%Y%m%d', raw.timestamp) AS INTEGER) AS reading_date_key,
+    CAST(strftime('%H', raw.timestamp) AS INTEGER) AS hour_of_day,
     
     -- Flag for potential IOW excursions (simplified check - will be refined in Phase 3)
     CASE 
-        WHEN parameter_type = 'Pressure' AND (measured_value < 50 OR measured_value > 750) THEN 1
-        WHEN parameter_type = 'Temperature' AND (measured_value < 300 OR measured_value > 950) THEN 1
-        WHEN parameter_type = 'pH' AND (measured_value < 5.0 OR measured_value > 9.0) THEN 1
-        WHEN parameter_type = 'Flow' AND (measured_value < 5000 OR measured_value > 85000) THEN 1
+        WHEN raw.parameter_type = 'Pressure' AND (raw.measured_value < 50 OR raw.measured_value > 750) THEN 1
+        WHEN raw.parameter_type = 'Temperature' AND (raw.measured_value < 300 OR raw.measured_value > 950) THEN 1
+        WHEN raw.parameter_type = 'pH' AND (raw.measured_value < 5.0 OR raw.measured_value > 9.0) THEN 1
+        WHEN raw.parameter_type = 'Flow' AND (raw.measured_value < 5000 OR raw.measured_value > 85000) THEN 1
         ELSE 0
     END AS is_excursion_candidate
 
-FROM {{ ref('raw_sensor_readings') }}
+FROM raw_sensor_readings AS raw
 
 -- Join to validate tag_id exists in dim_asset
-INNER JOIN {{ ref('dim_asset') }} AS asset
-    ON raw_sensor_readings.tag_id = asset.tag_id
+INNER JOIN dim_asset AS asset
+    ON raw.tag_id = asset.tag_id
 
 -- Join to validate parameter_type exists in dim_parameter_type
-INNER JOIN {{ ref('dim_parameter_type') }} AS param
-    ON raw_sensor_readings.parameter_type = param.parameter_type
+INNER JOIN dim_parameter_type AS param
+    ON raw.parameter_type = param.parameter_type
 
 WHERE 
     -- Filter out bad quality readings
-    data_quality_flag != 'Bad'
+    raw.data_quality_flag != 'Bad'
     
     -- Data validation: ensure values are within physical limits
-    AND measured_value IS NOT NULL
-    AND timestamp IS NOT NULL
-    AND tag_id IS NOT NULL
-    AND parameter_type IS NOT NULL
+    AND raw.measured_value IS NOT NULL
+    AND raw.timestamp IS NOT NULL
+    AND raw.tag_id IS NOT NULL
+    AND raw.parameter_type IS NOT NULL
     
     -- Specific range validations per parameter type
     AND (
-        (parameter_type = 'Pressure' AND measured_value >= 0 AND measured_value <= 3000)
-        OR (parameter_type = 'Temperature' AND measured_value >= 32 AND measured_value <= 1400)
-        OR (parameter_type = 'pH' AND measured_value >= 0 AND measured_value <= 14)
-        OR (parameter_type = 'Flow' AND measured_value >= 0 AND measured_value <= 50000)
+        (raw.parameter_type = 'Pressure' AND raw.measured_value >= 0 AND raw.measured_value <= 3000)
+        OR (raw.parameter_type = 'Temperature' AND raw.measured_value >= 32 AND raw.measured_value <= 1400)
+        OR (raw.parameter_type = 'pH' AND raw.measured_value >= 0 AND raw.measured_value <= 14)
+        OR (raw.parameter_type = 'Flow' AND raw.measured_value >= 0 AND raw.measured_value <= 50000)
     )
