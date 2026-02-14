@@ -1,0 +1,276 @@
+# Schema Documentation: Metrics & Aggregations Layer
+# Phase 7: PSR-specific KPIs and analytical aggregations
+
+version: 2
+
+models:
+  - name: agg_network_fluidity
+    description: |
+      Network fluidity index measuring weighted average car velocity by corridor and time period.
+      Fluidity is a key PSR metric indicating how smoothly cars flow through the network.
+      Higher fluidity (mph) indicates better network performance.
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor (may be NULL if corridor not identified)
+        tests:
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+      - name: week_period
+        description: Week identifier in YYYY-WNN format (e.g., 2024-W01)
+      - name: total_distance_miles
+        description: Sum of miles traveled across all car trips in this corridor/period
+      - name: total_duration_minutes
+        description: Sum of transit time minutes across all car trips in this corridor/period
+      - name: fluidity_index_mph
+        description: |
+          Network fluidity index calculated as (total_distance_miles / total_duration_minutes) * 60.
+          Represents effective network velocity in miles per hour.
+          Typical PSR target: 20-30 mph for loaded trips, 15-25 mph for empty trips.
+      - name: car_count
+        description: Number of individual car movements in this corridor/period
+      - name: trip_count
+        description: Number of trip segments in this corridor/period
+
+  - name: agg_slot_adherence
+    description: |
+      Slot adherence metrics measuring on-time performance using temporal variance analysis.
+      Lower variance in arrival times indicates better adherence to scheduled time slots.
+      Key PSR principle: precision railroading requires consistent, predictable arrivals.
+    columns:
+      - name: location_id
+        description: Foreign key to dim_location
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+      - name: time_period
+        description: Month identifier in YYYY-MM format
+      - name: arrival_count
+        description: Number of arrivals at this location during the time period
+      - name: stddev_hours
+        description: |
+          Standard deviation of arrival times (in decimal hours, 0-24).
+          Lower values indicate more consistent arrival times.
+          Calculated from hour-of-day variance to detect scheduling adherence.
+      - name: adherence_score
+        description: |
+          Normalized adherence score (0-100) where higher is better.
+          Calculated as: MAX(0, MIN(100, 100 - (stddev_hours * 15)))
+          Score > 80: Excellent adherence
+          Score 60-80: Good adherence
+          Score < 60: Poor adherence, indicates scheduling issues
+
+  - name: agg_shadow_yards
+    description: |
+      Shadow yard detection aggregations analyzing dwell patterns by location.
+      Shadow yards are unofficial holding locations that increase network inefficiency.
+      Detection based on dwell frequency, duration variance, and explicit flagging.
+    columns:
+      - name: location_id
+        description: Foreign key to dim_location
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+      - name: total_dwell_events
+        description: Total number of dwell events at this location
+      - name: shadow_yard_dwell_events
+        description: Number of dwells flagged as shadow yard holds
+      - name: shadow_yard_percentage
+        description: |
+          Percentage of dwells flagged as shadow yard holds (0-100).
+          > 30%: Strong shadow yard indicator
+          10-30%: Moderate shadow yard activity
+          < 10%: Normal operations
+      - name: avg_dwell_duration_minutes
+        description: Average dwell duration across all events at this location
+      - name: stddev_dwell_duration
+        description: Standard deviation of dwell duration (high variance suggests mixed use)
+      - name: min_dwell_duration_minutes
+        description: Shortest dwell observed at this location
+      - name: max_dwell_duration_minutes
+        description: Longest dwell observed at this location
+
+  - name: agg_buffer_consumption
+    description: |
+      Schedule buffer consumption metrics comparing actual vs. scheduled transit times.
+      Uses pre-PSR period as baseline "scheduled" time (target performance).
+      Positive buffer consumption indicates slower than target; negative indicates faster.
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor (may be NULL if corridor not identified)
+        tests:
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+      - name: time_period
+        description: Month identifier in YYYY-MM format
+      - name: avg_scheduled_duration_minutes
+        description: |
+          Baseline/scheduled transit duration for this corridor.
+          Derived from pre-PSR period average as target performance benchmark.
+      - name: avg_actual_duration_minutes
+        description: Actual average transit duration for this corridor/time period
+      - name: avg_buffer_consumed_minutes
+        description: |
+          Difference between actual and scheduled duration (actual - scheduled).
+          Positive: trips taking longer than schedule (buffer consumed)
+          Negative: trips faster than schedule (buffer gained)
+      - name: buffer_consumption_percentage
+        description: |
+          Percentage of buffer consumed: ((actual - scheduled) / scheduled) * 100
+          > 20%: Significant buffer consumption, schedule reliability issues
+          -10% to 20%: Normal variance range
+          < -10%: Significant buffer gain, potential for schedule tightening
+
+  - name: agg_directional_asymmetry
+    description: |
+      Directional asymmetry analysis comparing loaded vs. empty trip performance.
+      PSR principle: prioritize loaded moves over empties to improve asset utilization.
+      Asymmetry ratio > 1.2 indicates loaded trips prioritized (desired PSR outcome).
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor (may be NULL if corridor not identified)
+        tests:
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+      - name: loaded_trip_count
+        description: Number of loaded trips in this corridor
+      - name: loaded_avg_velocity_mph
+        description: Average velocity for loaded trips (mph)
+      - name: loaded_avg_duration_minutes
+        description: Average duration for loaded trips (minutes)
+      - name: empty_trip_count
+        description: Number of empty trips in this corridor
+      - name: empty_avg_velocity_mph
+        description: Average velocity for empty trips (mph)
+      - name: empty_avg_duration_minutes
+        description: Average duration for empty trips (minutes)
+      - name: asymmetry_ratio
+        description: |
+          Ratio of loaded to empty velocity: loaded_avg_velocity / empty_avg_velocity
+          > 1.2: Loaded trips prioritized (PSR best practice)
+          0.8-1.2: Balanced treatment
+          < 0.8: Empty trips prioritized (inefficient, indicates poor asset management)
+      - name: priority_direction
+        description: |
+          Categorical priority classification: 'loaded', 'empty', or 'balanced'
+          Based on asymmetry ratio thresholds (> 1.2 = loaded, < 0.8 = empty, else balanced)
+
+  - name: agg_corridor_weekly_performance
+    description: |
+      Time-series analysis of corridor performance by week.
+      Enables detection of seasonal patterns (25% variation target) and trend analysis.
+      Weekly granularity provides sufficient detail for operational monitoring.
+    columns:
+      - name: corridor_id
+        description: Foreign key to dim_corridor (may be NULL if corridor not identified)
+        tests:
+          - relationships:
+              to: ref('dim_corridor')
+              field: corridor_id
+      - name: week_period
+        description: Week identifier in YYYY-WNN format (e.g., 2024-W01)
+      - name: year
+        description: Calendar year extracted from week_period
+      - name: quarter
+        description: Calendar quarter (1-4)
+      - name: month
+        description: Calendar month (1-12)
+      - name: trip_count
+        description: Number of trips in this corridor during the week
+      - name: car_count
+        description: Number of individual car movements (equivalent to trip_count)
+      - name: avg_velocity_mph
+        description: Average velocity across all trips in the week (mph)
+      - name: avg_duration_minutes
+        description: Average trip duration in the week (minutes)
+      - name: total_distance_miles
+        description: Total miles traveled in this corridor during the week
+
+  - name: agg_psr_evolution
+    description: |
+      PSR evolution metrics tracking KPI changes across three PSR adoption periods.
+      Demonstrates transformation impact: pre-PSR baseline, transition implementation, mature operations.
+      Key metrics include velocity improvements, duration reductions, and operational variance changes.
+    columns:
+      - name: psr_period
+        description: |
+          PSR adoption period: pre-PSR, transition, or mature
+          pre-PSR (2016-2017): Baseline period before PSR adoption
+          transition (2018-2020): PSR implementation and transformation
+          mature (2021-2025): Mature PSR operations with optimization
+      - name: total_trips
+        description: Total number of trips in this PSR period
+      - name: loaded_trips
+        description: Number of loaded (revenue-generating) trips
+      - name: empty_trips
+        description: Number of empty (repositioning) trips
+      - name: avg_velocity_mph
+        description: |
+          Average trip velocity across the period (mph).
+          PSR target: 20-30% velocity improvement from pre-PSR to mature.
+      - name: stddev_velocity
+        description: |
+          Standard deviation of trip velocities.
+          PSR goal: reduce variance (lower stddev) for more consistent service.
+      - name: avg_trip_duration_minutes
+        description: |
+          Average trip duration across the period.
+          PSR target: 20-30% duration reduction from pre-PSR to mature.
+      - name: stddev_trip_duration
+        description: |
+          Standard deviation of trip durations.
+          PSR goal: reduce variance for more predictable arrivals.
+      - name: avg_dwell_count_per_trip
+        description: |
+          Average number of dwells per trip.
+          PSR goal: minimize dwells by improving network fluidity.
+      - name: total_distance_miles
+        description: Total distance traveled across all trips in the period
+
+# PSR KPI Definitions and Calculations
+
+# Network Fluidity Index
+# Formula: (total_distance_miles / total_duration_minutes) * 60
+# Interpretation: Effective network velocity in mph
+# PSR Target: Increase by 20-30% from pre-PSR baseline
+# Typical Values: 20-30 mph (loaded), 15-25 mph (empty)
+
+# Slot Adherence Score
+# Formula: MAX(0, MIN(100, 100 - (stddev_hours * 15)))
+# Interpretation: Higher score = better time slot adherence
+# PSR Target: Score > 75 for consistent scheduled operations
+# Based On: Temporal variance of arrival times (lower variance = higher score)
+
+# Shadow Yard Detection
+# Primary Indicator: shadow_yard_percentage > 30%
+# Secondary Indicators:
+#   - High stddev_dwell_duration (mixed use patterns)
+#   - Location type inconsistent with dwell patterns
+#   - Elevated avg_dwell_duration vs. location type baseline
+# PSR Goal: Identify and eliminate shadow yards to improve network flow
+
+# Buffer Consumption
+# Formula: ((actual_duration - scheduled_duration) / scheduled_duration) * 100
+# Interpretation: % of schedule buffer consumed
+# PSR Target: Maintain <20% buffer consumption for schedule reliability
+# Baseline: Uses pre-PSR period averages as "scheduled" time
+
+# Directional Asymmetry Ratio
+# Formula: loaded_avg_velocity / empty_avg_velocity
+# Interpretation: Velocity ratio indicating priority treatment
+# PSR Target: Ratio > 1.2 (loaded trips 20% faster than empties)
+# PSR Principle: Prioritize revenue-generating loaded moves
+
+# PSR Evolution Analysis
+# Compares three periods: pre-PSR (baseline), transition (implementation), mature (optimized)
+# Key Metrics:
+#   - Velocity: Target 20-30% improvement (pre-PSR → mature)
+#   - Duration: Target 20-30% reduction (pre-PSR → mature)
+#   - Variance: Target reduced stddev for consistency (pre-PSR → mature)
+#   - Dwells: Target fewer stops per trip (pre-PSR → mature)
