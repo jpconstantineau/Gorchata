@@ -1496,3 +1496,735 @@ func TestReferentialIntegrity(t *testing.T) {
 
 	t.Skip("Skipping integration test - requires database execution")
 }
+
+// ===================================================================
+// PHASE 5 TESTS: METRICS LAYER (Asset Integrity Health Indices & Bad Actors)
+// ===================================================================
+
+// TestMetricsAssetIntegrityIndexModel validates metrics_asset_integrity_index.sql model file exists
+func TestMetricsAssetIntegrityIndexModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "metrics_asset_integrity_index.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("metrics_asset_integrity_index.sql model does not exist at %s", modelPath)
+	}
+
+	// Verify it's a non-empty file
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to stat model file: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("metrics_asset_integrity_index.sql is empty - must contain SELECT logic")
+	}
+
+	// Verify it references fact_asset_damage_accumulation
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+	contentStr := string(content)
+	if !strings.Contains(strings.ToLower(contentStr), "fact_asset_damage_accumulation") {
+		t.Error("metrics_asset_integrity_index.sql must reference fact_asset_damage_accumulation")
+	}
+}
+
+// TestMetricsAssetIntegrityIndexSchema validates metrics_asset_integrity_index has required columns
+func TestMetricsAssetIntegrityIndexSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find metrics_asset_integrity_index model
+	var metricsModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "metrics_asset_integrity_index" {
+			metricsModel = &model
+			break
+		}
+	}
+
+	if metricsModel == nil {
+		t.Fatal("metrics_asset_integrity_index not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"asset_key",
+		"tag_id",
+		"equipment_name",
+		"unit_name",
+		"integrity_health_index",
+		"health_status",
+		"health_trend_30d",
+		"trend_direction",
+		"total_excursion_count",
+		"critical_excursion_count",
+		"cumulative_damage_total",
+		"damage_last_90_days",
+		"days_since_last_critical",
+		"last_excursion_date",
+		"asset_install_date",
+		"design_life_years",
+		"years_in_service",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range metricsModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in metrics_asset_integrity_index", colName)
+		}
+	}
+
+	// Verify integrity_health_index has accepted_range test (0-100)
+	var healthIndexCol *schema.ColumnSchema
+	for _, col := range metricsModel.Columns {
+		if col.Name == "integrity_health_index" {
+			healthIndexCol = &col
+			break
+		}
+	}
+
+	if healthIndexCol != nil {
+		if !hasDataTest(healthIndexCol.DataTests, "not_null") {
+			t.Error("integrity_health_index must have not_null test")
+		}
+		// Check for accepted_range test (simplified check)
+		foundRange := false
+		for _, test := range healthIndexCol.DataTests {
+			if testMap, ok := test.(map[string]interface{}); ok {
+				if _, ok := testMap["accepted_range"]; ok {
+					foundRange = true
+					break
+				}
+			}
+		}
+		if !foundRange {
+			t.Error("integrity_health_index must have accepted_range test (0-100)")
+		}
+	}
+
+	// Verify health_status has accepted_values test
+	var healthStatusCol *schema.ColumnSchema
+	for _, col := range metricsModel.Columns {
+		if col.Name == "health_status" {
+			healthStatusCol = &col
+			break
+		}
+	}
+
+	if healthStatusCol != nil {
+		foundAcceptedValues := false
+		for _, test := range healthStatusCol.DataTests {
+			if testMap, ok := test.(map[string]interface{}); ok {
+				if _, ok := testMap["accepted_values"]; ok {
+					foundAcceptedValues = true
+					break
+				}
+			}
+		}
+		if !foundAcceptedValues {
+			t.Error("health_status must have accepted_values test")
+		}
+	}
+}
+
+// TestMetricsBadActorsModel validates metrics_bad_actors.sql model file exists
+func TestMetricsBadActorsModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "metrics_bad_actors.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("metrics_bad_actors.sql model does not exist at %s", modelPath)
+	}
+
+	// Verify it's a non-empty file
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to stat model file: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("metrics_bad_actors.sql is empty - must contain SELECT logic")
+	}
+
+	// Verify it references metrics_asset_integrity_index
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+	contentStr := string(content)
+	if !strings.Contains(strings.ToLower(contentStr), "metrics_asset_integrity_index") {
+		t.Error("metrics_bad_actors.sql must reference metrics_asset_integrity_index")
+	}
+}
+
+// TestMetricsBadActorsSchema validates metrics_bad_actors has required columns
+func TestMetricsBadActorsSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find metrics_bad_actors model
+	var badActorsModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "metrics_bad_actors" {
+			badActorsModel = &model
+			break
+		}
+	}
+
+	if badActorsModel == nil {
+		t.Fatal("metrics_bad_actors not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"bad_actor_rank",
+		"asset_key",
+		"tag_id",
+		"equipment_name",
+		"unit_name",
+		"bad_actor_score",
+		"integrity_health_index",
+		"primary_reason_code",
+		"secondary_reason_code",
+		"total_excursion_count",
+		"critical_excursion_count",
+		"cumulative_damage_total",
+		"damage_last_90_days",
+		"days_since_last_critical",
+		"health_trend_30d",
+		"recommended_action",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range badActorsModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in metrics_bad_actors", colName)
+		}
+	}
+
+	// Verify bad_actor_rank has unique and not_null tests
+	var rankCol *schema.ColumnSchema
+	for _, col := range badActorsModel.Columns {
+		if col.Name == "bad_actor_rank" {
+			rankCol = &col
+			break
+		}
+	}
+
+	if rankCol != nil {
+		if !hasDataTest(rankCol.DataTests, "unique") {
+			t.Error("bad_actor_rank must have unique test")
+		}
+		if !hasDataTest(rankCol.DataTests, "not_null") {
+			t.Error("bad_actor_rank must have not_null test")
+		}
+	}
+
+	// Verify recommended_action has accepted_values test
+	var actionCol *schema.ColumnSchema
+	for _, col := range badActorsModel.Columns {
+		if col.Name == "recommended_action" {
+			actionCol = &col
+			break
+		}
+	}
+
+	if actionCol != nil {
+		foundAcceptedValues := false
+		for _, test := range actionCol.DataTests {
+			if testMap, ok := test.(map[string]interface{}); ok {
+				if _, ok := testMap["accepted_values"]; ok {
+					foundAcceptedValues = true
+					break
+				}
+			}
+		}
+		if !foundAcceptedValues {
+			t.Error("recommended_action must have accepted_values test")
+		}
+	}
+}
+
+// TestMetricsUnitHealthSummaryModel validates metrics_unit_health_summary.sql model file exists
+func TestMetricsUnitHealthSummaryModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "metrics_unit_health_summary.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("metrics_unit_health_summary.sql model does not exist at %s", modelPath)
+	}
+
+	// Verify it's a non-empty file
+	info, err := os.Stat(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to stat model file: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("metrics_unit_health_summary.sql is empty - must contain SELECT logic")
+	}
+
+	// Verify it references metrics_asset_integrity_index
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+	contentStr := string(content)
+	if !strings.Contains(strings.ToLower(contentStr), "metrics_asset_integrity_index") {
+		t.Error("metrics_unit_health_summary.sql must reference metrics_asset_integrity_index")
+	}
+
+	// Verify it contains GROUP BY unit_name
+	if !strings.Contains(strings.ToLower(contentStr), "group by") {
+		t.Error("metrics_unit_health_summary.sql must contain GROUP BY clause for unit aggregation")
+	}
+}
+
+// TestMetricsUnitHealthSummarySchema validates metrics_unit_health_summary has required columns
+func TestMetricsUnitHealthSummarySchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find metrics_unit_health_summary model
+	var unitSummaryModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "metrics_unit_health_summary" {
+			unitSummaryModel = &model
+			break
+		}
+	}
+
+	if unitSummaryModel == nil {
+		t.Fatal("metrics_unit_health_summary not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"unit_name",
+		"asset_count",
+		"unit_avg_health_index",
+		"unit_min_health_index",
+		"unit_max_health_index",
+		"assets_in_critical_status",
+		"assets_in_poor_status",
+		"unit_critical_excursion_count",
+		"unit_total_excursion_count",
+		"unit_damage_total",
+		"unit_damage_last_90_days",
+		"worst_asset_tag_id",
+		"worst_asset_health_index",
+		"unit_health_status",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range unitSummaryModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in metrics_unit_health_summary", colName)
+		}
+	}
+
+	// Verify unit_name has unique and not_null tests (PK)
+	var unitNameCol *schema.ColumnSchema
+	for _, col := range unitSummaryModel.Columns {
+		if col.Name == "unit_name" {
+			unitNameCol = &col
+			break
+		}
+	}
+
+	if unitNameCol != nil {
+		if !hasDataTest(unitNameCol.DataTests, "unique") {
+			t.Error("unit_name must have unique test (primary key)")
+		}
+		if !hasDataTest(unitNameCol.DataTests, "not_null") {
+			t.Error("unit_name must have not_null test")
+		}
+	}
+
+	// Verify unit_health_status has accepted_values test
+	var unitHealthStatusCol *schema.ColumnSchema
+	for _, col := range unitSummaryModel.Columns {
+		if col.Name == "unit_health_status" {
+			unitHealthStatusCol = &col
+			break
+		}
+	}
+
+	if unitHealthStatusCol != nil {
+		foundAcceptedValues := false
+		for _, test := range unitHealthStatusCol.DataTests {
+			if testMap, ok := test.(map[string]interface{}); ok {
+				if _, ok := testMap["accepted_values"]; ok {
+					foundAcceptedValues = true
+					break
+				}
+			}
+		}
+		if !foundAcceptedValues {
+			t.Error("unit_health_status must have accepted_values test")
+		}
+	}
+}
+
+// ===================================================================
+// PHASE 6: ALERT MODELS TESTS
+// ===================================================================
+
+// TestAlertsCriticalExcursionsModel validates alerts_critical_excursions.sql model file exists
+func TestAlertsCriticalExcursionsModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "alerts_critical_excursions.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("alerts_critical_excursions.sql model does not exist at %s", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model references fact_excursion_events
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"fact_excursion_events",
+		"criticality_level",
+		"Critical",
+		"alert_id",
+		"alert_timestamp",
+		"asset_key",
+		"alert_type",
+		"priority",
+		"message",
+		"acknowledged_flag",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("alerts_critical_excursions.sql missing required pattern: %s", pattern)
+		}
+	}
+}
+
+// TestAlertsCriticalExcursionsSchema validates alerts_critical_excursions has required columns
+func TestAlertsCriticalExcursionsSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find alerts_critical_excursions model
+	var alertsModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "alerts_critical_excursions" {
+			alertsModel = &model
+			break
+		}
+	}
+
+	if alertsModel == nil {
+		t.Fatal("alerts_critical_excursions not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"alert_id",
+		"alert_timestamp",
+		"asset_key",
+		"asset_name",
+		"alert_type",
+		"priority",
+		"message",
+		"acknowledged_flag",
+		"excursion_event_id",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range alertsModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in alerts_critical_excursions", colName)
+		}
+	}
+
+	// Verify alert_id has unique and not_null tests
+	var alertIdCol *schema.ColumnSchema
+	for _, col := range alertsModel.Columns {
+		if col.Name == "alert_id" {
+			alertIdCol = &col
+			break
+		}
+	}
+
+	if alertIdCol != nil {
+		if !hasDataTest(alertIdCol.DataTests, "unique") {
+			t.Error("alert_id must have unique test")
+		}
+		if !hasDataTest(alertIdCol.DataTests, "not_null") {
+			t.Error("alert_id must have not_null test")
+		}
+	}
+
+	// Verify alert_type has accepted_values test
+	var alertTypeCol *schema.ColumnSchema
+	for _, col := range alertsModel.Columns {
+		if col.Name == "alert_type" {
+			alertTypeCol = &col
+			break
+		}
+	}
+
+	if alertTypeCol != nil {
+		if !hasDataTest(alertTypeCol.DataTests, "accepted_values") {
+			t.Error("alert_type must have accepted_values test")
+		}
+	}
+}
+
+// TestAlertsInspectionDueModel validates alerts_inspection_due.sql model file exists
+func TestAlertsInspectionDueModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "alerts_inspection_due.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("alerts_inspection_due.sql model does not exist at %s", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model references required upstream models
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"fact_asset_damage_accumulation",
+		"metrics_asset_integrity_index",
+		"cumulative_damage",
+		"health_index",
+		"damage_pct_of_limit",
+		"days_until_inspection",
+		"recommended_action",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("alerts_inspection_due.sql missing required pattern: %s", pattern)
+		}
+	}
+}
+
+// TestAlertsInspectionDueSchema validates alerts_inspection_due has required columns
+func TestAlertsInspectionDueSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find alerts_inspection_due model
+	var alertsModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "alerts_inspection_due" {
+			alertsModel = &model
+			break
+		}
+	}
+
+	if alertsModel == nil {
+		t.Fatal("alerts_inspection_due not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"alert_id",
+		"alert_timestamp",
+		"asset_key",
+		"asset_name",
+		"alert_type",
+		"priority",
+		"days_until_inspection",
+		"damage_pct_of_limit",
+		"recommended_action",
+		"message",
+		"acknowledged_flag",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range alertsModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in alerts_inspection_due", colName)
+		}
+	}
+
+	// Verify alert_id has unique and not_null tests
+	var alertIdCol *schema.ColumnSchema
+	for _, col := range alertsModel.Columns {
+		if col.Name == "alert_id" {
+			alertIdCol = &col
+			break
+		}
+	}
+
+	if alertIdCol != nil {
+		if !hasDataTest(alertIdCol.DataTests, "unique") {
+			t.Error("alert_id must have unique test")
+		}
+		if !hasDataTest(alertIdCol.DataTests, "not_null") {
+			t.Error("alert_id must have not_null test")
+		}
+	}
+}
+
+// TestAlertsHealthDegradationModel validates alerts_health_degradation.sql model file exists
+func TestAlertsHealthDegradationModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "alerts_health_degradation.sql")
+
+	// Verify file exists
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("alerts_health_degradation.sql model does not exist at %s", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model references metrics_asset_integrity_index and has 30-day comparison logic
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"metrics_asset_integrity_index",
+		"health_index",
+		"health_change",
+		"degradation_severity",
+		"health_index_current",
+		"health_index_30d_ago",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("alerts_health_degradation.sql missing required pattern: %s", pattern)
+		}
+	}
+}
+
+// TestAlertsHealthDegradationSchema validates alerts_health_degradation has required columns
+func TestAlertsHealthDegradationSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	// Find alerts_health_degradation model
+	var alertsModel *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "alerts_health_degradation" {
+			alertsModel = &model
+			break
+		}
+	}
+
+	if alertsModel == nil {
+		t.Fatal("alerts_health_degradation not found in schema")
+	}
+
+	// Verify required columns exist
+	requiredColumns := []string{
+		"alert_id",
+		"alert_timestamp",
+		"asset_key",
+		"asset_name",
+		"alert_type",
+		"priority",
+		"health_index_current",
+		"health_index_30d_ago",
+		"health_change",
+		"degradation_severity",
+		"recommended_action",
+		"message",
+		"acknowledged_flag",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range alertsModel.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in alerts_health_degradation", colName)
+		}
+	}
+
+	// Verify alert_id has unique and not_null tests
+	var alertIdCol *schema.ColumnSchema
+	for _, col := range alertsModel.Columns {
+		if col.Name == "alert_id" {
+			alertIdCol = &col
+			break
+		}
+	}
+
+	if alertIdCol != nil {
+		if !hasDataTest(alertIdCol.DataTests, "unique") {
+			t.Error("alert_id must have unique test")
+		}
+		if !hasDataTest(alertIdCol.DataTests, "not_null") {
+			t.Error("alert_id must have not_null test")
+		}
+	}
+
+	// Verify degradation_severity has accepted_values test
+	var degradationCol *schema.ColumnSchema
+	for _, col := range alertsModel.Columns {
+		if col.Name == "degradation_severity" {
+			degradationCol = &col
+			break
+		}
+	}
+
+	if degradationCol != nil {
+		if !hasDataTest(degradationCol.DataTests, "accepted_values") {
+			t.Error("degradation_severity must have accepted_values test")
+		}
+	}
+}

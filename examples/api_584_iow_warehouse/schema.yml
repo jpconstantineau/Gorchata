@@ -837,3 +837,837 @@ models:
           - accepted_range:
               min_value: 1
 
+  # ===================================================================
+  # METRICS LAYER - API 584 IOW Data Warehouse
+  # Asset Integrity Health Indices & Bad Actor Identification
+  # ===================================================================
+
+  - name: metrics_asset_integrity_index
+    description: "Asset-level integrity health scores (0-100 scale) with operational KPIs for monitoring"
+    columns:
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS (e.g., P-101, HX-201)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_name
+        description: "Descriptive equipment name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: integrity_health_index
+        description: "Asset health score 0-100 (100=perfect health, 0=critically unhealthy)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: health_status
+        description: "Health classification: Excellent (>90), Good (70-90), Fair (50-70), Poor (30-50), Critical (<30)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Critical']
+      
+      - name: health_trend_30d
+        description: "Percent change in damage last 30 days vs previous 30 days (positive=degrading, negative=improving)"
+        data_tests:
+          - not_null
+      
+      - name: trend_direction
+        description: "Trend classification: Improving (<-10%), Stable (-10% to +10%), Degrading (>+10%)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Improving', 'Stable', 'Degrading']
+      
+      - name: total_excursion_count
+        description: "Total number of excursion events for this asset"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: critical_excursion_count
+        description: "Number of Critical-level excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: cumulative_damage_total
+        description: "Total cumulative damage from all excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_90_days
+        description: "Cumulative damage in last 90 days"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: days_since_last_critical
+        description: "Days since most recent Critical excursion (NULL if never had Critical event)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+      
+      - name: last_excursion_date
+        description: "Date of most recent excursion event (any criticality)"
+        data_tests:
+          - not_null
+      
+      - name: asset_install_date
+        description: "Installation date of asset"
+        data_tests:
+          - not_null
+      
+      - name: design_life_years
+        description: "Expected design life of asset in years"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+      
+      - name: years_in_service
+        description: "Years asset has been in service (calculated from install_date to current date)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+
+  - name: metrics_bad_actors
+    description: "Bottom 10% worst performing assets by composite score for prioritized attention"
+    columns:
+      - name: bad_actor_rank
+        description: "Rank of bad actor (1 = worst asset)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_range:
+              min_value: 1
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: equipment_name
+        description: "Descriptive equipment name"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: bad_actor_score
+        description: "Composite bad actor score 0-100 (higher=worse performance)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: integrity_health_index
+        description: "Asset health score 0-100 (from metrics_asset_integrity_index)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: primary_reason_code
+        description: "Dominant issue causing bad actor status"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['High_Excursion_Frequency', 'Severe_Damage_Accumulation', 'Repeated_Critical_Events', 'Degrading_Health_Trend']
+      
+      - name: secondary_reason_code
+        description: "Secondary contributing issue (nullable)"
+        data_tests:
+          - accepted_values:
+              values: ['High_Excursion_Frequency', 'Severe_Damage_Accumulation', 'Repeated_Critical_Events', 'Degrading_Health_Trend']
+      
+      - name: total_excursion_count
+        description: "Total number of excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: critical_excursion_count
+        description: "Number of Critical-level excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: cumulative_damage_total
+        description: "Total cumulative damage from all excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_90_days
+        description: "Cumulative damage in last 90 days"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: days_since_last_critical
+        description: "Days since most recent Critical excursion (NULL if never had Critical event)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+      
+      - name: health_trend_30d
+        description: "Percent change in damage last 30 days vs previous 30 days"
+        data_tests:
+          - not_null
+      
+      - name: recommended_action
+        description: "Recommended action based on severity and recency of issues"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Immediate_Inspection', 'Schedule_Inspection', 'Monitor_Closely', 'Increase_Monitoring_Frequency']
+
+  - name: metrics_unit_health_summary
+    description: "Unit-level health aggregations by refinery unit (CDU, VDU, FCC, HCU)"
+    columns:
+      - name: unit_name
+        description: "Refinery unit name (PK)"
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: asset_count
+        description: "Number of assets in this unit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+      
+      - name: unit_avg_health_index
+        description: "Average health index across all assets in unit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: unit_min_health_index
+        description: "Minimum (worst) health index in unit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: unit_max_health_index
+        description: "Maximum (best) health index in unit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: assets_in_critical_status
+        description: "Count of assets with Critical health status"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: assets_in_poor_status
+        description: "Count of assets with Poor health status"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unit_critical_excursion_count
+        description: "Total Critical-level excursions across all unit assets"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unit_total_excursion_count
+        description: "Total excursions (all criticality levels) across all unit assets"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unit_damage_total
+        description: "Total cumulative damage across all unit assets"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: unit_damage_last_90_days
+        description: "Total damage in last 90 days across all unit assets"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: worst_asset_tag_id
+        description: "Tag ID of asset with lowest health index in unit"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: worst_asset_health_index
+        description: "Health index of worst performing asset in unit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: unit_health_status
+        description: "Unit-level health classification based on unit_avg_health_index"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Critical']
+
+  # ===================================================================
+  # ALERT MODELS - Phase 6: Alert Notifications
+  # Critical condition monitoring and exception-based alerting
+  # ===================================================================
+
+  - name: alerts_critical_excursions
+    description: "Alert notifications for all critical-level IOW limit breaches requiring immediate operator response"
+    columns:
+      - name: alert_id
+        description: "Unique alert identifier"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: alert_timestamp
+        description: "When the alert was generated (excursion start time)"
+        data_tests:
+          - not_null
+      
+      - name: asset_key
+        description: "Foreign key to dim_asset"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: asset_name
+        description: "Human-readable asset identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: alert_type
+        description: "Category of alert"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical_IOW_Excursion']
+      
+      - name: priority
+        description: "Alert urgency level"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'High', 'Medium', 'Low']
+      
+      - name: parameter_type
+        description: "Sensor parameter that exceeded limit"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Pressure', 'Temperature', 'pH', 'Flow']
+      
+      - name: limit_value
+        description: "IOW limit that was breached"
+        data_tests:
+          - not_null
+      
+      - name: measured_peak_value
+        description: "Peak sensor reading during excursion"
+        data_tests:
+          - not_null
+      
+      - name: measured_avg_value
+        description: "Average sensor reading during excursion"
+        data_tests:
+          - not_null
+      
+      - name: excursion_magnitude
+        description: "Magnitude of limit breach"
+        data_tests:
+          - not_null
+      
+      - name: duration_minutes
+        description: "Duration of excursion event in minutes"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: cumulative_damage_index
+        description: "Cumulative damage from this excursion event (AUC calculation)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: message
+        description: "Human-readable alert message"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: acknowledged_flag
+        description: "Whether alert has been acknowledged (0=open, 1=acknowledged)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      
+      - name: excursion_event_id
+        description: "Foreign key to fact_excursion_events (natural key)"
+        data_tests:
+          - not_null
+
+  - name: alerts_inspection_due
+    description: "Alert notifications for assets requiring inspection based on damage accumulation, health degradation, or schedule"
+    columns:
+      - name: alert_id
+        description: "Unique alert identifier"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: alert_timestamp
+        description: "When the alert was generated"
+        data_tests:
+          - not_null
+      
+      - name: asset_key
+        description: "Foreign key to dim_asset"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: asset_name
+        description: "Human-readable asset identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: alert_type
+        description: "Category of alert"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Inspection_Due']
+      
+      - name: priority
+        description: "Alert urgency level based on health and damage state"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'High', 'Medium', 'Low']
+      
+      - name: cumulative_damage_to_date
+        description: "Total cumulative damage from all excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: cumulative_damage_365d
+        description: "Cumulative damage in last 365 days"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_pct_of_limit
+        description: "Damage as percentage of design margin limit"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: health_index
+        description: "Current asset health score 0-100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: health_status
+        description: "Health classification (Excellent, Good, Fair, Poor, Critical)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Critical']
+      
+      - name: days_since_last_critical_excursion
+        description: "Days since most recent Critical excursion (NULL if never had Critical event)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+      
+      - name: days_until_inspection
+        description: "Estimated days until inspection needed (based on damage rate)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: recommended_action
+        description: "Recommended inspection action"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Immediate_Inspection', 'Schedule_Within_30_Days', 'Schedule_Next_Turnaround']
+      
+      - name: message
+        description: "Human-readable alert message"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: acknowledged_flag
+        description: "Whether alert has been acknowledged (0=open, 1=acknowledged)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: alerts_health_degradation
+    description: "Alert notifications for rapid health index deterioration (>20 point drop in 30 days)"
+    columns:
+      - name: alert_id
+        description: "Unique alert identifier"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: alert_timestamp
+        description: "When the alert was generated"
+        data_tests:
+          - not_null
+      
+      - name: asset_key
+        description: "Foreign key to dim_asset"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: asset_name
+        description: "Human-readable asset identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: alert_type
+        description: "Category of alert"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Health_Degradation']
+      
+      - name: priority
+        description: "Alert urgency level based on severity of health degradation"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'High', 'Medium', 'Low']
+      
+      - name: health_index_current
+        description: "Current asset health score 0-100"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: health_index_30d_ago
+        description: "Health score 30 days ago (estimated)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 100
+      
+      - name: health_change
+        description: "Change in health index over 30 days (negative indicates degradation)"
+        data_tests:
+          - not_null
+      
+      - name: degradation_severity
+        description: "Severity of health degradation"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Severe', 'Significant', 'Moderate']
+      
+      - name: health_status
+        description: "Current health classification (Excellent, Good, Fair, Poor, Critical)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Critical']
+      
+      - name: trend_direction
+        description: "Trend classification from metrics_asset_integrity_index"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Improving', 'Stable', 'Degrading']
+      
+      - name: primary_reason
+        description: "Primary cause of degradation (most frequent excursion type in last 30 days)"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: recommended_action
+        description: "Recommended corrective action"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Investigate_Root_Cause', 'Increase_Monitoring', 'Expedite_Inspection']
+      
+      - name: message
+        description: "Human-readable alert message"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: acknowledged_flag
+        description: "Whether alert has been acknowledged (0=open, 1=acknowledged)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: alerts_damage_threshold
+    description: "Alert notifications for assets exceeding damage mechanism-specific thresholds"
+    columns:
+      - name: alert_id
+        description: "Unique alert identifier"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: alert_timestamp
+        description: "When the alert was generated"
+        data_tests:
+          - not_null
+      
+      - name: asset_key
+        description: "Foreign key to dim_asset"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: tag_id
+        description: "Asset tag identifier from DCS"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: asset_name
+        description: "Human-readable asset identifier"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: unit_name
+        description: "Refinery unit (CDU, VDU, FCC, HCU)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['CDU', 'VDU', 'FCC', 'HCU']
+      
+      - name: damage_mechanism_primary
+        description: "Primary damage mechanism for this asset"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: material_grade
+        description: "Material grade of asset"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: alert_type
+        description: "Category of alert"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Damage_Threshold_Exceeded']
+      
+      - name: priority
+        description: "Alert urgency level based on how much threshold is exceeded"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Critical', 'High', 'Medium', 'Low']
+      
+      - name: cumulative_damage_to_date
+        description: "Total cumulative damage from all excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_threshold
+        description: "Mechanism-specific damage threshold that was exceeded"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_pct_over_threshold
+        description: "Percentage by which threshold is exceeded"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_30_days
+        description: "Cumulative damage in last 30 days (rate of accumulation)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_90_days
+        description: "Cumulative damage in last 90 days"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: estimated_days_to_failure
+        description: "Estimated days until critical failure (extrapolated based on damage rate)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: recommended_action
+        description: "Recommended corrective action based on severity"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Immediate_Shutdown_Inspection', 'Plan_Replacement', 'Schedule_Repair', 'Monitor_Closely']
+      
+      - name: message
+        description: "Human-readable alert message"
+        data_tests:
+          - not_null
+          - not_empty_string
+      
+      - name: acknowledged_flag
+        description: "Whether alert has been acknowledged (0=open, 1=acknowledged)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+
