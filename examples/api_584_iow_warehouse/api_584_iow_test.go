@@ -2228,3 +2228,225 @@ func TestAlertsHealthDegradationSchema(t *testing.T) {
 		}
 	}
 }
+
+// ===================================================================
+// PHASE 7: ANALYTICAL QUERIES TESTS
+// Business-facing analytical queries (not models in schema.yml)
+// ===================================================================
+
+// TestInspectionPriorityQueueQuery validates inspection_priority_queue.sql exists and contains required logic
+func TestInspectionPriorityQueueQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "inspection_priority_queue.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "metrics_asset_integrity_index" }}`) {
+		t.Error("Query must reference metrics_asset_integrity_index model")
+	}
+	if !strings.Contains(query, `{{ ref "fact_asset_damage_accumulation" }}`) {
+		t.Error("Query must reference fact_asset_damage_accumulation model")
+	}
+	if !strings.Contains(query, `{{ ref "dim_asset" }}`) {
+		t.Error("Query must reference dim_asset model")
+	}
+
+	// Verify priority_score calculation exists
+	if !strings.Contains(query, "priority_score") {
+		t.Error("Query must calculate priority_score")
+	}
+
+	// Verify ORDER BY clause for prioritization
+	if !strings.Contains(strings.ToUpper(query), "ORDER BY") {
+		t.Error("Query must have ORDER BY clause for ranking")
+	}
+
+	// Verify key business columns
+	requiredColumns := []string{"health_index", "cumulative_damage", "critical_excursion_count"}
+	for _, col := range requiredColumns {
+		if !strings.Contains(strings.ToLower(query), strings.ToLower(col)) {
+			t.Errorf("Query must include %s column", col)
+		}
+	}
+}
+
+// TestParameterTrendingQuery validates parameter_trending.sql exists and uses window functions
+func TestParameterTrendingQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "parameter_trending.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "stg_sensor_readings" }}`) {
+		t.Error("Query must reference stg_sensor_readings model")
+	}
+	if !strings.Contains(query, `{{ ref "dim_iow_limit" }}`) {
+		t.Error("Query must reference dim_iow_limit model")
+	}
+
+	// Verify window functions for moving averages
+	if !strings.Contains(strings.ToUpper(query), "OVER") {
+		t.Error("Query must use window functions (OVER clause)")
+	}
+	if !strings.Contains(strings.ToUpper(query), "AVG") && !strings.Contains(strings.ToUpper(query), "STDDEV") {
+		t.Error("Query must calculate moving averages or standard deviations")
+	}
+
+	// Verify trending calculations
+	requiredElements := []string{"moving_avg", "control_limit", "iow_critical"}
+	for _, elem := range requiredElements {
+		if !strings.Contains(strings.ToLower(query), strings.ToLower(elem)) {
+			t.Errorf("Query must include %s calculation", elem)
+		}
+	}
+}
+
+// TestDamageMechanismCorrelationQuery validates damage_mechanism_correlation.sql
+func TestDamageMechanismCorrelationQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "damage_mechanism_correlation.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "fact_excursion_events" }}`) {
+		t.Error("Query must reference fact_excursion_events model")
+	}
+	if !strings.Contains(query, `{{ ref "dim_asset" }}`) {
+		t.Error("Query must reference dim_asset model")
+	}
+
+	// Verify grouping by damage_mechanism and parameter_type
+	if !strings.Contains(strings.ToLower(query), "damage_mechanism") {
+		t.Error("Query must group by damage_mechanism")
+	}
+	if !strings.Contains(strings.ToLower(query), "parameter_type") {
+		t.Error("Query must group by parameter_type")
+	}
+
+	// Verify correlation calculations
+	if !strings.Contains(strings.ToUpper(query), "GROUP BY") {
+		t.Error("Query must use GROUP BY for correlation analysis")
+	}
+}
+
+// TestExcursionRootCauseAnalysisQuery validates excursion_root_cause_analysis.sql
+func TestExcursionRootCauseAnalysisQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "excursion_root_cause_analysis.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "fact_excursion_events" }}`) {
+		t.Error("Query must reference fact_excursion_events model")
+	}
+	if !strings.Contains(query, `{{ ref "dim_date" }}`) {
+		t.Error("Query must reference dim_date model")
+	}
+
+	// Verify temporal pattern analysis (operational event classification)
+	if !strings.Contains(strings.ToLower(query), "root_cause") || !strings.Contains(strings.ToLower(query), "category") {
+		t.Error("Query must classify excursions by root_cause_category")
+	}
+
+	// Verify time-based correlation elements
+	temporalElements := []string{"startup", "weekend", "night", "shift"}
+	foundTemporal := false
+	for _, elem := range temporalElements {
+		if strings.Contains(strings.ToLower(query), elem) {
+			foundTemporal = true
+			break
+		}
+	}
+	if !foundTemporal {
+		t.Error("Query must include temporal pattern analysis (startup, weekend, night shift, etc.)")
+	}
+}
+
+// TestAssetLifecycleAnalysisQuery validates asset_lifecycle_analysis.sql
+func TestAssetLifecycleAnalysisQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "asset_lifecycle_analysis.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "fact_asset_damage_accumulation" }}`) {
+		t.Error("Query must reference fact_asset_damage_accumulation model")
+	}
+	if !strings.Contains(query, `{{ ref "dim_asset" }}`) {
+		t.Error("Query must reference dim_asset model")
+	}
+
+	// Verify lifecycle calculations
+	lifecycleElements := []string{"design_life", "aging", "acceleration"}
+	for _, elem := range lifecycleElements {
+		if !strings.Contains(strings.ToLower(query), elem) {
+			t.Errorf("Query must include %s calculation", elem)
+		}
+	}
+
+	// Verify comparison of actual vs design life
+	if !strings.Contains(strings.ToLower(query), "pct") || !strings.Contains(strings.ToLower(query), "consumed") {
+		t.Error("Query must calculate percentage of design life consumed")
+	}
+}
+
+// TestUnitPerformanceComparisonQuery validates unit_performance_comparison.sql
+func TestUnitPerformanceComparisonQuery(t *testing.T) {
+	queryPath := filepath.Join("queries", "unit_performance_comparison.sql")
+
+	// Verify file exists
+	content, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatalf("Query file does not exist at %s: %v", queryPath, err)
+	}
+
+	query := string(content)
+
+	// Verify references to required models
+	if !strings.Contains(query, `{{ ref "metrics_unit_health_summary" }}`) && !strings.Contains(query, `{{ ref "dim_asset" }}`) {
+		t.Error("Query must reference metrics_unit_health_summary or dim_asset model")
+	}
+
+	// Verify unit-level grouping
+	if !strings.Contains(strings.ToLower(query), "unit_name") {
+		t.Error("Query must group by unit_name")
+	}
+	if !strings.Contains(strings.ToUpper(query), "GROUP BY") {
+		t.Error("Query must use GROUP BY for unit comparison")
+	}
+
+	// Verify normalized metrics (per-asset calculations)
+	if !strings.Contains(strings.ToLower(query), "per_asset") || !strings.Contains(strings.ToLower(query), "avg") {
+		t.Error("Query must calculate per-asset averages for fair unit comparison")
+	}
+}
