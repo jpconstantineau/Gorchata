@@ -1191,3 +1191,308 @@ func TestSeverityCalculation(t *testing.T) {
 
 	t.Skip("Skipping integration test - requires database execution")
 }
+
+// ===================================================================
+// PHASE 4 TESTS: FACT TABLES (Excursion Events with Damage Metrics)
+// ===================================================================
+
+// TestFactExcursionEventsModel validates fact_excursion_events.sql model file exists
+func TestFactExcursionEventsModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "fact_excursion_events.sql")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("Required model file %s does not exist", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model contains fact table logic
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"int_excursion_severity",
+		"ROW_NUMBER",
+		"cumulative_damage_index",
+		"excursion_event_key",
+		"asset_key",
+		"date_key",
+		"parameter_type_key",
+		"limit_key",
+		"criticality_key",
+		"excursion_type",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Model file missing required fact table pattern: %s", pattern)
+		}
+	}
+}
+
+// TestFactExcursionEventsSchema validates fact_excursion_events has required columns
+func TestFactExcursionEventsSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factExcursionEvents *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_excursion_events" {
+			factExcursionEvents = &model
+			break
+		}
+	}
+
+	if factExcursionEvents == nil {
+		t.Fatal("fact_excursion_events not found in schema")
+	}
+
+	requiredColumns := []string{
+		"excursion_event_key",
+		"excursion_event_id",
+		"asset_key",
+		"date_key",
+		"parameter_type_key",
+		"limit_key",
+		"criticality_key",
+		"excursion_start_timestamp",
+		"excursion_end_timestamp",
+		"duration_minutes",
+		"reading_count",
+		"peak_magnitude",
+		"average_magnitude",
+		"cumulative_damage_index",
+		"severity_score",
+		"severity_category",
+		"breach_type",
+		"excursion_type",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factExcursionEvents.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in fact_excursion_events", colName)
+		}
+	}
+
+	// Verify excursion_event_key has unique and not_null tests
+	var eventKeyCol *schema.ColumnSchema
+	for _, col := range factExcursionEvents.Columns {
+		if col.Name == "excursion_event_key" {
+			eventKeyCol = &col
+			break
+		}
+	}
+
+	if eventKeyCol != nil {
+		if !hasDataTest(eventKeyCol.DataTests, "unique") {
+			t.Error("excursion_event_key must have unique test")
+		}
+		if !hasDataTest(eventKeyCol.DataTests, "not_null") {
+			t.Error("excursion_event_key must have not_null test")
+		}
+	}
+
+	// Verify excursion_type has accepted_values
+	var excursionTypeCol *schema.ColumnSchema
+	for _, col := range factExcursionEvents.Columns {
+		if col.Name == "excursion_type" {
+			excursionTypeCol = &col
+			break
+		}
+	}
+
+	if excursionTypeCol != nil {
+		if !hasDataTest(excursionTypeCol.DataTests, "accepted_values") {
+			t.Error("excursion_type must have accepted_values test")
+		}
+	}
+
+	// Verify cumulative_damage_index has not_null test
+	var damageCol *schema.ColumnSchema
+	for _, col := range factExcursionEvents.Columns {
+		if col.Name == "cumulative_damage_index" {
+			damageCol = &col
+			break
+		}
+	}
+
+	if damageCol != nil {
+		if !hasDataTest(damageCol.DataTests, "not_null") {
+			t.Error("cumulative_damage_index must have not_null test")
+		}
+	}
+}
+
+// TestFactAssetDamageAccumulationModel validates fact_asset_damage_accumulation.sql model file exists
+func TestFactAssetDamageAccumulationModel(t *testing.T) {
+	modelPath := filepath.Join("models", "marts", "fact_asset_damage_accumulation.sql")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Fatalf("Required model file %s does not exist", modelPath)
+	}
+
+	// Read model file content
+	content, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("Failed to read model file: %v", err)
+	}
+
+	// Verify model contains damage accumulation logic
+	contentStr := string(content)
+	requiredPatterns := []string{
+		"fact_excursion_events",
+		"cumulative_damage_to_date",
+		"damage_last_30_days",
+		"damage_last_90_days",
+		"damage_last_365_days",
+		"GROUP BY",
+		"asset_key",
+	}
+
+	for _, pattern := range requiredPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Model file missing required damage accumulation pattern: %s", pattern)
+		}
+	}
+}
+
+// TestFactAssetDamageAccumulationSchema validates fact_asset_damage_accumulation has required columns
+func TestFactAssetDamageAccumulationSchema(t *testing.T) {
+	schemaPath := filepath.Join("schema.yml")
+
+	schemaFile, err := schema.ParseSchemaFile(schemaPath)
+	if err != nil {
+		t.Fatalf("Failed to parse schema.yml: %v", err)
+	}
+
+	var factAssetDamage *schema.ModelSchema
+	for _, model := range schemaFile.Models {
+		if model.Name == "fact_asset_damage_accumulation" {
+			factAssetDamage = &model
+			break
+		}
+	}
+
+	if factAssetDamage == nil {
+		t.Fatal("fact_asset_damage_accumulation not found in schema")
+	}
+
+	requiredColumns := []string{
+		"damage_record_key",
+		"asset_key",
+		"as_of_date_key",
+		"cumulative_damage_to_date",
+		"damage_last_30_days",
+		"damage_last_90_days",
+		"damage_last_365_days",
+		"excursion_count_total",
+		"critical_excursion_count",
+		"standard_excursion_count",
+		"informational_excursion_count",
+		"days_since_last_critical_excursion",
+		"last_excursion_date",
+		"asset_install_date",
+		"design_life_years",
+	}
+
+	columnMap := make(map[string]bool)
+	for _, col := range factAssetDamage.Columns {
+		columnMap[col.Name] = true
+	}
+
+	for _, colName := range requiredColumns {
+		if !columnMap[colName] {
+			t.Errorf("Required column %s not found in fact_asset_damage_accumulation", colName)
+		}
+	}
+
+	// Verify damage_record_key has unique and not_null tests
+	var keyCol *schema.ColumnSchema
+	for _, col := range factAssetDamage.Columns {
+		if col.Name == "damage_record_key" {
+			keyCol = &col
+			break
+		}
+	}
+
+	if keyCol != nil {
+		if !hasDataTest(keyCol.DataTests, "unique") {
+			t.Error("damage_record_key must have unique test")
+		}
+		if !hasDataTest(keyCol.DataTests, "not_null") {
+			t.Error("damage_record_key must have not_null test")
+		}
+	}
+
+	// Verify cumulative_damage_to_date has not_null test
+	var cumulativeDamageCol *schema.ColumnSchema
+	for _, col := range factAssetDamage.Columns {
+		if col.Name == "cumulative_damage_to_date" {
+			cumulativeDamageCol = &col
+			break
+		}
+	}
+
+	if cumulativeDamageCol != nil {
+		if !hasDataTest(cumulativeDamageCol.DataTests, "not_null") {
+			t.Error("cumulative_damage_to_date must have not_null test")
+		}
+	}
+}
+
+// TestFactGrainUniqueness validates one row per excursion event
+func TestFactGrainUniqueness(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate fact grain - one row per excursion event")
+
+	// This test would:
+	// 1. Query fact_excursion_events
+	// 2. Verify excursion_event_key is unique
+	// 3. Verify COUNT(*) matches COUNT(DISTINCT excursion_event_id)
+	// 4. Verify no duplicate rows for same excursion_event_id
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestDamageCalculationAUC validates Area Under Curve calculation
+func TestDamageCalculationAUC(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate cumulative_damage_index = average_magnitude × duration_minutes")
+
+	// This test would:
+	// 1. Query fact_excursion_events
+	// 2. For each event, verify:
+	//    - cumulative_damage_index = average_magnitude × duration_minutes (Area Under Curve)
+	//    - cumulative_damage_index >= 0
+	//    - If duration_minutes = 0, then cumulative_damage_index = 0
+
+	t.Skip("Skipping integration test - requires database execution")
+}
+
+// TestReferentialIntegrity validates all FKs resolve
+func TestReferentialIntegrity(t *testing.T) {
+	// This is a placeholder test that will validate data once models are created
+	t.Log("Test placeholder: Will validate all foreign keys resolve to dimension tables")
+
+	// This test would:
+	// 1. Query fact_excursion_events joined to dimensions
+	// 2. Verify all asset_key values exist in dim_asset
+	// 3. Verify all date_key values exist in dim_date
+	// 4. Verify all parameter_type_key values exist in dim_parameter_type
+	// 5. Verify all limit_key values exist in dim_iow_limit
+	// 6. Verify all criticality_key values exist in dim_criticality_level
+	// 7. Count orphaned records (should be 0)
+
+	t.Skip("Skipping integration test - requires database execution")
+}

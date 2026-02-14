@@ -605,3 +605,235 @@ models:
           - not_null
           - accepted_values:
               values: ['Extreme', 'High', 'Moderate', 'Low']
+
+  # ===================================================================
+  # FACT TABLES - API 584 IOW Data Warehouse (Phase 4)
+  # Core operational reporting and damage tracking
+  # ===================================================================
+  
+  - name: fact_excursion_events
+    description: "Core fact table with one row per IOW excursion event including cumulative damage metrics using Area Under Curve methodology"
+    columns:
+      - name: excursion_event_key
+        description: "Surrogate key for excursion event (auto-incrementing)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: excursion_event_id
+        description: "Natural key from intermediate layer (tag_id + parameter_type + sequence)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: date_key
+        description: "FK to dim_date.date_key (based on excursion_start_timestamp)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      
+      - name: parameter_type_key
+        description: "FK to dim_parameter_type.parameter_type_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_parameter_type')
+              field: parameter_type_key
+      
+      - name: limit_key
+        description: "FK to dim_iow_limit.limit_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_iow_limit')
+              field: limit_key
+      
+      - name: criticality_key
+        description: "FK to dim_criticality_level.criticality_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_criticality_level')
+              field: criticality_key
+      
+      - name: excursion_start_timestamp
+        description: "Timestamp when excursion event began"
+        data_tests:
+          - not_null
+      
+      - name: excursion_end_timestamp
+        description: "Timestamp when excursion event ended"
+        data_tests:
+          - not_null
+      
+      - name: duration_minutes
+        description: "Duration of excursion event in minutes"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: reading_count
+        description: "Number of excursion readings within event window"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+      
+      - name: peak_magnitude
+        description: "Maximum excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: average_magnitude
+        description: "Average excursion magnitude during event"
+        data_tests:
+          - not_null
+      
+      - name: cumulative_damage_index
+        description: "Cumulative damage using Area Under Curve: average_magnitude × duration_minutes"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: severity_score
+        description: "Calculated severity score (0-10 scale)"
+        data_tests:
+          - not_null
+      
+      - name: severity_category
+        description: "Severity classification: Extreme (>8), High (5-8), Moderate (2-5), Low (<2)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Extreme', 'High', 'Moderate', 'Low']
+      
+      - name: breach_type
+        description: "Direction of breach: High (above upper limit) or Low (below lower limit)"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Low']
+      
+      - name: excursion_type
+        description: "Event type classification combining parameter and breach direction"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Overpressure', 'Underpressure', 'Overtemp', 'Undertemp', 'pH_High', 'pH_Low', 'Flow_High', 'Flow_Low']
+
+  - name: fact_asset_damage_accumulation
+    description: "Aggregate damage by asset over time for lifecycle tracking with rolling damage windows"
+    columns:
+      - name: damage_record_key
+        description: "Surrogate key for damage record (auto-incrementing)"
+        data_tests:
+          - unique
+          - not_null
+      
+      - name: asset_key
+        description: "FK to dim_asset.asset_key"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_asset')
+              field: asset_key
+      
+      - name: as_of_date_key
+        description: "FK to dim_date.date_key (snapshot date for damage calculation)"
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      
+      - name: cumulative_damage_to_date
+        description: "Total cumulative damage from all excursion events up to as_of_date"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_30_days
+        description: "Cumulative damage in last 30 days from as_of_date"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_90_days
+        description: "Cumulative damage in last 90 days from as_of_date"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: damage_last_365_days
+        description: "Cumulative damage in last 365 days from as_of_date"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: excursion_count_total
+        description: "Total number of excursion events for this asset"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: critical_excursion_count
+        description: "Number of Critical-level excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: standard_excursion_count
+        description: "Number of Standard-level excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: informational_excursion_count
+        description: "Number of Informational-level excursion events"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      
+      - name: days_since_last_critical_excursion
+        description: "Number of days between as_of_date and most recent Critical excursion (NULL if never had Critical event)"
+        data_tests:
+          - accepted_range:
+              min_value: 0
+      
+      - name: last_excursion_date
+        description: "Date of most recent excursion event (any criticality)"
+        data_tests:
+          - not_null
+      
+      - name: asset_install_date
+        description: "Installation date of asset (from dim_asset)"
+        data_tests:
+          - not_null
+      
+      - name: design_life_years
+        description: "Expected design life of asset in years (from dim_asset)"
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+
