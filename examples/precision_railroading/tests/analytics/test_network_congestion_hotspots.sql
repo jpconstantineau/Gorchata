@@ -18,7 +18,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Congestion score should be >= 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "network_congestion_hotspots" }}
+  FROM network_congestion_hotspots
   WHERE congestion_score < 0
 
   UNION ALL
@@ -29,7 +29,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Dwell event count must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "network_congestion_hotspots" }}
+  FROM network_congestion_hotspots
   WHERE dwell_event_count <= 0
 
   UNION ALL
@@ -40,7 +40,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average dwell minutes must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "network_congestion_hotspots" }}
+  FROM network_congestion_hotspots
   WHERE avg_dwell_minutes <= 0
 
   UNION ALL
@@ -55,7 +55,7 @@ WITH tests AS (
     SELECT 
       congestion_rank,
       LAG(congestion_rank) OVER (ORDER BY congestion_rank) AS prev_rank
-    FROM {{ ref "network_congestion_hotspots" }}
+    FROM network_congestion_hotspots
   ) ranked
   WHERE prev_rank IS NOT NULL 
     AND congestion_rank != prev_rank + 1

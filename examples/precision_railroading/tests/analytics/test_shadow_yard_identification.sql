@@ -18,7 +18,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Shadow yard flag should be 1 when composite_score > 60, else 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "shadow_yard_identification" }}
+  FROM shadow_yard_identification
   WHERE (shadow_yard_flag = 1 AND composite_score <= 60)
      OR (shadow_yard_flag = 0 AND composite_score > 60)
 
@@ -30,7 +30,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Composite score should be between 0 and 100' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "shadow_yard_identification" }}
+  FROM shadow_yard_identification
   WHERE composite_score < 0 OR composite_score > 100
 
   UNION ALL
@@ -41,7 +41,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Shadow yard percentage should be between 0 and 100' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "shadow_yard_identification" }}
+  FROM shadow_yard_identification
   WHERE shadow_yard_percentage < 0 OR shadow_yard_percentage > 100
 
   UNION ALL
@@ -56,7 +56,7 @@ WITH tests AS (
     SELECT 
       ranking,
       LAG(ranking) OVER (ORDER BY ranking) AS prev_ranking
-    FROM {{ ref "shadow_yard_identification" }}
+    FROM shadow_yard_identification
   ) ranked
   WHERE prev_ranking IS NOT NULL 
     AND ranking != prev_ranking + 1

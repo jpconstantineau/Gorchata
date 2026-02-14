@@ -8,7 +8,7 @@ WITH all_tests AS (
     'splc_codes_resolve' AS test_name,
     COUNT(*) AS violation_count,
     'All SPLC codes must resolve to dim_location' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE location_id IS NULL
   
   UNION ALL
@@ -18,7 +18,7 @@ WITH all_tests AS (
     'car_numbers_resolve' AS test_name,
     COUNT(*) AS violation_count,
     'All car numbers must resolve to dim_railcar' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE railcar_id IS NULL
   
   UNION ALL
@@ -28,7 +28,7 @@ WITH all_tests AS (
     'dates_resolve' AS test_name,
     COUNT(*) AS violation_count,
     'All event dates must resolve to dim_date' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE date_id IS NULL
   
   UNION ALL
@@ -44,7 +44,7 @@ WITH all_tests AS (
       timestamp,
       event_sequence,
       LAG(timestamp) OVER (PARTITION BY car_number ORDER BY event_sequence) AS prev_timestamp
-    FROM {{ ref "stg_clm_enriched" }}
+    FROM stg_clm_enriched
   )
   WHERE prev_timestamp IS NOT NULL 
     AND timestamp < prev_timestamp
@@ -56,7 +56,7 @@ WITH all_tests AS (
     'loaded_flag_plac' AS test_name,
     COUNT(*) AS violation_count,
     'PLAC events must have is_loaded_event = TRUE' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE event_type = 'PLAC' 
     AND (is_loaded_event IS NULL OR is_loaded_event != 1)
   
@@ -67,7 +67,7 @@ WITH all_tests AS (
     'loaded_flag_pull' AS test_name,
     COUNT(*) AS violation_count,
     'PULL events must have is_loaded_event = FALSE' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE event_type = 'PULL' 
     AND (is_loaded_event IS NULL OR is_loaded_event != 0)
   
@@ -78,7 +78,7 @@ WITH all_tests AS (
     'loaded_flag_movement' AS test_name,
     COUNT(*) AS violation_count,
     'DEPA/ARRI events should have is_loaded_event = NULL' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE event_type IN ('DEPA', 'ARRI')
     AND is_loaded_event IS NOT NULL
   
@@ -89,7 +89,7 @@ WITH all_tests AS (
     'movement_flag_depa_arri' AS test_name,
     COUNT(*) AS violation_count,
     'DEPA/ARRI events must have is_movement_event = TRUE' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE event_type IN ('DEPA', 'ARRI')
     AND (is_movement_event IS NULL OR is_movement_event != 1)
   
@@ -100,7 +100,7 @@ WITH all_tests AS (
     'movement_flag_plac_pull' AS test_name,
     COUNT(*) AS violation_count,
     'PLAC/PULL events must have is_movement_event = FALSE' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE event_type IN ('PLAC', 'PULL')
     AND (is_movement_event IS NULL OR is_movement_event != 0)
   
@@ -113,7 +113,7 @@ WITH all_tests AS (
     'First event per car must have event_sequence = 1' AS description
   FROM (
     SELECT car_number, MIN(event_sequence) AS min_seq
-    FROM {{ ref "stg_clm_enriched" }}
+    FROM stg_clm_enriched
     GROUP BY car_number
   )
   WHERE min_seq != 1
@@ -130,7 +130,7 @@ WITH all_tests AS (
       car_number,
       event_sequence,
       LAG(event_sequence) OVER (PARTITION BY car_number ORDER BY event_sequence) AS prev_seq
-    FROM {{ ref "stg_clm_enriched" }}
+    FROM stg_clm_enriched
   )
   WHERE prev_seq IS NOT NULL 
     AND event_sequence != prev_seq + 1
@@ -142,7 +142,7 @@ WITH all_tests AS (
     'location_type_populated' AS test_name,
     COUNT(*) AS violation_count,
     'Location type must be populated when location_id exists' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE location_id IS NOT NULL 
     AND (location_type IS NULL OR TRIM(location_type) = '')
   
@@ -153,7 +153,7 @@ WITH all_tests AS (
     'railroad_owner_populated' AS test_name,
     COUNT(*) AS violation_count,
     'Railroad owner must be populated when railcar_id exists' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE railcar_id IS NOT NULL 
     AND (railroad_owner IS NULL OR TRIM(railroad_owner) = '')
   
@@ -164,7 +164,7 @@ WITH all_tests AS (
     'psr_period_populated' AS test_name,
     COUNT(*) AS violation_count,
     'PSR period must be populated when date_id exists' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE date_id IS NOT NULL 
     AND (psr_period IS NULL OR TRIM(psr_period) = '')
   
@@ -175,7 +175,7 @@ WITH all_tests AS (
     'valid_coordinates' AS test_name,
     COUNT(*) AS violation_count,
     'Coordinates must be within valid ranges when populated' AS description
-  FROM {{ ref "stg_clm_enriched" }}
+  FROM stg_clm_enriched
   WHERE (latitude IS NOT NULL AND (latitude < -90 OR latitude > 90))
      OR (longitude IS NOT NULL AND (longitude < -180 OR longitude > 180))
 )

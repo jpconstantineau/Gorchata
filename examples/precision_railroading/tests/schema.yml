@@ -1,0 +1,134 @@
+# Precision Scheduled Railroading - Data Quality Test Suite
+# Comprehensive validation framework for referential integrity, temporal consistency,
+# business rules, exclusivity constraints, and minute precision
+
+version: 2
+
+tests:
+  # ============================================================================
+  # REFERENTIAL INTEGRITY TESTS (15 tests)
+  # ============================================================================
+  - name: test_referential_integrity
+    description: |
+      Validates all foreign key relationships across fact and dimension tables.
+      Ensures every FK reference resolves to a valid dimension record.
+    tests:
+      - test_fact_trip_railcar_fk
+      - test_fact_trip_origin_location_fk
+      - test_fact_trip_destination_location_fk
+      - test_fact_trip_train_fk
+      - test_fact_trip_corridor_fk
+      - test_fact_dwell_railcar_fk
+      - test_fact_dwell_location_fk
+      - test_fact_stop_classification_railcar_fk
+      - test_fact_corridor_transit_railcar_fk
+      - test_railcar_coverage_in_facts
+      - test_agg_metrics_location_fk
+      - test_agg_metrics_corridor_fk
+      - test_analytics_location_fk
+      - test_analytics_corridor_fk
+    expected_violations: 0
+    execution_time: ~2 seconds
+    
+  # ============================================================================
+  # TEMPORAL CONSISTENCY TESTS (10 tests)
+  # ============================================================================
+  - name: test_temporal_consistency
+    description: |
+      Validates chronological ordering, no gaps/overlaps in time-series data,
+      and minute-level granularity across all temporal data.
+    tests:
+      - test_trip_temporal_order
+      - test_dwell_temporal_order
+      - test_state_interval_no_gaps
+      - test_state_interval_no_overlaps
+      - test_trip_segment_chronological
+      - test_velocity_timestamp_order
+      - test_corridor_transit_duration_positive
+      - test_weekly_aggregation_temporal_bounds
+      - test_psr_period_chronological
+      - test_timestamp_minute_granularity
+    expected_violations: 0
+    execution_time: ~3 seconds
+    
+  # ============================================================================
+  # BUSINESS RULES TESTS (15 tests)
+  # ============================================================================
+  - name: test_business_rules
+    description: |
+      Validates domain-specific business rules including physical constraints
+      (velocity limits, dwell durations), PSR period assignments, risk scores,
+      and operational metrics.
+    tests:
+      - test_velocity_physical_limits
+      - test_dwell_duration_reasonable
+      - test_trip_distance_corridor_match
+      - test_load_status_consistency
+      - test_psr_period_assignments
+      - test_shadow_yard_risk_score_range
+      - test_fluidity_score_range
+      - test_seasonal_variance_within_threshold
+      - test_train_id_format
+      - test_railcar_type_valid
+      - test_location_type_valid
+      - test_corridor_directionality
+      - test_slot_adherence_percentage
+      - test_asymmetry_ratio_positive
+      - test_buffer_consumption_percentage
+    expected_violations: 0
+    execution_time: ~2 seconds
+    
+  # ============================================================================
+  # EXCLUSIVITY CONSTRAINTS TESTS (8 tests)
+  # ============================================================================
+  - name: test_exclusivity_constraints
+    description: |
+      Validates mutually exclusive states and classifications. Ensures a railcar
+      cannot be in two states simultaneously, trips are either loaded XOR empty,
+      and classifications are unique.
+    tests:
+      - test_trip_type_exclusivity
+      - test_dwell_classification_exclusivity
+      - test_state_interval_no_railcar_overlap
+      - test_cycle_classification_unique
+      - test_shadow_yard_flag_exclusive
+      - test_trip_segment_no_overlap
+      - test_location_classification_exclusive
+      - test_psr_period_no_overlap
+    expected_violations: 0
+    execution_time: ~3 seconds
+    
+  # ============================================================================
+  # MINUTE PRECISION TESTS (10 tests)
+  # ============================================================================
+  - name: test_minute_precision
+    description: |
+      Validates all timestamps and durations maintain minute-level precision
+      with no seconds or milliseconds. Critical for accurate time-series analysis.
+    tests:
+      - test_clm_timestamp_no_seconds
+      - test_trip_timestamp_no_seconds
+      - test_dwell_timestamp_no_seconds
+      - test_state_interval_timestamp_no_seconds
+      - test_duration_whole_minutes
+      - test_velocity_calculation_minute_based
+      - test_aggregation_timestamp_precision
+      - test_date_dimension_minute_precision
+      - test_julianday_conversion_accuracy
+      - test_no_millisecond_precision
+    expected_violations: 0
+    execution_time: ~2 seconds
+
+# ============================================================================
+# TEST EXECUTION SUMMARY
+# ============================================================================
+# Total Tests: 58
+# Total Test Files: 5
+# Expected Total Execution Time: ~12 seconds
+# 
+# Run all tests with:
+#   gorchata test --profiles-dir .
+#
+# Run specific test file:
+#   gorchata test tests/test_referential_integrity.sql --profiles-dir .
+# ============================================================================

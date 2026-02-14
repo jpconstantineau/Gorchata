@@ -18,7 +18,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Loaded and empty velocities must be >= 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "directional_efficiency_analysis" }}
+  FROM directional_efficiency_analysis
   WHERE loaded_velocity_mph < 0 OR empty_velocity_mph < 0
 
   UNION ALL
@@ -29,7 +29,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Velocities should be between 0 and 80 mph' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "directional_efficiency_analysis" }}
+  FROM directional_efficiency_analysis
   WHERE loaded_velocity_mph > 80 OR empty_velocity_mph > 80
 
   UNION ALL
@@ -40,7 +40,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Asymmetry ratio must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "directional_efficiency_analysis" }}
+  FROM directional_efficiency_analysis
   WHERE asymmetry_ratio <= 0
 
   UNION ALL
@@ -51,7 +51,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Loaded and empty trip counts must be >= 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "directional_efficiency_analysis" }}
+  FROM directional_efficiency_analysis
   WHERE loaded_trip_count < 0 OR empty_trip_count < 0
 
 )

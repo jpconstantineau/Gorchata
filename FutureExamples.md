@@ -10,12 +10,12 @@
 - [x] [Haul Truck Analytics Data Warehouse](examples/haul_truck_analytics/README.md) - *Complete ✅*
 - [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Complete ✅*
 - [x] [Oil Refinery Data Transformation and Warehousing](examples/oil_refinery_warehousing/README.md) - *Complete ✅*
+- [x] [Precision Scheduled Railroading (PSR) Analytics](examples/precision_railroading/README.md) - *Complete ✅ (223+ tests, 110M events, Phase 1-10)*
 
 ### Future Examples 🔮
 - [] API 584 IOW Data Warehouse
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
-- [-] Precision Scheduled Railroading (PSR) performance monitoring - *In Progress 🚧*
 
 ## Example Design Prompts
 

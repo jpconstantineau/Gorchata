@@ -18,7 +18,7 @@ WITH tests AS (
     CASE WHEN COUNT(DISTINCT time_period) > 0 THEN 0 ELSE 1 END AS violation_count,
     'Results should be grouped by distinct time periods' AS description,
     CASE WHEN COUNT(DISTINCT time_period) > 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "seasonal_performance_trends" }}
+  FROM seasonal_performance_trends
 
   UNION ALL
 
@@ -28,7 +28,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Quarter should be between 1 and 4' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "seasonal_performance_trends" }}
+  FROM seasonal_performance_trends
   WHERE quarter < 1 OR quarter > 4
 
   UNION ALL
@@ -39,7 +39,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average velocity should be between 0 and 80 mph' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "seasonal_performance_trends" }}
+  FROM seasonal_performance_trends
   WHERE avg_velocity_mph < 0 OR avg_velocity_mph > 80
 
   UNION ALL
@@ -50,7 +50,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Trip count must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "seasonal_performance_trends" }}
+  FROM seasonal_performance_trends
   WHERE trip_count <= 0
 
 )

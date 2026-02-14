@@ -1,0 +1,1078 @@
+{
+  "results": [
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_directional_efficiency_analysis"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_network_congestion_hotspots"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_psr_strategy_shifts"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_seasonal_performance_trends"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_shadow_yard_identification"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_worst_performing_corridors"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 1,
+      "status": "failed",
+      "test_id": "test_dim_corridor"
+    },
+    {
+      "duration_ms": 8,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "test_dim_date"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 2,
+      "status": "failed",
+      "test_id": "test_dim_location"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 1,
+      "status": "failed",
+      "test_id": "test_dim_railcar"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "test_dim_train"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_fact_corridor_transit"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_fact_dwell"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_fact_stop_classification"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_fact_trip"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_cycle_classification"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_dwell_classification"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_nodal_dwell"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_state_intervals"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_trip_segments"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_int_velocity_vectors"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_buffer_consumption"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_corridor_weekly_performance"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_directional_asymmetry"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_network_fluidity"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_psr_evolution"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_shadow_yards"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_agg_slot_adherence"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_stg_clm_enriched"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: unrecognized token: \"{\" (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_stg_clm_events"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such column: slot_adherence_pct (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_business_rules"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 8,
+      "status": "failed",
+      "test_id": "test_exclusivity_constraints"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 6,
+      "status": "failed",
+      "test_id": "test_integration"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 10,
+      "status": "failed",
+      "test_id": "test_minute_precision"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such column: a.location_id (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_referential_integrity"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such column: transit_duration_minutes (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "test_temporal_consistency"
+    },
+    {
+      "duration_ms": 2,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_date_date_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_date_id"
+    },
+    {
+      "duration_ms": 2,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_date_date"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_date"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_year"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_date_year"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_quarter"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_date_quarter"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_month"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_date_month"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_month_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_date_month_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_week_of_year"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 3,
+      "status": "failed",
+      "test_id": "accepted_range_dim_date_week_of_year"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_day_of_month"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_date_day_of_month"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_day_of_week"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_date_day_of_week"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_day_name"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_date_day_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_is_weekend"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_date_is_weekend"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_season"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_date_season"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_date_psr_period"
+    },
+    {
+      "duration_ms": 1,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_date_psr_period"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_location_location_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_location_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_location_splc_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_splc_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_empty_string_dim_location_splc_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_location_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_empty_string_dim_location_location_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_location_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_location_location_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_latitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_location_latitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_longitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_location_longitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_state_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_empty_string_dim_location_state_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_capacity_classification"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_location_capacity_classification"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_shadow_yard_risk_score"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_location_shadow_yard_risk_score"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_location_region"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_location_region"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_railcar_railcar_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_railcar_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_railcar_car_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_car_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_empty_string_dim_railcar_car_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_railroad_owner"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_railcar_railroad_owner"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_car_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_railcar_car_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_capacity_tons"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_railcar_capacity_tons"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_manufacture_year"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_railcar_manufacture_year"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_acquisition_date"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_railcar_in_service"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_railcar_in_service"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_train_train_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_train_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_train_train_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_train_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 1,
+      "status": "failed",
+      "test_id": "not_empty_string_dim_train_train_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_train_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_train_train_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_priority_level"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_train_priority_level"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_typical_car_count"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_train_typical_car_count"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_train_psr_optimized"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_train_psr_optimized"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_corridor_corridor_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_corridor_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_dim_corridor_corridor_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_corridor_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_empty_string_dim_corridor_corridor_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_origin_splc"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "relationships_dim_corridor_origin_splc"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_destination_splc"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "relationships_dim_corridor_destination_splc"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_distance_miles"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_corridor_distance_miles"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_lane_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_corridor_lane_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_traffic_volume_class"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_dim_corridor_traffic_volume_class"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_dim_corridor_congestion_level"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_range_dim_corridor_congestion_level"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_stg_clm_events_event_key"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_event_key"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_stg_clm_events_event_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_event_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_car_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_timestamp"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_event_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_stg_clm_events_event_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_splc_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_location_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_events_load_timestamp"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_stg_clm_enriched_event_key"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_event_key"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "unique_stg_clm_enriched_event_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_event_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_car_number"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_timestamp"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_event_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_stg_clm_enriched_event_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_splc_code"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_location_name"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_load_timestamp"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_location_id"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such table: ref (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "relationships_stg_clm_enriched_location_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_railcar_id"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such table: ref (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "relationships_stg_clm_enriched_railcar_id"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such table: ref (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "relationships_stg_clm_enriched_train_db_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_date_id"
+    },
+    {
+      "duration_ms": 0,
+      "error_message": "failed to execute test query: failed to execute query: SQL logic error: no such table: ref (1)",
+      "failure_count": 0,
+      "status": "failed",
+      "test_id": "relationships_stg_clm_enriched_date_id"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_location_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_stg_clm_enriched_location_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_latitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_longitude"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_shadow_yard_risk_score"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_region"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_railroad_owner"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_car_type"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_psr_period"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_stg_clm_enriched_psr_period"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_season"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "accepted_values_stg_clm_enriched_season"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_is_movement_event"
+    },
+    {
+      "duration_ms": 0,
+      "failure_count": 0,
+      "status": "passed",
+      "test_id": "not_null_stg_clm_enriched_event_sequence"
+    }
+  ],
+  "summary": {
+    "duration_ms": 29,
+    "end_time": "2026-02-13T19:36:32-06:00",
+    "failed": 40,
+    "passed": 132,
+    "skipped": 0,
+    "start_time": "2026-02-13T19:36:32-06:00",
+    "total_tests": 172,
+    "warnings": 0
+  }
+}

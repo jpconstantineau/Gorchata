@@ -18,7 +18,7 @@ WITH tests AS (
     CASE WHEN COUNT(DISTINCT psr_period) >= 1 THEN 0 ELSE 1 END AS violation_count,
     'Should include at least 1 PSR period with actual data' AS description,
     CASE WHEN COUNT(DISTINCT psr_period) >= 1 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "psr_strategy_shifts" }}
+  FROM psr_strategy_shifts
 
   UNION ALL
 
@@ -28,7 +28,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average velocity should be between 0 and 80 mph' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "psr_strategy_shifts" }}
+  FROM psr_strategy_shifts
   WHERE avg_velocity_mph < 0 OR avg_velocity_mph > 80
 
   UNION ALL
@@ -39,7 +39,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average duration minutes must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "psr_strategy_shifts" }}
+  FROM psr_strategy_shifts
   WHERE avg_duration_minutes <= 0
 
   UNION ALL
@@ -50,7 +50,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Trip count must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "psr_strategy_shifts" }}
+  FROM psr_strategy_shifts
   WHERE trip_count <= 0
 
 )

@@ -9,8 +9,8 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All trip_segment_id values must exist in fact_trip' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }} fsc
-  LEFT JOIN {{ ref "fact_trip" }} ft ON fsc.trip_segment_id = ft.trip_segment_id
+  FROM fact_stop_classification fsc
+  LEFT JOIN fact_trip ft ON fsc.trip_segment_id = ft.trip_segment_id
   WHERE ft.trip_segment_id IS NULL
 
   UNION ALL
@@ -21,7 +21,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All railcar_id values must exist in dim_railcar' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }} fsc
+  FROM fact_stop_classification fsc
   LEFT JOIN dim_railcar dr ON fsc.railcar_id = dr.railcar_id
   WHERE dr.railcar_id IS NULL
 
@@ -33,7 +33,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Trip end timestamp must be after trip start timestamp' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
   WHERE trip_end_timestamp <= trip_start_timestamp
 
   UNION ALL
@@ -44,7 +44,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All stop counts must be non-negative' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
   WHERE total_stops < 0
      OR shadow_yard_stops < 0
      OR crew_change_stops < 0
@@ -61,7 +61,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Total stops must equal sum of individual stop types' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
   WHERE total_stops != (
     shadow_yard_stops + crew_change_stops + terminal_stops + 
     mainline_stops + maintenance_stops + unclassified_stops
@@ -75,7 +75,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Total dwell minutes must be non-negative' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
   WHERE total_dwell_minutes < 0
 
   UNION ALL
@@ -86,7 +86,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'PSR period must be pre-PSR, transition, or mature' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
   WHERE psr_period NOT IN ('pre-PSR', 'transition', 'mature')
 
   UNION ALL
@@ -97,7 +97,7 @@ WITH tests AS (
     CASE WHEN COUNT(*) >= 25 AND COUNT(*) <= 35 THEN 0 ELSE ABS(COUNT(*) - 30) END AS violation_count,
     'Row count should be approximately 30 (matches fact_trip)' AS description,
     CASE WHEN COUNT(*) >= 25 AND COUNT(*) <= 35 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_stop_classification" }}
+  FROM fact_stop_classification
 
 )
 

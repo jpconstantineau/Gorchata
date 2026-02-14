@@ -9,7 +9,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Trip count must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_corridor_weekly_performance" }}
+  FROM agg_corridor_weekly_performance
   WHERE trip_count <= 0
 
   UNION ALL
@@ -20,7 +20,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average velocity mph must be between 0 and 80' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_corridor_weekly_performance" }}
+  FROM agg_corridor_weekly_performance
   WHERE avg_velocity_mph < 0 OR avg_velocity_mph > 80
 
   UNION ALL
@@ -31,7 +31,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All corridor_id values must exist in dim_corridor or be NULL' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_corridor_weekly_performance" }} cwp
+  FROM agg_corridor_weekly_performance cwp
   LEFT JOIN dim_corridor dc ON cwp.corridor_id = dc.corridor_id
   WHERE cwp.corridor_id IS NOT NULL AND dc.corridor_id IS NULL
 
@@ -43,7 +43,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Week format should match YYYY-WNN pattern' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_corridor_weekly_performance" }}
+  FROM agg_corridor_weekly_performance
   WHERE week_period NOT LIKE '____-W__'
 
 )

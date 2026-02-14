@@ -9,7 +9,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All railcar_id values must exist in dim_railcar' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }} fd
+  FROM fact_dwell fd
   LEFT JOIN dim_railcar dr ON fd.railcar_id = dr.railcar_id
   WHERE dr.railcar_id IS NULL
 
@@ -21,7 +21,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All location_id values must exist in dim_location' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }} fd
+  FROM fact_dwell fd
   LEFT JOIN dim_location dl ON fd.location_id = dl.location_id
   WHERE dl.location_id IS NULL
 
@@ -33,7 +33,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All dwell_start_date_id values must exist in dim_date' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }} fd
+  FROM fact_dwell fd
   LEFT JOIN dim_date dd ON fd.dwell_start_date_id = dd.date_id
   WHERE dd.date_id IS NULL
 
@@ -45,7 +45,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Dwell duration must be positive (> 0 minutes)' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE dwell_duration_minutes <= 0
 
   UNION ALL
@@ -56,7 +56,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Dwell end timestamp must be after dwell start timestamp' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE dwell_end_timestamp <= dwell_start_timestamp
 
   UNION ALL
@@ -67,7 +67,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Shadow yard flag must be 0 or 1' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE shadow_yard_flag NOT IN (0, 1)
 
   UNION ALL
@@ -78,7 +78,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Dwell classification must be valid type' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE dwell_classification NOT IN (
     'shadow_yard_hold', 'crew_change', 'terminal', 
     'maintenance', 'mainline_hold', 'unclassified'
@@ -92,7 +92,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Shadow yard flag must be 1 if and only if classification is shadow_yard_hold' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE (shadow_yard_flag = 1 AND dwell_classification != 'shadow_yard_hold')
      OR (shadow_yard_flag = 0 AND dwell_classification = 'shadow_yard_hold')
 
@@ -104,7 +104,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Is loaded flag must be 0 or 1' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE is_loaded NOT IN (0, 1)
 
   UNION ALL
@@ -115,7 +115,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'PSR period must be pre-PSR, transition, or mature' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
   WHERE psr_period NOT IN ('pre-PSR', 'transition', 'mature')
 
   UNION ALL
@@ -126,7 +126,7 @@ WITH tests AS (
     CASE WHEN COUNT(*) >= 25 AND COUNT(*) <= 35 THEN 0 ELSE ABS(COUNT(*) - 30) END AS violation_count,
     'Row count should be approximately 30 (matches int_dwell_classification)' AS description,
     CASE WHEN COUNT(*) >= 25 AND COUNT(*) <= 35 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "fact_dwell" }}
+  FROM fact_dwell
 
 )
 

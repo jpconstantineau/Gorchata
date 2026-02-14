@@ -8,7 +8,7 @@ WITH all_tests AS (
     'cycle_duration_valid' AS test_name,
     COUNT(*) AS violation_count,
     'Cycle duration must be >= sum of loaded and empty trip durations' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE cycle_duration_days < (loaded_duration_minutes + empty_duration_minutes) / (24.0 * 60.0)
   
   UNION ALL
@@ -21,8 +21,8 @@ WITH all_tests AS (
   FROM (
     SELECT
       COUNT(*) AS mismatches,
-      (SELECT COUNT(*) FROM {{ ref "int_cycle_classification" }}) AS total_cycles
-    FROM {{ ref "int_cycle_classification" }}
+      (SELECT COUNT(*) FROM int_cycle_classification) AS total_cycles
+    FROM int_cycle_classification
     WHERE empty_origin_splc != loaded_destination_splc
   )
   WHERE CAST(mismatches AS REAL) / NULLIF(total_cycles, 0) > 0.10
@@ -48,7 +48,7 @@ WITH all_tests AS (
       cycle_start_timestamp,
       cycle_end_timestamp,
       LAG(cycle_end_timestamp) OVER (PARTITION BY car_number ORDER BY cycle_start_timestamp) AS prev_end
-    FROM {{ ref "int_cycle_classification" }}
+    FROM int_cycle_classification
   )
   WHERE prev_end IS NOT NULL 
     AND cycle_start_timestamp < prev_end
@@ -60,7 +60,7 @@ WITH all_tests AS (
     'valid_railcar' AS test_name,
     COUNT(*) AS violation_count,
     'All cycles must have valid railcar_id' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE railcar_id IS NULL
   
   UNION ALL
@@ -70,7 +70,7 @@ WITH all_tests AS (
     'valid_loaded_trip' AS test_name,
     COUNT(*) AS violation_count,
     'All cycles must have valid loaded trip segment' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE loaded_trip_segment_id IS NULL
   
   UNION ALL
@@ -80,7 +80,7 @@ WITH all_tests AS (
     'valid_empty_trip' AS test_name,
     COUNT(*) AS violation_count,
     'All cycles must have valid empty trip segment' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE empty_trip_segment_id IS NULL
   
   UNION ALL
@@ -90,7 +90,7 @@ WITH all_tests AS (
     'reasonable_cycle_duration' AS test_name,
     COUNT(*) AS violation_count,
     'Cycle duration should be between 2 hours and 30 days' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE cycle_duration_days < 0.08  -- Less than 2 hours
     OR cycle_duration_days > 30
   
@@ -106,7 +106,7 @@ WITH all_tests AS (
       car_number,
       cycle_number,
       LAG(cycle_number) OVER (PARTITION BY car_number ORDER BY cycle_start_timestamp) AS prev_cycle_number
-    FROM {{ ref "int_cycle_classification" }}
+    FROM int_cycle_classification
   )
   WHERE prev_cycle_number IS NOT NULL
     AND cycle_number != prev_cycle_number + 1
@@ -118,7 +118,7 @@ WITH all_tests AS (
     'valid_psr_period' AS test_name,
     COUNT(*) AS violation_count,
     'All cycles must have valid PSR period' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE psr_period IS NULL
   
   UNION ALL
@@ -128,7 +128,7 @@ WITH all_tests AS (
     'positive_distance' AS test_name,
     COUNT(*) AS violation_count,
     'Total distance should be positive when available' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE total_distance_miles IS NOT NULL
     AND total_distance_miles <= 0
   
@@ -139,7 +139,7 @@ WITH all_tests AS (
     'timestamps_ordered' AS test_name,
     COUNT(*) AS violation_count,
     'Cycle end must be after cycle start' AS description
-  FROM {{ ref "int_cycle_classification" }}
+  FROM int_cycle_classification
   WHERE cycle_end_timestamp <= cycle_start_timestamp
 )
 

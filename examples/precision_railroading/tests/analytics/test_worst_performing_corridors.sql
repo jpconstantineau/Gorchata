@@ -22,7 +22,7 @@ WITH tests AS (
     SELECT 
       fluidity_rank,
       LAG(fluidity_rank) OVER (ORDER BY fluidity_rank) AS prev_rank
-    FROM {{ ref "worst_performing_corridors" }}
+    FROM worst_performing_corridors
   ) ranked
   WHERE prev_rank IS NOT NULL 
     AND fluidity_rank != prev_rank + 1
@@ -35,7 +35,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Trip count must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "worst_performing_corridors" }}
+  FROM worst_performing_corridors
   WHERE trip_count <= 0
 
   UNION ALL
@@ -46,7 +46,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average velocity should be between 0 and 80 mph' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "worst_performing_corridors" }}
+  FROM worst_performing_corridors
   WHERE avg_velocity_mph < 0 OR avg_velocity_mph > 80
 
   UNION ALL
@@ -57,7 +57,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average dwell minutes should be >= 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "worst_performing_corridors" }}
+  FROM worst_performing_corridors
   WHERE avg_dwell_minutes < 0
 
 )

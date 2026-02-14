@@ -9,7 +9,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average scheduled duration must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_buffer_consumption" }}
+  FROM agg_buffer_consumption
   WHERE avg_scheduled_duration_minutes <= 0
 
   UNION ALL
@@ -20,7 +20,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Average actual duration must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_buffer_consumption" }}
+  FROM agg_buffer_consumption
   WHERE avg_actual_duration_minutes <= 0
 
   UNION ALL
@@ -31,7 +31,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Buffer consumption percentage should be within -50% to 200%' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_buffer_consumption" }}
+  FROM agg_buffer_consumption
   WHERE buffer_consumption_percentage < -50 OR buffer_consumption_percentage > 200
 
   UNION ALL
@@ -42,7 +42,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All corridor_id values must exist in dim_corridor or be NULL' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_buffer_consumption" }} bc
+  FROM agg_buffer_consumption bc
   LEFT JOIN dim_corridor dc ON bc.corridor_id = dc.corridor_id
   WHERE bc.corridor_id IS NOT NULL AND dc.corridor_id IS NULL
 

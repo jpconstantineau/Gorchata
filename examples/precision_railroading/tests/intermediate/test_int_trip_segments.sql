@@ -8,7 +8,7 @@ WITH all_tests AS (
     'positive_trip_duration' AS test_name,
     COUNT(*) AS violation_count,
     'All trips must have positive duration' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE trip_duration_minutes <= 0
   
   UNION ALL
@@ -26,7 +26,7 @@ WITH all_tests AS (
     'loaded_trips_valid' AS test_name,
     COUNT(*) AS violation_count,
     'Loaded trips must be correctly identified' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE is_loaded_trip IS NULL
   
   UNION ALL
@@ -42,7 +42,7 @@ WITH all_tests AS (
       trip_start_timestamp,
       trip_end_timestamp,
       LAG(trip_end_timestamp) OVER (PARTITION BY car_number ORDER BY trip_start_timestamp) AS prev_end
-    FROM {{ ref "int_trip_segments" }}
+    FROM int_trip_segments
   )
   WHERE prev_end IS NOT NULL 
     AND trip_start_timestamp < prev_end
@@ -54,7 +54,7 @@ WITH all_tests AS (
     'valid_railcar' AS test_name,
     COUNT(*) AS violation_count,
     'All trips must have valid railcar_id' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE railcar_id IS NULL
   
   UNION ALL
@@ -64,7 +64,7 @@ WITH all_tests AS (
     'valid_origin' AS test_name,
     COUNT(*) AS violation_count,
     'All trips must have valid origin location' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE origin_location_id IS NULL
     OR origin_splc_code IS NULL
   
@@ -75,7 +75,7 @@ WITH all_tests AS (
     'valid_destination' AS test_name,
     COUNT(*) AS violation_count,
     'All trips must have valid destination location' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE destination_location_id IS NULL
     OR destination_splc_code IS NULL
   
@@ -86,7 +86,7 @@ WITH all_tests AS (
     'valid_psr_period' AS test_name,
     COUNT(*) AS violation_count,
     'All trips must have valid PSR period' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE psr_period IS NULL
   
   UNION ALL
@@ -96,7 +96,7 @@ WITH all_tests AS (
     'timestamps_ordered' AS test_name,
     COUNT(*) AS violation_count,
     'Trip end must be after trip start' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE trip_end_timestamp <= trip_start_timestamp
   
   UNION ALL
@@ -106,7 +106,7 @@ WITH all_tests AS (
     'reasonable_duration' AS test_name,
     COUNT(*) AS violation_count,
     'Trip duration should be less than 30 days' AS description
-  FROM {{ ref "int_trip_segments" }}
+  FROM int_trip_segments
   WHERE trip_duration_minutes > (30 * 24 * 60)
   
   UNION ALL
@@ -121,7 +121,7 @@ WITH all_tests AS (
       car_number,
       is_loaded_trip,
       LAG(is_loaded_trip) OVER (PARTITION BY car_number ORDER BY trip_start_timestamp) AS prev_is_loaded
-    FROM {{ ref "int_trip_segments" }}
+    FROM int_trip_segments
   )
   WHERE prev_is_loaded IS NOT NULL
     AND is_loaded_trip = prev_is_loaded

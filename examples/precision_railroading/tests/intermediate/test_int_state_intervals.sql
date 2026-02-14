@@ -14,7 +14,7 @@ WITH all_tests AS (
       start_timestamp,
       end_timestamp,
       LAG(end_timestamp) OVER (PARTITION BY car_number ORDER BY start_timestamp) AS prev_end
-    FROM {{ ref "int_state_intervals" }}
+    FROM int_state_intervals
     WHERE end_timestamp IS NOT NULL
   )
   WHERE prev_end IS NOT NULL 
@@ -33,7 +33,7 @@ WITH all_tests AS (
       start_timestamp,
       end_timestamp,
       LAG(end_timestamp) OVER (PARTITION BY car_number ORDER BY start_timestamp) AS prev_end
-    FROM {{ ref "int_state_intervals" }}
+    FROM int_state_intervals
     WHERE end_timestamp IS NOT NULL
   )
   WHERE prev_end IS NOT NULL 
@@ -46,7 +46,7 @@ WITH all_tests AS (
     'positive_duration' AS test_name,
     COUNT(*) AS violation_count,
     'Complete intervals must have positive duration' AS description
-  FROM {{ ref "int_state_intervals" }}
+  FROM int_state_intervals
   WHERE end_timestamp IS NOT NULL
     AND duration_minutes <= 0
   
@@ -57,7 +57,7 @@ WITH all_tests AS (
     'valid_start_event' AS test_name,
     COUNT(*) AS violation_count,
     'All intervals must have valid start event' AS description
-  FROM {{ ref "int_state_intervals" }}
+  FROM int_state_intervals
   WHERE start_event_id IS NULL
     OR start_timestamp IS NULL
     OR start_event_type IS NULL
@@ -77,7 +77,7 @@ WITH all_tests AS (
       end_timestamp,
       end_event_type,
       ROW_NUMBER() OVER (PARTITION BY car_number ORDER BY start_timestamp DESC) AS rn
-    FROM {{ ref "int_state_intervals" }}
+    FROM int_state_intervals
   )
   WHERE rn > 1  -- Not the last interval for the car
     AND (end_event_id IS NULL OR end_timestamp IS NULL OR end_event_type IS NULL)
@@ -95,7 +95,7 @@ WITH all_tests AS (
       interval_id,
       end_timestamp,
       ROW_NUMBER() OVER (PARTITION BY car_number ORDER BY start_timestamp DESC) AS rn
-    FROM {{ ref "int_state_intervals" }}
+    FROM int_state_intervals
   )
   WHERE end_timestamp IS NULL 
     AND rn > 1
@@ -107,7 +107,7 @@ WITH all_tests AS (
     'valid_railcar_id' AS test_name,
     COUNT(*) AS violation_count,
     'All intervals must have valid railcar_id' AS description
-  FROM {{ ref "int_state_intervals" }}
+  FROM int_state_intervals
   WHERE railcar_id IS NULL
   
   UNION ALL
@@ -117,7 +117,7 @@ WITH all_tests AS (
     'duration_accuracy' AS test_name,
     COUNT(*) AS violation_count,
     'Duration must match timestamp difference (within 1 minute tolerance)' AS description
-  FROM {{ ref "int_state_intervals" }}
+  FROM int_state_intervals
   WHERE end_timestamp IS NOT NULL
     AND ABS(duration_minutes - CAST((julianday(end_timestamp) - julianday(start_timestamp)) * 24 * 60 AS INTEGER)) > 1
   
@@ -128,7 +128,7 @@ WITH all_tests AS (
     'valid_start_location' AS test_name,
     COUNT(*) AS violation_count,
     'All intervals must have valid start location' AS description
-  FROM {{ ref "int_state_intervals" }}
+  FROM int_state_intervals
   WHERE start_location_id IS NULL
     OR start_splc_code IS NULL
   
@@ -145,7 +145,7 @@ WITH all_tests AS (
       COUNT(*) AS interval_count,
       MAX(start_timestamp) AS last_start,
       MIN(start_timestamp) AS first_start
-    FROM {{ ref "int_state_intervals" }}
+    FROM int_state_intervals
     GROUP BY car_number
   )
   WHERE interval_count = 0

@@ -10,7 +10,7 @@ WITH all_tests AS (
     'Each event_id should appear exactly once' AS description
   FROM (
     SELECT event_id, COUNT(*) AS cnt
-    FROM {{ ref "stg_clm_events" }}
+    FROM stg_clm_events
     GROUP BY event_id
     HAVING COUNT(*) > 1
   )
@@ -22,7 +22,7 @@ WITH all_tests AS (
     'valid_event_types' AS test_name,
     COUNT(*) AS violation_count,
     'Event type must be DEPA, ARRI, PULL, or PLAC' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE event_type NOT IN ('DEPA', 'ARRI', 'PULL', 'PLAC')
   
   UNION ALL
@@ -32,7 +32,7 @@ WITH all_tests AS (
     'timestamps_not_null' AS test_name,
     COUNT(*) AS violation_count,
     'All events must have timestamps' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE timestamp IS NULL
   
   UNION ALL
@@ -42,7 +42,7 @@ WITH all_tests AS (
     'timestamp_minute_precision' AS test_name,
     COUNT(*) AS violation_count,
     'Timestamps should have minute precision only (no seconds or milliseconds)' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE CAST(strftime('%S', timestamp) AS INTEGER) != 0
   
   UNION ALL
@@ -52,7 +52,7 @@ WITH all_tests AS (
     'car_numbers_not_null' AS test_name,
     COUNT(*) AS violation_count,
     'All events must have car numbers' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE car_number IS NULL OR TRIM(car_number) = ''
   
   UNION ALL
@@ -62,7 +62,7 @@ WITH all_tests AS (
     'splc_codes_not_null' AS test_name,
     COUNT(*) AS violation_count,
     'All events must have SPLC codes' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE splc_code IS NULL OR TRIM(splc_code) = ''
   
   UNION ALL
@@ -72,7 +72,7 @@ WITH all_tests AS (
     'event_id_not_null' AS test_name,
     COUNT(*) AS violation_count,
     'All events must have event IDs' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE event_id IS NULL OR TRIM(event_id) = ''
   
   UNION ALL
@@ -82,7 +82,7 @@ WITH all_tests AS (
     'timestamp_valid_range' AS test_name,
     COUNT(*) AS violation_count,
     'Timestamps must be within 2016-2025 date range' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE timestamp < '2016-01-01 00:00:00' 
      OR timestamp >= '2026-01-01 00:00:00'
   
@@ -95,7 +95,7 @@ WITH all_tests AS (
     'Event key must be unique' AS description
   FROM (
     SELECT event_key, COUNT(*) AS cnt
-    FROM {{ ref "stg_clm_events" }}
+    FROM stg_clm_events
     GROUP BY event_key
     HAVING COUNT(*) > 1
   )
@@ -107,7 +107,7 @@ WITH all_tests AS (
     'load_timestamp_not_null' AS test_name,
     COUNT(*) AS violation_count,
     'All records must have load timestamp' AS description
-  FROM {{ ref "stg_clm_events" }}
+  FROM stg_clm_events
   WHERE load_timestamp IS NULL
 )
 

@@ -9,7 +9,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Loaded and empty trip counts must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_directional_asymmetry" }}
+  FROM agg_directional_asymmetry
   WHERE loaded_trip_count <= 0 OR empty_trip_count <= 0
 
   UNION ALL
@@ -20,7 +20,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Velocities must be >= 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_directional_asymmetry" }}
+  FROM agg_directional_asymmetry
   WHERE loaded_avg_velocity_mph < 0 OR empty_avg_velocity_mph < 0
 
   UNION ALL
@@ -31,7 +31,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Asymmetry ratio must be > 0' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_directional_asymmetry" }}
+  FROM agg_directional_asymmetry
   WHERE asymmetry_ratio <= 0
 
   UNION ALL
@@ -42,7 +42,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'All corridor_id values must exist in dim_corridor or be NULL' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_directional_asymmetry" }} da
+  FROM agg_directional_asymmetry da
   LEFT JOIN dim_corridor dc ON da.corridor_id = dc.corridor_id
   WHERE da.corridor_id IS NOT NULL AND dc.corridor_id IS NULL
 
@@ -54,7 +54,7 @@ WITH tests AS (
     COUNT(*) AS violation_count,
     'Priority direction must be loaded, empty, or balanced' AS description,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
-  FROM {{ ref "agg_directional_asymmetry" }}
+  FROM agg_directional_asymmetry
   WHERE priority_direction NOT IN ('loaded', 'empty', 'balanced')
 
 )

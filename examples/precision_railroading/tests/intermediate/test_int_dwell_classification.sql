@@ -8,7 +8,7 @@ WITH all_tests AS (
     'test_classification_valid_types' AS test_name,
     COUNT(*) AS violation_count,
     'Classification must be one of: terminal, crew_change, mainline_hold, maintenance, shadow_yard_hold, unclassified' AS description
-  FROM {{ ref "int_dwell_classification" }}
+  FROM int_dwell_classification
   WHERE dwell_classification NOT IN ('terminal', 'crew_change', 'mainline_hold', 'maintenance', 'shadow_yard_hold', 'unclassified')
   
   UNION ALL
@@ -18,7 +18,7 @@ WITH all_tests AS (
     'test_classification_terminal_logic' AS test_name,
     COUNT(*) AS violation_count,
     'Terminal classification: 480-2880 min at terminal locations' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.location_type = 'terminal'
     AND dc.dwell_duration_minutes BETWEEN 480 AND 2880
@@ -32,7 +32,7 @@ WITH all_tests AS (
     'test_classification_crew_change_logic' AS test_name,
     COUNT(*) AS violation_count,
     'Crew change classification: 60-240 min at crew base locations' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.location_type = 'crew_base'
     AND dc.dwell_duration_minutes BETWEEN 60 AND 240
@@ -46,7 +46,7 @@ WITH all_tests AS (
     'test_classification_mainline_logic' AS test_name,
     COUNT(*) AS violation_count,
     'Mainline hold classification: 30-360 min at siding locations' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.location_type = 'siding'
     AND dc.dwell_duration_minutes BETWEEN 30 AND 360
@@ -60,7 +60,7 @@ WITH all_tests AS (
     'test_classification_maintenance_logic' AS test_name,
     COUNT(*) AS violation_count,
     'Maintenance classification: >360 min at repair facility locations' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.location_type = 'repair_facility'
     AND dc.dwell_duration_minutes > 360
@@ -74,7 +74,7 @@ WITH all_tests AS (
     'test_classification_shadow_yard_logic' AS test_name,
     COUNT(*) AS violation_count,
     'Shadow yard: risk_score > 0.5 AND 120-1440 min should be flagged' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.shadow_yard_risk_score > 50
     AND dc.dwell_duration_minutes BETWEEN 120 AND 1440
@@ -86,8 +86,8 @@ WITH all_tests AS (
   SELECT
     'test_classification_shadow_yard_count' AS test_name,
     CASE 
-      WHEN (SELECT COUNT(DISTINCT location_id) FROM {{ ref "int_dwell_classification" }} WHERE shadow_yard_flag = 1) < 3
-        OR (SELECT COUNT(DISTINCT location_id) FROM {{ ref "int_dwell_classification" }} WHERE shadow_yard_flag = 1) > 15
+      WHEN (SELECT COUNT(DISTINCT location_id) FROM int_dwell_classification WHERE shadow_yard_flag = 1) < 3
+        OR (SELECT COUNT(DISTINCT location_id) FROM int_dwell_classification WHERE shadow_yard_flag = 1) > 15
       THEN 1
       ELSE 0
     END AS violation_count,
@@ -100,7 +100,7 @@ WITH all_tests AS (
     'test_classification_shadow_yard_flag_boolean' AS test_name,
     COUNT(*) AS violation_count,
     'shadow_yard_flag must be 0 or 1' AS description
-  FROM {{ ref "int_dwell_classification" }}
+  FROM int_dwell_classification
   WHERE shadow_yard_flag NOT IN (0, 1)
   
   UNION ALL
@@ -110,7 +110,7 @@ WITH all_tests AS (
     'test_classification_fk_locations' AS test_name,
     COUNT(*) AS violation_count,
     'All location_id must exist in dim_location' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   LEFT JOIN dim_location l ON dc.location_id = l.location_id
   WHERE l.location_id IS NULL
   
@@ -121,7 +121,7 @@ WITH all_tests AS (
     'test_classification_no_nulls' AS test_name,
     COUNT(*) AS violation_count,
     'dwell_classification must never be NULL' AS description
-  FROM {{ ref "int_dwell_classification" }}
+  FROM int_dwell_classification
   WHERE dwell_classification IS NULL
   
   UNION ALL
@@ -131,7 +131,7 @@ WITH all_tests AS (
     'test_classification_facility_type_valid' AS test_name,
     COUNT(*) AS violation_count,
     'facility_type must match dim_location.location_type' AS description
-  FROM {{ ref "int_dwell_classification" }} dc
+  FROM int_dwell_classification dc
   JOIN dim_location l ON dc.location_id = l.location_id
   WHERE dc.facility_type != l.location_type
   
@@ -141,8 +141,8 @@ WITH all_tests AS (
   SELECT
     'test_classification_row_count_matches' AS test_name,
     CASE 
-      WHEN (SELECT COUNT(*) FROM {{ ref "int_dwell_classification" }}) != 
-           (SELECT COUNT(*) FROM {{ ref "int_nodal_dwell" }})
+      WHEN (SELECT COUNT(*) FROM int_dwell_classification) != 
+           (SELECT COUNT(*) FROM int_nodal_dwell)
       THEN 1
       ELSE 0
     END AS violation_count,
