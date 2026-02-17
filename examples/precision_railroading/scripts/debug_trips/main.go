@@ -19,7 +19,7 @@ func main() {
 	}
 	defer db.Close()
 
-	fmt.Println("=== Trip Segments Analysis ===\n")
+	fmt.Println("=== Trip Segments Analysis ===")
 
 	// Check trip segments by car
 	rows, err := db.Query(`
@@ -57,7 +57,7 @@ func main() {
 	rows.Close()
 
 	// Count loaded vs empty by car
-	fmt.Println("\n=== Trips by Type per Car ===\n")
+	fmt.Println("\n=== Trips by Type per Car ===")
 	rows, err = db.Query(`
 		SELECT 
 			car_number,
@@ -81,7 +81,7 @@ func main() {
 	rows.Close()
 
 	// Check raw event types
-	fmt.Println("\n=== Event Type Distribution ===\n")
+	fmt.Println("\n=== Event Type Distribution ===")
 	rows, err = db.Query(`
 		SELECT 
 			event_type,

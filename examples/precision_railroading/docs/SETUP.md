@@ -113,7 +113,7 @@ cd examples\precision_railroading
 
 ```powershell
 # Generate 110M CLM events
-go run generate_clm_data.go
+go run scripts\generate_clm_data\main.go
 ```
 
 **What This Does**:
@@ -397,7 +397,7 @@ goroutine 1 [running]:
 
 **Solutions**:
 1. Increase system RAM (16GB minimum, 32GB recommended)
-2. Reduce batch size in `generate_clm_data.go`:
+2. Reduce batch size in `scripts/generate_clm_data/main.go`:
    ```go
    // Line ~50: Reduce writeBatchSize
    const writeBatchSize = 10000  // Change from 50000 to 10000
@@ -532,7 +532,7 @@ Remove-Item *.db-shm -Force -ErrorAction SilentlyContinue
 Remove-Item *.db-wal -Force -ErrorAction SilentlyContinue
 
 # 3. Regenerate
-go run generate_clm_data.go
+go run scripts\generate_clm_data\main.go
 gorchata run
 gorchata test
 ```
@@ -572,7 +572,7 @@ $ErrorActionPreference = "Stop"
 
 if ($FullBuild) {
     Write-Host "Generating seed data..." -ForegroundColor Cyan
-    go run generate_clm_data.go
+    go run scripts\generate_clm_data\main.go
 }
 
 Write-Host "Building warehouse..." -ForegroundColor Cyan

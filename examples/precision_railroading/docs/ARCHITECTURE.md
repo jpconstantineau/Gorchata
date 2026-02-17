@@ -265,9 +265,9 @@ The dimensional model follows Kimball methodology with a clear separation betwee
 
 **3. Go 1.25+**
 - **Usage**: 
-  - Data generation (generate_clm_data.go)
-  - Build tooling (build_phaseX.go)
-  - Test execution (test_phaseX.go)
+  - Data generation (scripts/generate_clm_data/)
+  - Build tooling (scripts/build_phaseX/)
+  - Test execution (scripts/test_phaseX/)
 - **Constraint**: No CGO, pure Go only
 
 **4. PowerShell**
@@ -551,12 +551,12 @@ for _, testFile := range testFiles {
 **PowerShell Wrapper** (`build_phase8.ps1`):
 ```powershell
 $env:CGO_ENABLED = "0"  # Force pure Go
-go build -o build_phase8_tool.exe build_phase8.go
+go build -o build_phase8_tool.exe scripts\build_phase8\main.go
 .\build_phase8_tool.exe
 Remove-Item build_phase8_tool.exe
 ```
 
-**Go Build Tool** (`build_phase8.go`):
+**Go Build Tool** (`scripts/build_phase8/main.go`):
 ```go
 models := []Model{
     {Name: "worst_performing_corridors", Path: "models/analytics/..."},

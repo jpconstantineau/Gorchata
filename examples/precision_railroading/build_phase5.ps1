@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 # Build the Go tool first
 Write-Host "Building Phase 5 build tool..." -ForegroundColor Cyan
 $env:CGO_ENABLED = "0"
-go build -o build_phase5_tool.exe build_phase5.go
+go build -o build_phase5_tool.exe scripts\build_phase5\main.go
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to build the Go tool" -ForegroundColor Red

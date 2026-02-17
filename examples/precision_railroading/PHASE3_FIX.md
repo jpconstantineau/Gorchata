@@ -41,7 +41,7 @@ Fixed Phase 3 to comply with project requirements by removing all Python code an
 .\test_phase3.ps1
 ```
 
-#### 3. verify_phase3.go (Go)
+#### 3. scripts/verify_phase3/ (Go)
 - Generates comprehensive data quality report
 - Uses pure Go SQLite driver (modernc.org/sqlite - NO CGO)
 - Checks row counts, dimension joins, event types, derived fields, temporal ordering
@@ -49,7 +49,7 @@ Fixed Phase 3 to comply with project requirements by removing all Python code an
 
 **Usage:**
 ```powershell
-go run verify_phase3.go
+go run scripts\verify_phase3\main.go
 ```
 
 **Dependencies:**
@@ -126,7 +126,7 @@ After applying this fix:
 .\test_phase3.ps1
 
 # Generate verification report (requires: go get modernc.org/sqlite)
-go run verify_phase3.go
+go run scripts\verify_phase3\main.go
 ```
 
 All functionality from Python scripts preserved in PowerShell/Go equivalents.

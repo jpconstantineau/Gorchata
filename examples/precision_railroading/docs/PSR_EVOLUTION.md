@@ -34,7 +34,7 @@ The PSR evolution framework models **gradual operational transformation** throug
 
 ### Data Generation Approach
 
-The synthetic data generator (`generate_clm_data.go`) models PSR adoption through:
+The synthetic data generator (`scripts/generate_clm_data/main.go`) models PSR adoption through:
 - **Velocity improvements**: Linear interpolation from 18 mph (pre-PSR) to 27 mph (mature)
 - **Dwell reductions**: Linear interpolation from 1,245 min (pre-PSR) to 723 min (mature)
 - **Shadow yard emergence**: Probability-based appearance in transition (low) and mature (high)
