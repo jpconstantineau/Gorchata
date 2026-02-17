@@ -294,6 +294,7 @@ func createAdapter(output *config.OutputConfig) (platform.DatabaseAdapter, error
 	}
 }
 
+<<<<<<< HEAD
 // loadModelsFromDirectory loads all SQL models from a directory recursively
 func loadModelsFromDirectory(dir string) ([]*executor.Model, error) {
 	var models []*executor.Model
@@ -322,6 +323,31 @@ func loadModelsFromDirectory(dir string) ([]*executor.Model, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory: %w", err)
+=======
+// loadModelsFromDirectory loads all SQL models from a directory
+func loadModelsFromDirectory(dir string) ([]*executor.Model, error) {
+	var models []*executor.Model
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+
+		modelID := strings.TrimSuffix(entry.Name(), ".sql")
+		modelPath := filepath.Join(dir, entry.Name())
+
+		model, err := executor.NewModel(modelID, modelPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model %s: %w", modelID, err)
+		}
+
+		models = append(models, model)
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 	}
 
 	return models, nil

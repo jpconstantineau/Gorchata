@@ -16,6 +16,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 
 **Phases: 8**
 
+<<<<<<< HEAD
 ### Phase 1: Schema Design and DDL Generation ✅ COMPLETE
 
 **Status**: ✅ **COMPLETE** - All tests passing, schema validated
@@ -45,6 +46,9 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 ---
 
 ### Phase 1: Schema Design and DDL Generation (ORIGINAL PLAN)
+=======
+### Phase 1: Schema Design and DDL Generation
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 - **Objective:** Define star schema for OSB manufacturing analytics including dimensions (equipment, production area, reason codes mapped to OEE model, shifts, products), staging tables for raw machine events, state duration logic, and fact tables for equipment performance, production output, and quality results
 - **Files/Functions to Modify/Create:**
   - `examples/osb_machine_event_oee/schema.yml`
@@ -78,6 +82,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
      - fact_quality_results (quality_id, batch_id, product_id, date_id, panels_produced, panels_tested, panels_passed, panels_downgraded, panels_scrapped, thickness_avg, thickness_stdev, density_avg, density_stdev)
   9. Run tests and verify DDL generation works correctly
 
+<<<<<<< HEAD
 ---
 
 ### Phase 2: Seed Configuration for Machine Event Generation ✅ COMPLETE
@@ -127,6 +132,9 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 ---
 
 ### Phase 2: Seed Configuration for Machine Event Generation (ORIGINAL PLAN)
+=======
+### Phase 2: Seed Configuration for Machine Event Generation
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 - **Objective:** Create seed configuration that generates realistic machine event streams for an OSB plant with 15+ pieces of equipment across 7 production areas, operating over 90 days with realistic state transitions, downtime patterns, buffer dynamics, quality holds, shift handovers, and maintenance windows
 - **Files/Functions to Modify/Create:**
   - `examples/osb_machine_event_oee/seed.yml`
@@ -231,6 +239,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
   6. Join to dim_date to assign date_id
   7. Run tests and verify state history table populated correctly
 
+<<<<<<< HEAD
 #### Phase 3 Completion Summary
 **Status:** ✅ COMPLETE
 
@@ -274,6 +283,8 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 - Compute Six Big Losses categorization
 - Create `fact_equipment_daily_oee.sql` and corresponding tests
 
+=======
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 ### Phase 4: OEE Calculation (Availability, Performance, Quality)
 - **Objective:** Implement OEE calculation logic that aggregates equipment state durations and production output to compute Availability Loss, Performance Loss, and Quality Loss, producing daily OEE scores per equipment and shift following standard OEE calculation methodology
 - **Files/Functions to Modify/Create:**
@@ -315,6 +326,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
   8. Aggregate by equipment, shift, and day
   9. Run tests and verify OEE calculations match expected results
 
+<<<<<<< HEAD
 #### Phase 4 Completion Summary
 **Status:** ✅ COMPLETE
 
@@ -373,6 +385,8 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 - Identify chronic failure patterns
 - Prioritize maintenance interventions based on downtime impact
 
+=======
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 ### Phase 5: Downtime Analysis and Reliability Metrics (MTBF, MTTR)
 - **Objective:** Create detailed downtime analysis tables that aggregate failure events by equipment, categorize by failure mode, calculate Mean Time Between Failures (MTBF), Mean Time To Repair (MTTR), failure frequency, and identify chronic reliability issues for maintenance prioritization
 - **Files/Functions to Modify/Create:**
@@ -421,6 +435,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
   7. Calculate reliability trends over time (rolling 30-day MTBF/MTTR)
   8. Run tests and verify downtime analysis accuracy
 
+<<<<<<< HEAD
 #### Phase 5 Completion Summary
 **Status:** ✅ COMPLETE
 
@@ -491,6 +506,8 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 - Perform constraint analysis to identify system bottleneck
 - Quantify economic impact of capacity improvements at constraint
 
+=======
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 ### Phase 6: Buffer and Constraint Analysis
 - **Objective:** Implement logic to track buffer inventory levels over time, identify starved and blocked conditions, analyze downtime propagation through production stages, and perform constraint analysis to identify the current system bottleneck and quantify economic impact of capacity improvements
 - **Files/Functions to Modify/Create:**
@@ -542,6 +559,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
      - Prioritize investments: $/ton capacity increase for each bottleneck option
   7. Run tests and verify constraint identification and buffer analysis
 
+<<<<<<< HEAD
 #### Phase 6 Completion Summary
 **Status:** ✅ COMPLETE
 
@@ -635,6 +653,8 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
 - Build maintenance strategy recommendations (PM vs breakdown analysis)
 - Add improvement ROI calculations
 
+=======
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 ### Phase 7: Advanced Analytics and Improvement Opportunities
 - **Objective:** Create advanced analytical views that identify operational improvement opportunities including "bad actor" equipment prioritization for reliability improvements, shift and crew performance comparisons, quality issue root cause analysis, and maintenance strategy optimization recommendations
 - **Files/Functions to Modify/Create:**
@@ -701,6 +721,7 @@ Building a comprehensive Oriented Strand Board (OSB) manufacturing analytics exa
      - Quality defect rate trend
   8. Run tests and verify analytics provide actionable insights
 
+<<<<<<< HEAD
 ---
 
 ## Phase 7 Completion Summary (Advanced Analytics and Improvement Opportunities)
@@ -1070,6 +1091,9 @@ OSB Machine Event to OEE Analytics example is now **production-ready** for:
 ---
 
 ### Phase 8: Documentation, Example Queries, and Visualization Guidance (ORIGINAL PLAN)
+=======
+### Phase 8: Documentation, Example Queries, and Visualization Guidance
+>>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 - **Objective:** Create comprehensive documentation including README with domain overview, data dictionary, example SQL queries for common analytics scenarios, visualization guidance for dashboards (OEE trending, Pareto charts, buffer utilization), and troubleshooting guide for common data quality issues
 - **Files/Functions to Modify/Create:**
   - `examples/osb_machine_event_oee/README.md`

@@ -9,6 +9,7 @@ bin/
 .gorchata/
 
 examples/precision_railroading/seeds/*.csv
+*.csv
 
 # Go workspace
 # Note: go.sum MUST be committed for reproducible builds
