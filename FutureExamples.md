@@ -8,7 +8,6 @@
 - [x] Manufacturing Data for Bottleneck Analysis
 - [x] [Unit Train Analytics Data Warehouse](examples/unit_train_analytics/README.md)
 - [x] [Haul Truck Analytics Data Warehouse](examples/haul_truck_analytics/README.md) - *Complete ✅*
-<<<<<<< HEAD
 - [x] [Machine Event Data to OEE (OSB Manufacturing)](examples/osb_machine_event_oee/README.md) - *Complete ✅*
 - [x] [Oil Refinery Data Transformation and Warehousing](examples/oil_refinery_warehousing/README.md) - *Complete ✅*
 - [x] [Precision Scheduled Railroading (PSR) Analytics](examples/precision_railroading/README.md) - *Complete ✅ (223+ tests, 110M events, Phase 1-10)*
@@ -17,18 +16,6 @@
 ### Future Examples 🔮
 - [] Statistical Process Control (SPC) in manufacturing
 - [] Garbage Truck Waste Operations
-=======
-
-### In Progress 🚧
-
-*No examples currently in progress*
-
-### Future Examples 🔮
-
-- [] [Machine Event Data to OEE (OSB Manufacturing)](plans/osb-machine-event-oee-plan.md) - *Planning Complete ✅ | Implementation: Not Started*
-- [] Oil Refinery Data Transformation and Warehousing
-- [] API 584 IOW Data Warehouse
->>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
 
 ## Example Design Prompts
 
@@ -64,7 +51,6 @@ Create a data engineering project centered on constructing a mass balance and pe
 
 
 ### API 584 IOW Data Warehouse
-<<<<<<< HEAD
 Design a data engineering project to implement a Risk-Based Integrity Operating Window (IOW) monitoring system compliant with API 584 for a refinery’s static equipment. The scope must include the ingestion and harmonization of high-frequency sensor telemetry (Pressure, Temperature, pH, and flow) with a centralized Asset Registry containing hierarchical IOW limits (Critical, Standard, and Informational). Transformations should identify excursions through time-series analysis, calculating core metrics for frequency, duration, and severity—specifically utilizing "Area Under the Curve" logic to quantify cumulative damage. The resulting data marts must prioritize "Bad Actor" assets, calculate a rolling "Integrity Health Index," and generate automated alerts for inspection schedule adjustments where cumulative process stress indicates accelerated metallurgical degradation or encroachment on design life limits.
 
 ### Statistical Process Control (SPC) in manufacturing 
@@ -78,6 +64,3 @@ Design a data engineering pipeline for a city of 500,000 residents that transfor
 Architect an exmple project designed to ingest 10 years of raw CLM (Car Location Message) event data into a refined analytics layer for Precision Scheduled Railroading (PSR) performance monitoring. The project must implement a multi-layered transformation pipeline that converts discrete event logs—such as DEPA, ARRI, PULL, and PLAC—into a "State-Interval Model," partitioning data into discrete loaded trips and empty return cycles. Staging models should handle SPLC (Standard Point Location Code) enrichment with GIS coordinates and infrastructure metadata, while intermediate models must calculate point-to-point velocity vectors and "Nodal Dwell" durations. The core objective is to identify and classify every stop by its operational signature—differentiating between terminal operations, crew changes, and intermediate mainline stays—to provide a granular view of the rail network’s geographic "heartbeat" and asset utilization.
 
 The analytics layer must execute temporal variance analysis to diagnose dwell causes, using standard deviation in arrival and dwell windows to distinguish between scheduled meet/pass events, systemic congestion, and "Holding Pattern" signatures. Develop logic to identify PSR-critical infrastructure, specifically flagging "Shadow Yards" where trains are held at distant sidings to artificially optimize terminal dwell KPIs. Final reporting models should produce a "Network Fluidity Index," "Slot Adherence Score," and "Buffer Consumption" metrics to facilitate data-driven discussions between the customer and the railroad regarding service reliability. Include directional asymmetry analysis to pinpoint where railroad operational choices prioritize line-haul velocity over equipment turnaround, enabling precise root-cause identification for performance regressions and providing the necessary evidence for commercial negotiations.  The metrics should be able to reported by various time periods in order to identify seasonal variations, and shifts in PSR optimization strategies.
-=======
-Design a data engineering project to implement a Risk-Based Integrity Operating Window (IOW) monitoring system compliant with API 584 for a refinery’s static equipment. The scope must include the ingestion and harmonization of high-frequency sensor telemetry (Pressure, Temperature, pH, and flow) with a centralized Asset Registry containing hierarchical IOW limits (Critical, Standard, and Informational). Transformations should identify excursions through time-series analysis, calculating core metrics for frequency, duration, and severity—specifically utilizing "Area Under the Curve" logic to quantify cumulative damage. The resulting data marts must prioritize "Bad Actor" assets, calculate a rolling "Integrity Health Index," and generate automated alerts for inspection schedule adjustments where cumulative process stress indicates accelerated metallurgical degradation or encroachment on design life limits.
->>>>>>> d4ea892c2fc9bc45ac7e84e3d0653799d3365960
